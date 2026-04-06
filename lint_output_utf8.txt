@@ -1,0 +1,24 @@
+﻿
+> gymflow-nextjs@2.0.0 lint
+> next lint
+
+node.exe : Invalid project 
+directory provided, no 
+such directory: C:\Users\pr
+ash\GymFlow-NextJS\lint
+At line:1 char:1
++ & "C:\Program 
+Files\nodejs/node.exe" "C:\
+Users\prash\AppData\Roaming
+\ ...
++ ~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~
+    + CategoryInfo         
+     : NotSpecified: (Inv  
+  alid project...low-Nex   
+ tJS\lint:String) [], R    
+emoteException
+    + FullyQualifiedErrorI 
+   d : NativeCommandError
+ 

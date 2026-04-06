@@ -1,0 +1,5 @@
+﻿app/members/page.tsx(95,7): error TS2322: Type '"Basic" | "Premium" | "Elite" | "Trial"' is not assignable to type '"Basic"'.
+  Type '"Premium"' is not assignable to type '"Basic"'.
+app/members/page.tsx(96,7): error TS2322: Type '"active" | "expired" | "pending" | "cancelled"' is not assignable to type '"active"'.
+  Type '"expired"' is not assignable to type '"active"'.
+lib/store.ts(438,51): error TS7006: Parameter 'n' implicitly has an 'any' type.

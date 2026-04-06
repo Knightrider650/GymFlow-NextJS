@@ -1,0 +1,587 @@
+require('dotenv').config();
+const express = require('express');
+const cors = require('cors');
+const morgan = require('morgan');
+const helmet = require('helmet');
+const compression = require('compression');
+const http = require('http');
+const { Server } = require('socket.io');
+const { v4: uuidv4 } = require('uuid');
+
+// Use PostgreSQL if DATABASE_URL is provided, else fallback to JSON file
+const db = process.env.DATABASE_URL ? require('./db-postgres') : require('./db');
+const { authMiddleware, generateToken, generateRefreshToken, authorizeRoles } = require('./middleware/auth');
+
+const app = express();
+const httpServer = http.createServer(app);
+const io = new Server(httpServer, {
+  cors: {
+    origin: process.env.CORS_ORIGIN ? process.env.CORS_ORIGIN.split(',') : ['http://localhost:3000'],
+    methods: ['GET', 'POST']
+  }
+});
+
+const PORT = process.env.PORT || 5000;
+
+// Standard Middlewares
+const rateLimit = require('express-rate-limit');
+app.use(helmet({
+  contentSecurityPolicy: {
+    directives: {
+      defaultSrc: ["'self'"],
+      scriptSrc: ["'self'", "'unsafe-inline'", "'unsafe-eval'"],
+      styleSrc: ["'self'", "'unsafe-inline'"],
+      imgSrc: ["'self'", "data:", "https:"],
+      connectSrc: ["'self'", "http://localhost:*", "ws://localhost:*"],
+    },
+  },
+}));
+app.use(cors());
+app.use(compression());
+app.use(morgan('dev'));
+app.use(express.json());
+
+// Main App Rate Limiter
+const apiLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, 
+  max: 1000,
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+app.use('/api/', apiLimiter);
+
+// Socket.io Setup
+io.on('connection', (socket) => {
+  console.log('Client connected:', socket.id);
+  socket.on('disconnect', () => console.log('Client disconnected'));
+});
+
+const sseClients = new Set();
+const broadcast = (event, data) => {
+  io.emit(event, data);
+  const message = `event: ${event}\ndata: ${JSON.stringify(data)}\n\n`;
+  for (const client of sseClients) {
+    client.write(message);
+  }
+};
+
+// ============================================================================
+// AUTHENTICATION ROUTES
+// ============================================================================
+
+const loginAttempts = {};
+
+const loginLimiter = rateLimit({
+  windowMs: 30 * 60 * 1000,
+  max: 5,
+  skipSuccessfulRequests: true,
+  message: { error: 'Account temporarily locked after 5 failed attempts. Please try again in 30 minutes.' }
+});
+
+app.post('/api/auth/register', async (req, res) => {
+  try {
+    const { email, password, name, role } = req.body;
+    if (!email || !password || !name) return res.status(400).json({ error: 'Missing required fields' });
+    const existingUser = await db.getUserByEmail(email);
+    if (existingUser) return res.status(400).json({ error: 'Email already registered' });
+
+    const user = await db.createUser({ id: uuidv4(), email, password, name, role: role || 'staff', gymId: 'gym-001' });
+    const token = generateToken(user);
+    const refreshToken = generateRefreshToken(user);
+
+    res.json({ success: true, data: { accessToken: token, refreshToken, user: { id: user.id, email: user.email, name: user.name, role: user.role } } });
+  } catch(err) {
+    res.status(500).json({ error: 'Registration failed' });
+  }
+});
+
+app.post('/api/auth/login', loginLimiter, async (req, res) => {
+  try {
+    const { email, password } = req.body;
+    const attempt = loginAttempts[email];
+    
+    if (attempt && attempt.count >= 5 && Date.now() < attempt.lockUntil) {
+      return res.status(429).json({ error: 'Account temporarily locked. Please try again later.' });
+    }
+
+    const user = await db.getUserByEmail(email);
+    if (!user) {
+      return res.status(401).json({ error: 'Invalid email or password' });
+    }
+
+    const bcrypt = require('bcrypt');
+    const isValid = await bcrypt.compare(password, user.password_hash);
+    if (!isValid) {
+      if (!loginAttempts[email]) loginAttempts[email] = { count: 0, lockUntil: 0 };
+      loginAttempts[email].count += 1;
+      if (loginAttempts[email].count >= 5) {
+        loginAttempts[email].lockUntil = Date.now() + 30 * 60 * 1000;
+      }
+      return res.status(401).json({ error: 'Invalid email or password' });
+    }
+
+    delete loginAttempts[email];
+
+    const token = generateToken(user);
+    const refreshToken = generateRefreshToken(user);
+
+    res.json({
+      success: true,
+      data: {
+        accessToken: token,
+        refreshToken,
+        user: { id: user.id, email: user.email, name: user.name, role: user.role, gymId: user.gymId }
+      }
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Authentication failed' });
+  }
+});
+
+app.get('/api/auth/me', authMiddleware, async (req, res) => {
+  res.json({ success: true, data: req.user });
+});
+
+app.post('/api/auth/refresh', async (req, res) => {
+  try {
+    const { refreshToken } = req.body;
+    if (!refreshToken) return res.status(400).json({ error: 'Refresh token required' });
+
+    const { verifyRefreshToken, generateToken } = require('./middleware/auth');
+    const decoded = verifyRefreshToken(refreshToken);
+
+    if (!decoded) return res.status(401).json({ error: 'Invalid or expired refresh token' });
+
+    const user = await db.getUserById(decoded.id);
+    if (!user) return res.status(401).json({ error: 'User not found' });
+
+    const accessToken = generateToken(user);
+    res.json({ success: true, data: { accessToken, user: { id: user.id, email: user.email, name: user.name, role: user.role } } });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Token refresh failed' });
+  }
+});
+
+app.post('/api/auth/logout', authMiddleware, async (req, res) => {
+  res.json({ success: true, message: 'Logged out successfully' });
+});
+
+// ============================================================================
+// MEMBERS ROUTES 
+// ============================================================================
+
+app.get('/api/members', authMiddleware, async (req, res) => {
+  let members = await db.getMembers(req.user.id);
+  members = members.map(m => ({
+    ...m,
+    membershipType: m.membership_type || m.membershipType,
+    joinDate: m.join_date || m.joinDate,
+    expiryDate: m.expiry_date || m.expiryDate
+  }));
+  res.json({ success: true, data: members });
+});
+
+app.post('/api/members', authMiddleware, async (req, res) => {
+  const member = await db.addMember({ ...req.body, id: uuidv4() }, req.user.id);
+  broadcast('members:update', member);
+  res.status(201).json({ success: true, data: member });
+});
+
+app.post('/api/members/bulk', authMiddleware, async (req, res) => {
+  try {
+    if (!Array.isArray(req.body.members)) {
+      return res.status(400).json({ success: false, error: 'Expected "members" array in payload' });
+    }
+    
+    // Assign UUIDs to each imported member
+    const preparedMembers = req.body.members.map(m => ({ ...m, id: uuidv4() }));
+    
+    const inserted = await db.bulkAddMembers(preparedMembers, req.user.id);
+    
+    // Broadcast bulk update so all connected clients fetch fresh state
+    broadcast('members:update_bulk', { count: inserted.length });
+    res.status(201).json({ success: true, data: inserted });
+  } catch (err) {
+    console.error('Bulk Import Error:', err);
+    res.status(500).json({ success: false, error: 'Bulk import failed on database level' });
+  }
+});
+
+app.delete('/api/members/:id', authMiddleware, async (req, res) => {
+  const success = await db.deleteMember(req.params.id, req.user.id);
+  if (success) broadcast('members:delete', { id: req.params.id });
+  res.json({ success });
+});
+
+app.put('/api/members/:id', authMiddleware, async (req, res) => {
+  const member = await db.updateMember(req.params.id, req.body, req.user.id);
+  if (member) broadcast('members:update', member);
+  res.json({ success: !!member, data: member });
+});
+
+
+// ============================================================================
+// ATTENDANCE ROUTES
+// ============================================================================
+
+app.get('/api/attendance', authMiddleware, async (req, res) => {
+  const data = await db.getAttendance(req.query, req.user.id);
+  res.json({ success: true, data });
+});
+
+app.post('/api/attendance/checkin', authMiddleware, async (req, res) => {
+  const record = await db.checkIn(req.body.memberId, req.body.notes, req.user.id);
+  broadcast('attendance:update', record);
+  res.status(201).json({ success: true, data: record });
+});
+
+app.post('/api/attendance/:id/checkout', authMiddleware, async (req, res) => {
+  const record = await db.checkOut(req.params.id, req.user.id);
+  if (record) broadcast('attendance:update', record);
+  res.json({ success: !!record, data: record });
+});
+
+// ============================================================================
+// STAFF ROUTES
+// ============================================================================
+
+app.get('/api/staff', authMiddleware, async (req, res) => {
+  const data = await db.getStaff(req.user.id);
+  res.json({ success: true, data });
+});
+
+app.post('/api/staff', authMiddleware, async (req, res) => {
+  const member = await db.addStaff({ ...req.body, id: uuidv4() }, req.user.id);
+  broadcast('staff:update', member);
+  res.status(201).json({ success: true, data: member });
+});
+
+app.put('/api/staff/:id', authMiddleware, async (req, res) => {
+  const member = await db.updateStaff(req.params.id, req.body, req.user.id);
+  if (member) broadcast('staff:update', member);
+  res.json({ success: !!member, data: member });
+});
+
+app.delete('/api/staff/:id', authMiddleware, async (req, res) => {
+  const success = await db.deleteStaff(req.params.id, req.user.id);
+  if (success) broadcast('staff:delete', { id: req.params.id });
+  res.json({ success });
+});
+
+// ============================================================================
+// INVENTORY ROUTES
+// ============================================================================
+
+app.get('/api/inventory', authMiddleware, async (req, res) => {
+  let data = await db.getInventory(req.user.id);
+  data = data.map(i => ({
+    ...i,
+    minThreshold: i.min_threshold ?? i.minThreshold,
+    costPerUnit: i.cost_per_unit ?? i.costPerUnit,
+    lastUpdated: i.last_updated ?? i.lastUpdated
+  }));
+  res.json({ success: true, data });
+});
+
+app.post('/api/inventory', authMiddleware, async (req, res) => {
+  const item = await db.addInventoryItem({ ...req.body, id: uuidv4() }, req.user.id);
+  broadcast('inventory:update', item);
+  res.status(201).json({ success: true, data: item });
+});
+
+app.put('/api/inventory/:id', authMiddleware, async (req, res) => {
+  const item = await db.updateInventoryItem(req.params.id, req.body, req.user.id);
+  if (item) broadcast('inventory:update', item);
+  res.json({ success: !!item, data: item });
+});
+
+app.delete('/api/inventory/:id', authMiddleware, async (req, res) => {
+  const success = await db.deleteInventoryItem(req.params.id, req.user.id);
+  if (success) broadcast('inventory:delete', { id: req.params.id });
+  res.json({ success });
+});
+
+// ============================================================================
+// BILLING ROUTES
+// ============================================================================
+
+app.get('/api/billing', authMiddleware, async (req, res) => {
+  const data = await db.getInvoices(req.user.id);
+  res.json({ success: true, data });
+});
+
+app.post('/api/billing', authMiddleware, async (req, res) => {
+  const invoice = await db.addInvoice({ ...req.body, id: uuidv4(), status: 'pending' }, req.user.id);
+  broadcast('billing:update', invoice);
+  res.status(201).json({ success: true, data: invoice });
+});
+
+app.post('/api/billing/:id/pay', authMiddleware, async (req, res) => {
+  const record = await db.payInvoice(req.params.id, req.body, req.user.id);
+  if (record) broadcast('billing:update', record);
+  res.json({ success: !!record, data: record });
+});
+
+app.put('/api/billing/:id', authMiddleware, async (req, res) => {
+  const invoice = await db.updateInvoice(req.params.id, req.body, req.user.id);
+  if (invoice) broadcast('billing:update', invoice);
+  res.json({ success: !!invoice, data: invoice });
+});
+
+app.delete('/api/billing/:id', authMiddleware, async (req, res) => {
+  const success = await db.deleteInvoice(req.params.id, req.user.id);
+  if (success) broadcast('billing:delete', { id: req.params.id });
+  res.json({ success });
+});
+
+// ============================================================================
+// CLASSES ROUTES
+// ============================================================================
+
+app.get('/api/classes', authMiddleware, async (req, res) => {
+  const data = await db.getClasses(req.user.id);
+  res.json({ success: true, data });
+});
+
+app.post('/api/classes', authMiddleware, async (req, res) => {
+  const cls = await db.addClass({ ...req.body, id: uuidv4(), currentEnrollment: 0 }, req.user.id);
+  broadcast('classes:update', cls);
+  res.status(201).json({ success: true, data: cls });
+});
+
+app.put('/api/classes/:id', authMiddleware, async (req, res) => {
+  const cls = await db.updateClass(req.params.id, req.body, req.user.id);
+  if (cls) broadcast('classes:update', cls);
+  res.json({ success: !!cls, data: cls });
+});
+
+app.delete('/api/classes/:id', authMiddleware, async (req, res) => {
+  const success = await db.deleteClass(req.params.id, req.user.id);
+  if (success) broadcast('classes:delete', { id: req.params.id });
+  res.json({ success });
+});
+
+// ============================================================================
+// SETTINGS & STATS
+// ============================================================================
+
+app.get('/api/settings', authMiddleware, async (req, res) => {
+  const data = await db.getSettings(req.user.id);
+  res.json({ success: true, data });
+});
+
+app.put('/api/settings', authMiddleware, async (req, res) => {
+  const data = await db.updateSettings(req.body, req.user.id);
+  res.json({ success: true, data });
+});
+
+app.get('/api/dashboard-stats', authMiddleware, async (req, res) => {
+  const data = await db.getDashboardStats(req.user.id);
+  res.json({ success: true, data });
+});
+
+// ============================================================================
+// NOTIFICATIONS ROUTES
+// ============================================================================
+
+app.get('/api/notifications', authMiddleware, async (req, res) => {
+  const data = await db.getNotifications(req.user.id);
+  res.json({ success: true, data });
+});
+
+app.put('/api/notifications/:id', authMiddleware, async (req, res) => {
+  const data = await db.markNotificationRead(req.params.id, req.user.id);
+  res.json({ success: !!data, data });
+});
+
+// ============================================================================
+// LEADS (CRM) ROUTES
+// ============================================================================
+
+app.get('/api/leads', authMiddleware, async (req, res) => {
+  const data = await db.getLeads(req.user.id);
+  res.json({ success: true, data });
+});
+
+app.post('/api/leads', authMiddleware, async (req, res) => {
+  const lead = await db.addLead({ ...req.body, id: uuidv4() }, req.user.id);
+  broadcast('leads:update', lead);
+  res.status(201).json({ success: true, data: lead });
+});
+
+app.put('/api/leads/:id', authMiddleware, async (req, res) => {
+  const lead = await db.updateLead(req.params.id, req.body, req.user.id);
+  if (lead) broadcast('leads:update', lead);
+  res.json({ success: !!lead, data: lead });
+});
+
+app.delete('/api/leads/:id', authMiddleware, async (req, res) => {
+  const success = await db.deleteLead(req.params.id, req.user.id);
+  if (success) broadcast('leads:delete', { id: req.params.id });
+  res.json({ success });
+});
+
+app.post('/api/leads/:id/convert', authMiddleware, async (req, res) => {
+  const member = await db.convertLead(req.params.id, { ...req.body, id: uuidv4() }, req.user.id);
+  if (member) {
+    broadcast('leads:delete', { id: req.params.id });
+    broadcast('members:update', member);
+  }
+  res.json({ success: !!member, data: member });
+});
+
+// ============================================================================
+// MEMBERSHIP PLANS ROUTES
+// ============================================================================
+
+app.get('/api/plans', authMiddleware, async (req, res) => {
+  const data = await db.getPlans(req.user.id);
+  res.json({ success: true, data });
+});
+
+app.post('/api/plans', authMiddleware, async (req, res) => {
+  const plan = await db.addPlan({ ...req.body, id: uuidv4() }, req.user.id);
+  broadcast('plans:update', plan);
+  res.status(201).json({ success: true, data: plan });
+});
+
+app.put('/api/plans/:id', authMiddleware, async (req, res) => {
+  const plan = await db.updatePlan(req.params.id, req.body, req.user.id);
+  if (plan) broadcast('plans:update', plan);
+  res.json({ success: !!plan, data: plan });
+});
+
+app.delete('/api/plans/:id', authMiddleware, async (req, res) => {
+  const success = await db.deletePlan(req.params.id, req.user.id);
+  if (success) broadcast('plans:delete', { id: req.params.id });
+  res.json({ success });
+});
+
+// ============================================================================
+// SETTINGS API
+// ============================================================================
+
+app.get('/api/settings', authMiddleware, async (req, res) => {
+  try {
+    const data = await db.getSettings ? await db.getSettings(req.user.id) : { gymName: 'GymFlow' };
+    res.json({ success: true, data });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to fetch settings' });
+  }
+});
+
+app.put('/api/settings', authMiddleware, async (req, res) => {
+  try {
+    const data = await db.updateSettings ? await db.updateSettings(req.body, req.user.id) : req.body;
+    res.json({ success: true, data });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to update settings' });
+  }
+});
+
+app.post('/api/settings', authMiddleware, async (req, res) => {
+  try {
+    const data = await db.updateSettings ? await db.updateSettings(req.body, req.user.id) : req.body;
+    res.json({ success: true, data });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to update settings' });
+  }
+});
+
+// ============================================================================
+// REPORTS API
+// ============================================================================
+
+app.get('/api/dashboard-stats', authMiddleware, async (req, res) => {
+  try {
+    const data = await db.getDashboardStats(req.user.id);
+    res.json({ success: true, data });
+  } catch(e) {
+    res.status(500).json({ error: 'Failed' });
+  }
+});
+
+app.get('/api/reports/:type', authMiddleware, async (req, res) => {
+  try {
+    const { type } = req.params;
+    let data;
+    
+    switch(type) {
+      case 'member-summary':
+      case 'expiring-members':
+        data = await db.getMembers(req.user.id);
+        break;
+      case 'revenue':
+        data = await db.getInvoices(req.user.id);
+        break;
+      case 'attendance':
+        data = await db.getAttendance({}, req.user.id);
+        break;
+      case 'class-utilization':
+        data = await db.getClasses(req.user.id);
+        break;
+      case 'equipment-status':
+        data = await db.getInventory(req.user.id);
+        break;
+      case 'leads-conversion':
+        data = await db.getLeads(req.user.id);
+        break;
+      case 'staff-performance':
+        data = await db.getStaff(req.user.id);
+        break;
+      default:
+        data = await db.getDashboardStats(req.user.id);
+    }
+    
+    res.json({ success: true, data });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Report generation failed' });
+  }
+});
+
+// ============================================================================
+// HEALTH & SYNC ROUTES
+// ============================================================================
+
+app.get('/health', (req, res) => res.status(200).send('OK'));
+
+app.get('/api/health', (req, res) => res.json({ status: 'healthy', timestamp: new Date() }));
+
+app.get('/api/health/detailed', async (req, res) => {
+  const start = Date.now();
+  const dbReady = await db.isReady();
+  const latency = Date.now() - start;
+  res.json({
+    status: dbReady ? 'healthy' : 'degraded',
+    database: { connected: dbReady, latencyMs: latency },
+    memory: process.memoryUsage(),
+    uptime: process.uptime()
+  });
+});
+
+app.get('/metrics', (req, res) => {
+  res.json({
+    uptime: process.uptime(),
+    memory: process.memoryUsage(),
+    cpuUsage: process.cpuUsage()
+  });
+});
+
+app.get('/api/sync/stream', (req, res) => {
+  res.setHeader('Content-Type', 'text/event-stream');
+  res.setHeader('Cache-Control', 'no-cache');
+  res.setHeader('Connection', 'keep-alive');
+  res.flushHeaders(); 
+  sseClients.add(res);
+  req.on('close', () => sseClients.delete(res));
+});
+
+// Start Server
+db.init().then(() => {
+  httpServer.listen(PORT, () => {
+    console.log(`🚀 Production server running at http://localhost:${PORT}`);
+  });
+});
