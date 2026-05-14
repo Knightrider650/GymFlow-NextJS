@@ -78,7 +78,7 @@ const loginLimiter = rateLimit({
   message: { error: 'Account temporarily locked after 5 failed attempts. Please try again in 30 minutes.' }
 });
 
-app.post('/api/auth/register', async (req, res) => {
+app.post('/api/auth/register', authMiddleware, authorizeRoles(['admin']), async (req, res) => {
   try {
     const { email, password, name, role } = req.body;
     if (!email || !password || !name) return res.status(400).json({ error: 'Missing required fields' });
@@ -209,7 +209,7 @@ app.post('/api/members/bulk', authMiddleware, async (req, res) => {
   }
 });
 
-app.delete('/api/members/:id', authMiddleware, async (req, res) => {
+app.delete('/api/members/:id', authMiddleware, authorizeRoles(['admin']), async (req, res) => {
   const success = await db.deleteMember(req.params.id, req.user.id);
   if (success) broadcast('members:delete', { id: req.params.id });
   res.json({ success });
@@ -264,7 +264,7 @@ app.put('/api/staff/:id', authMiddleware, async (req, res) => {
   res.json({ success: !!member, data: member });
 });
 
-app.delete('/api/staff/:id', authMiddleware, async (req, res) => {
+app.delete('/api/staff/:id', authMiddleware, authorizeRoles(['admin']), async (req, res) => {
   const success = await db.deleteStaff(req.params.id, req.user.id);
   if (success) broadcast('staff:delete', { id: req.params.id });
   res.json({ success });
@@ -297,7 +297,7 @@ app.put('/api/inventory/:id', authMiddleware, async (req, res) => {
   res.json({ success: !!item, data: item });
 });
 
-app.delete('/api/inventory/:id', authMiddleware, async (req, res) => {
+app.delete('/api/inventory/:id', authMiddleware, authorizeRoles(['admin']), async (req, res) => {
   const success = await db.deleteInventoryItem(req.params.id, req.user.id);
   if (success) broadcast('inventory:delete', { id: req.params.id });
   res.json({ success });
@@ -330,7 +330,7 @@ app.put('/api/billing/:id', authMiddleware, async (req, res) => {
   res.json({ success: !!invoice, data: invoice });
 });
 
-app.delete('/api/billing/:id', authMiddleware, async (req, res) => {
+app.delete('/api/billing/:id', authMiddleware, authorizeRoles(['admin']), async (req, res) => {
   const success = await db.deleteInvoice(req.params.id, req.user.id);
   if (success) broadcast('billing:delete', { id: req.params.id });
   res.json({ success });
@@ -357,7 +357,7 @@ app.put('/api/classes/:id', authMiddleware, async (req, res) => {
   res.json({ success: !!cls, data: cls });
 });
 
-app.delete('/api/classes/:id', authMiddleware, async (req, res) => {
+app.delete('/api/classes/:id', authMiddleware, authorizeRoles(['admin']), async (req, res) => {
   const success = await db.deleteClass(req.params.id, req.user.id);
   if (success) broadcast('classes:delete', { id: req.params.id });
   res.json({ success });
@@ -372,7 +372,7 @@ app.get('/api/settings', authMiddleware, async (req, res) => {
   res.json({ success: true, data });
 });
 
-app.put('/api/settings', authMiddleware, async (req, res) => {
+app.put('/api/settings', authMiddleware, authorizeRoles(['admin']), async (req, res) => {
   const data = await db.updateSettings(req.body, req.user.id);
   res.json({ success: true, data });
 });
@@ -472,7 +472,7 @@ app.get('/api/settings', authMiddleware, async (req, res) => {
   }
 });
 
-app.put('/api/settings', authMiddleware, async (req, res) => {
+app.put('/api/settings', authMiddleware, authorizeRoles(['admin']), async (req, res) => {
   try {
     const data = await db.updateSettings ? await db.updateSettings(req.body, req.user.id) : req.body;
     res.json({ success: true, data });
@@ -481,7 +481,7 @@ app.put('/api/settings', authMiddleware, async (req, res) => {
   }
 });
 
-app.post('/api/settings', authMiddleware, async (req, res) => {
+app.post('/api/settings', authMiddleware, authorizeRoles(['admin']), async (req, res) => {
   try {
     const data = await db.updateSettings ? await db.updateSettings(req.body, req.user.id) : req.body;
     res.json({ success: true, data });
@@ -503,7 +503,7 @@ app.get('/api/dashboard-stats', authMiddleware, async (req, res) => {
   }
 });
 
-app.get('/api/reports/:type', authMiddleware, async (req, res) => {
+app.get('/api/reports/:type', authMiddleware, authorizeRoles(['admin']), async (req, res) => {
   try {
     const { type } = req.params;
     let data;
@@ -579,9 +579,610 @@ app.get('/api/sync/stream', (req, res) => {
   req.on('close', () => sseClients.delete(res));
 });
 
+// ============================================================================
+// FEEDBACK API
+// ============================================================================
+
+app.post('/api/feedback', authMiddleware, async (req, res) => {
+  try {
+    const { category, title, details } = req.body;
+    
+    if (!category || !title || !details) {
+      return res.status(400).json({ error: 'All fields required' });
+    }
+
+    const feedback = await db.addFeedback({
+      id: uuidv4(),
+      category,
+      title,
+      details,
+      userId: req.user.id,
+      userName: req.user.name,
+      userEmail: req.user.email,
+      createdAt: new Date().toISOString(),
+      status: 'new'
+    }, req.user.id);
+
+    broadcast('feedback:new', feedback);
+    res.status(201).json({ success: true, data: feedback });
+  } catch (err) {
+    console.error('Feedback submission error:', err);
+    res.status(500).json({ error: 'Failed to submit feedback' });
+  }
+});
+
+app.get('/api/feedback', authMiddleware, async (req, res) => {
+  try {
+    const data = await db.getFeedback(req.user.id);
+    res.json({ success: true, data });
+  } catch (err) {
+    console.error('Fetch feedback error:', err);
+    res.status(500).json({ error: 'Failed to fetch feedback' });
+  }
+});
+
+// ============================================================================
+// ACTIVITY LOG API
+// ============================================================================
+
+app.post('/api/activity-logs', authMiddleware, async (req, res) => {
+  try {
+    const { action, entityType, entityId, entityName, details } = req.body;
+    
+    if (!action || !entityType) {
+      return res.status(400).json({ error: 'Action and entityType are required' });
+    }
+
+    const activity = await db.logActivity(
+      req.user.id,
+      req.user.name || req.user.email,
+      action,
+      entityType,
+      entityId || '',
+      entityName || '',
+      details || ''
+    );
+
+    broadcast('activity:new', activity);
+    res.status(201).json({ success: true, data: activity });
+  } catch (err) {
+    console.error('Activity logging error:', err);
+    res.status(500).json({ error: 'Failed to log activity' });
+  }
+});
+
+app.get('/api/activity-logs', authMiddleware, async (req, res) => {
+  try {
+    const filters = {
+      action: req.query.action,
+      entityType: req.query.entityType,
+      userId: req.query.userId,
+      dateFrom: req.query.dateFrom,
+      dateTo: req.query.dateTo,
+      limit: req.query.limit ? parseInt(req.query.limit) : 500
+    };
+
+    const data = await db.getActivityLogs(filters);
+    res.json({ success: true, data });
+  } catch (err) {
+    console.error('Fetch activity logs error:', err);
+    res.status(500).json({ error: 'Failed to fetch activity logs' });
+  }
+});
+
 // Start Server
+// ============================================================================
+// TEAM MANAGEMENT API
+// ============================================================================
+
+app.get('/api/team/members', authMiddleware, authorizeRoles(['admin']), async (req, res) => {
+  try {
+    const response = await db.getUsers();
+    res.json({ success: true, data: response || [] });
+  } catch (err) {
+    console.error('Fetch team members error:', err);
+    res.status(500).json({ error: 'Failed to fetch team members' });
+  }
+});
+
+app.post('/api/team/members', authMiddleware, authorizeRoles(['admin']), async (req, res) => {
+  try {
+    const { email, name, password, role } = req.body;
+    
+    if (!email || !name || !password) {
+      return res.status(400).json({ error: 'Email, name, and password are required' });
+    }
+
+    const existingUser = await db.getUserByEmail(email);
+    if (existingUser) {
+      return res.status(400).json({ error: 'Email already registered' });
+    }
+
+    const user = await db.createUser({
+      id: uuidv4(),
+      email,
+      password,
+      name,
+      role: role || 'staff',
+      gymId: 'gym-001'
+    });
+
+    await db.logActivity(
+      req.user.id,
+      req.user.name || req.user.email,
+      'create',
+      'team-member',
+      user.id,
+      name,
+      `Created new team member with role: ${role || 'staff'}`
+    );
+
+    res.status(201).json({
+      success: true,
+      data: {
+        id: user.id,
+        email: user.email,
+        name: user.name,
+        role: user.role,
+        created_at: user.created_at
+      }
+    });
+  } catch (err) {
+    console.error('Create team member error:', err);
+    res.status(500).json({ error: 'Failed to create team member' });
+  }
+});
+
+app.put('/api/team/members/:id', authMiddleware, authorizeRoles(['admin']), async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { role } = req.body;
+
+    if (!role || !['admin', 'staff', 'trainer'].includes(role)) {
+      return res.status(400).json({ error: 'Valid role is required' });
+    }
+
+    const updatedUser = await db.updateUser(id, { role });
+    
+    await db.logActivity(
+      req.user.id,
+      req.user.name || req.user.email,
+      'update',
+      'team-member',
+      id,
+      updatedUser.name,
+      `Updated role to: ${role}`
+    );
+
+    res.json({
+      success: true,
+      data: {
+        id: updatedUser.id,
+        email: updatedUser.email,
+        name: updatedUser.name,
+        role: updatedUser.role,
+        created_at: updatedUser.created_at
+      }
+    });
+  } catch (err) {
+    console.error('Update team member error:', err);
+    res.status(500).json({ error: 'Failed to update team member' });
+  }
+});
+
+app.delete('/api/team/members/:id', authMiddleware, authorizeRoles(['admin']), async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    // Prevent deleting self
+    if (id === req.user.id) {
+      return res.status(400).json({ error: 'Cannot delete your own account' });
+    }
+
+    const user = await db.getUserById(id);
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    const deleted = await db.deleteUser(id);
+    
+    if (deleted) {
+      await db.logActivity(
+        req.user.id,
+        req.user.name || req.user.email,
+        'delete',
+        'team-member',
+        id,
+        user.name,
+        'Deleted team member'
+      );
+      res.json({ success: true, message: 'Team member deleted' });
+    } else {
+      res.status(400).json({ error: 'Failed to delete team member' });
+    }
+  } catch (err) {
+    console.error('Delete team member error:', err);
+    res.status(500).json({ error: 'Failed to delete team member' });
+  }
+});
+
+// ============================================================================
+// CAMPAIGNS & REMINDERS API
+// ============================================================================
+
+app.post('/api/campaigns', authMiddleware, authorizeRoles(['admin']), async (req, res) => {
+  try {
+    const { title, description, targetAudience, message, scheduledDate } = req.body;
+    
+    if (!title || !message) {
+      return res.status(400).json({ error: 'Title and message are required' });
+    }
+
+    const campaign = await db.createCampaign({
+      id: uuidv4(),
+      userId: req.user.id,
+      title,
+      description,
+      target_audience: targetAudience,
+      message,
+      status: 'draft',
+      scheduled_date: scheduledDate,
+      createdAt: new Date().toISOString()
+    }, req.user.id);
+
+    await db.logActivity(
+      req.user.id,
+      req.user.name || req.user.email,
+      'create',
+      'campaign',
+      campaign.id,
+      title,
+      `Created campaign targeting: ${targetAudience}`
+    );
+
+    broadcast('campaign:created', campaign);
+    res.status(201).json({ success: true, data: campaign });
+  } catch (err) {
+    console.error('Campaign creation error:', err);
+    res.status(500).json({ error: 'Failed to create campaign' });
+  }
+});
+
+app.get('/api/campaigns', authMiddleware, authorizeRoles(['admin']), async (req, res) => {
+  try {
+    const campaigns = await db.getCampaigns(req.user.id);
+    res.json({ success: true, data: campaigns });
+  } catch (err) {
+    console.error('Fetch campaigns error:', err);
+    res.status(500).json({ error: 'Failed to fetch campaigns' });
+  }
+});
+
+app.put('/api/campaigns/:id', authMiddleware, authorizeRoles(['admin']), async (req, res) => {
+  try {
+    const { id } = req.params;
+    const campaign = await db.updateCampaign(id, req.body, req.user.id);
+    
+    if (!campaign) {
+      return res.status(404).json({ error: 'Campaign not found' });
+    }
+
+    await db.logActivity(
+      req.user.id,
+      req.user.name || req.user.email,
+      'update',
+      'campaign',
+      id,
+      campaign.title,
+      `Updated campaign status to: ${req.body.status}`
+    );
+
+    res.json({ success: true, data: campaign });
+  } catch (err) {
+    console.error('Campaign update error:', err);
+    res.status(500).json({ error: 'Failed to update campaign' });
+  }
+});
+
+app.delete('/api/campaigns/:id', authMiddleware, authorizeRoles(['admin']), async (req, res) => {
+  try {
+    const { id } = req.params;
+    const deleted = await db.deleteCampaign(id, req.user.id);
+    
+    if (!deleted) {
+      return res.status(404).json({ error: 'Campaign not found' });
+    }
+
+    await db.logActivity(
+      req.user.id,
+      req.user.name || req.user.email,
+      'delete',
+      'campaign',
+      id,
+      'Unknown',
+      'Deleted campaign'
+    );
+
+    res.json({ success: true, message: 'Campaign deleted' });
+  } catch (err) {
+    console.error('Campaign deletion error:', err);
+    res.status(500).json({ error: 'Failed to delete campaign' });
+  }
+});
+
+app.get('/api/reminders', authMiddleware, authorizeRoles(['admin']), async (req, res) => {
+  try {
+    const reminders = await db.getReminders(req.user.id);
+    const stats = await db.getReminderStats(req.user.id);
+    res.json({ success: true, data: reminders, stats });
+  } catch (err) {
+    console.error('Fetch reminders error:', err);
+    res.status(500).json({ error: 'Failed to fetch reminders' });
+  }
+});
+
+app.post('/api/campaigns/:id/send', authMiddleware, authorizeRoles(['admin']), async (req, res) => {
+  try {
+    const { id } = req.params;
+    const campaign = await db.getCampaigns(req.user.id);
+    const targetCampaign = campaign.find(c => c.id === id);
+    
+    if (!targetCampaign) {
+      return res.status(404).json({ error: 'Campaign not found' });
+    }
+
+    // Create reminders for all members
+    const members = await db.getMembers();
+    let reminderCount = 0;
+    
+    for (const member of members) {
+      await db.createReminder({
+        id: uuidv4(),
+        campaign_id: id,
+        user_id: req.user.id,
+        recipient_id: member.id,
+        message: targetCampaign.message,
+        status: 'sent',
+        sent_at: new Date().toISOString(),
+        createdAt: new Date().toISOString()
+      }, req.user.id);
+      reminderCount++;
+    }
+
+    // Update campaign status
+    await db.updateCampaign(id, { status: 'sent' }, req.user.id);
+
+    await db.logActivity(
+      req.user.id,
+      req.user.name || req.user.email,
+      'update',
+      'campaign',
+      id,
+      targetCampaign.title,
+      `Sent campaign to ${reminderCount} members`
+    );
+
+    broadcast('campaign:sent', { campaignId: id, reminderCount });
+    res.json({ success: true, message: `Campaign sent to ${reminderCount} members`, data: { reminderCount } });
+  } catch (err) {
+    console.error('Campaign send error:', err);
+    res.status(500).json({ error: 'Failed to send campaign' });
+  }
+
+// Invites & Signup
+app.post('/api/invites', authMiddleware, authorizeRoles(['admin']), async (req, res) => {
+  try {
+    const { email } = req.body;
+    
+    if (!email) {
+      return res.status(400).json({ error: 'Email is required' });
+    }
+
+    // Generate unique token
+    const token = uuidv4();
+    const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000); // 7 days
+
+    const invite = await db.createInvite({
+      id: uuidv4(),
+      email,
+      token,
+      inviter_id: req.user.id,
+      inviter_name: req.user.name || req.user.email,
+      expires_at: expiresAt.toISOString()
+    });
+
+    await db.logActivity(
+      req.user.id,
+      req.user.name || req.user.email,
+      'create',
+      'invite',
+      invite.id,
+      email,
+      'Sent signup invite'
+    );
+
+    broadcast('invite:created', { email, token });
+    res.json({ success: true, data: invite });
+  } catch (err) {
+    console.error('Invite creation error:', err);
+    res.status(500).json({ error: 'Failed to create invite' });
+  }
+});
+
+app.get('/api/invites', authMiddleware, authorizeRoles(['admin']), async (req, res) => {
+  try {
+    const { email, status } = req.query;
+    const invites = await db.getInvites({ email, status });
+    res.json({ success: true, data: invites });
+  } catch (err) {
+    console.error('Fetch invites error:', err);
+    res.status(500).json({ error: 'Failed to fetch invites' });
+  }
+});
+
+app.get('/api/invites/:token/verify', async (req, res) => {
+  try {
+    const { token } = req.params;
+    const invite = await db.getInviteByToken(token);
+    
+    if (!invite) {
+      return res.status(404).json({ error: 'Invite not found or expired' });
+    }
+
+    res.json({ success: true, data: { email: invite.email, invitedBy: invite.inviter_name } });
+  } catch (err) {
+    console.error('Verify invite error:', err);
+    res.status(500).json({ error: 'Failed to verify invite' });
+  }
+});
+
+app.post('/api/auth/signup-invite', async (req, res) => {
+  try {
+    const { email, password, name, token } = req.body;
+
+    if (!email || !password || !name || !token) {
+      return res.status(400).json({ error: 'Email, password, name, and token are required' });
+    }
+});
+    // Verify invite token
+    const invite = await db.getInviteByToken(token);
+    if (!invite) {
+      return res.status(401).json({ error: 'Invalid or expired invite' });
+    }
+
+    if (invite.email !== email) {
+      return res.status(401).json({ error: 'Email does not match invite' });
+    }
+
+    // Check if user already exists
+    const existingUser = await db.getUserByEmail(email);
+    if (existingUser) {
+      return res.status(409).json({ error: 'User already exists' });
+    }
 db.init().then(() => {
+    // Create new user
+    const userId = uuidv4();
+    const user = await db.createUser({
+      id: userId,
+      email,
+      password,
+      name,
+      role: 'staff'
+    });
   httpServer.listen(PORT, () => {
+    // Accept invite
+    await db.acceptInvite(token, userId);
     console.log(`🚀 Production server running at http://localhost:${PORT}`);
+    // Log activity
+    await db.logActivity(
+      userId,
+      name,
+      'create',
+      'user',
+      userId,
+      email,
+      'Registered via invite'
+    );
   });
+    // Generate tokens
+    const accessToken = generateToken(user.id, user.email, user.role);
+    const refreshToken = generateRefreshToken(user.id);
+
+    broadcast('user:registered', { email, name });
+    res.json({ 
+      success: true, 
+      data: {
+        user: { id: user.id, email: user.email, name: user.name, role: user.role },
+        accessToken,
+        refreshToken
+      }
+    });
+  } catch (err) {
+    console.error('Signup via invite error:', err);
+    res.status(500).json({ error: 'Failed to complete signup' });
+  }
+});
+
+app.delete('/api/invites/:id', authMiddleware, authorizeRoles(['admin']), async (req, res) => {
+  try {
+    const { id } = req.params;
+    const success = await db.deleteInvite(id);
+    
+    if (!success) {
+      return res.status(404).json({ error: 'Invite not found' });
+    }
+  // ============================================================================
+    await db.logActivity(
+      req.user.id,
+      req.user.name || req.user.email,
+      'delete',
+      'invite',
+      id,
+      '',
+      'Deleted invite'
+    );
+  // AUTO-EXPIRY JOB
+    broadcast('invite:deleted', { inviteId: id });
+    res.json({ success: true });
+  } catch (err) {
+    console.error('Delete invite error:', err);
+    res.status(500).json({ error: 'Failed to delete invite' });
+  }
+});
+  // ============================================================================
+db.init().then(() => {
+  const AUTO_EXPIRY_INTERVAL = 60 * 60 * 1000; // 1 hour
+  
+  const runAutoExpiryJob = async () => {
+    try {
+      console.log('🔄 Running auto-expiry job...');
+      const today = new Date().toISOString().split('T')[0];
+      
+      // Get all members
+      const allMembers = await db.getMembers();
+      
+      if (!allMembers || allMembers.length === 0) {
+        console.log('✓ No members to check');
+        return;
+      }
+      
+      // Find expired members
+      let expiredCount = 0;
+      for (const member of allMembers) {
+        if (member.status === 'active' && member.expiry_date && member.expiry_date < today) {
+          // Mark as expired
+          await db.updateMember(member.id, { status: 'expired' });
+          expiredCount++;
+          
+          // Log the expiry activity
+          await db.logActivity(
+            'system',
+            'System',
+            'update',
+            'member',
+            member.id,
+            member.name,
+            `Membership expired on ${member.expiry_date}`
+          );
+          
+          // Broadcast expiry event for real-time UI update
+          broadcast('member:expired', {
+            memberId: member.id,
+            memberName: member.name,
+            expiryDate: member.expiry_date
+          });
+        }
+      }
+      
+      if (expiredCount > 0) {
+        console.log(`✓ Auto-expiry job: ${expiredCount} member(s) marked as expired`);
+      }
+    } catch (error) {
+      console.error('❌ Auto-expiry job error:', error);
+    }
+  };
+  
+  // Run immediately on startup, then every hour
+  runAutoExpiryJob();
+  setInterval(runAutoExpiryJob, AUTO_EXPIRY_INTERVAL);
 });

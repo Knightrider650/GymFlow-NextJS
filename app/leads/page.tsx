@@ -41,10 +41,17 @@ export default function LeadsPage() {
   const deleteLead = useGymStore(state => state.deleteLead)
   const convertLead = useGymStore(state => state.convertLead)
   const leadsLoading = useGymStore(state => state.leadsLoading)
+  const fetchPlans = useGymStore(state => state.fetchPlans)
+  const plans = useGymStore(state => state.plans) || []
 
   const [isDialogOpen, setIsDialogOpen] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
   const [searchTerm, setSearchTerm] = useState('')
+
+  // Conversion dialog state
+  const [isConvertDialogOpen, setIsConvertDialogOpen] = useState(false)
+  const [convertingLeadId, setConvertingLeadId] = useState<string | null>(null)
+  const [selectedPlan, setSelectedPlan] = useState('')
 
   const filteredLeads = leads.filter(lead =>
     lead.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -66,7 +73,8 @@ export default function LeadsPage() {
 
   useEffect(() => {
     fetchLeads()
-  }, [fetchLeads])
+    fetchPlans()
+  }, [fetchLeads, fetchPlans])
 
   const onOpenChange = (open: boolean) => {
     setIsDialogOpen(open)
@@ -101,168 +109,223 @@ export default function LeadsPage() {
     }
   }
 
-  const handleConvert = async (leadId: string) => {
+  const openConvertDialog = (leadId: string) => {
+    setConvertingLeadId(leadId)
+    setSelectedPlan(plans.length > 0 ? plans[0].name : 'Basic')
+    setIsConvertDialogOpen(true)
+  }
+
+  const handleConvert = async () => {
+    if (!convertingLeadId) return
     try {
-      if (confirm('Convert lead to full active member?')) {
-        await convertLead(leadId, {
-          membershipType: 'Basic',
-          status: 'active',
-          joinDate: new Date().toISOString().split('T')[0],
-        })
-      }
+      await convertLead(convertingLeadId, {
+        membershipType: selectedPlan || 'Basic',
+        status: 'active',
+        joinDate: new Date().toISOString().split('T')[0],
+      })
+      setIsConvertDialogOpen(false)
+      setConvertingLeadId(null)
+      setSelectedPlan('')
     } catch (err) {
       console.error(err)
     }
   }
 
+  const convertingLead = leads.find(l => l.id === convertingLeadId)
+
   return (
     <ProtectedLayout>
-      <div className="flex justify-between items-center mb-6">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight text-white mb-1">Lead Management</h1>
-          <p className="text-slate-400">Track and convert gym prospects</p>
+      <div className="p-6 lg:p-8 space-y-8">
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+          <div>
+            <h1 className="text-3xl font-bold tracking-tight bg-gradient-to-r from-primary to-indigo-600 bg-clip-text text-transparent">Lead Management</h1>
+            <p className="text-sm text-muted-foreground mt-1">Track and convert gym prospects</p>
+          </div>
+
+          <Dialog open={isDialogOpen} onOpenChange={onOpenChange}>
+            <DialogTrigger asChild>
+              <Button className="gap-2 shadow-lg shadow-primary/20">
+                <Plus className="mr-2 h-4 w-4" /> Add Lead
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="sm:max-w-[425px]">
+              <DialogHeader>
+                <DialogTitle>{editingId ? 'Edit Lead' : 'Add New Lead'}</DialogTitle>
+                <DialogDescription>
+                  Enter prospect details to follow up later.
+                </DialogDescription>
+              </DialogHeader>
+              
+              <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="name">Full Name</Label>
+                  <Input id="name" {...register('name')} />
+                  {errors.name && <p className="text-xs text-red-400">{errors.name.message}</p>}
+                </div>
+                
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="email">Email</Label>
+                    <Input id="email" type="email" {...register('email')} />
+                    {errors.email && <p className="text-xs text-red-400">{errors.email.message}</p>}
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="phone">Phone</Label>
+                    <Input id="phone" {...register('phone')} />
+                    {errors.phone && <p className="text-xs text-red-400">{errors.phone.message}</p>}
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="status">Status</Label>
+                  <select id="status" {...register('status')} className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+                    <option value="New">New</option>
+                    <option value="Contacted">Contacted</option>
+                    <option value="Converted">Converted</option>
+                    <option value="Lost">Lost</option>
+                  </select>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="notes">Notes</Label>
+                  <Input id="notes" {...register('notes')} />
+                </div>
+
+                <DialogFooter>
+                  <Button type="submit" disabled={isSubmitting}>
+                    {isSubmitting ? 'Saving...' : (editingId ? 'Update Lead' : 'Save Lead')}
+                  </Button>
+                </DialogFooter>
+              </form>
+            </DialogContent>
+          </Dialog>
         </div>
 
-        <Dialog open={isDialogOpen} onOpenChange={onOpenChange}>
-          <DialogTrigger asChild>
-            <Button className="bg-primary hover:bg-primary/90">
-              <Plus className="mr-2 h-4 w-4" /> Add Lead
-            </Button>
-          </DialogTrigger>
-          <DialogContent className="sm:max-w-[425px] bg-slate-900 border-slate-800 text-slate-100">
+        {/* Search */}
+        <div className="relative">
+          <Search className="absolute left-3 top-3 h-5 w-5 text-muted-foreground" />
+          <Input
+            className="pl-10 h-11"
+            placeholder="Search leads by name or email..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+          />
+        </div>
+
+        <Card className="border-none shadow-xl bg-card/40 backdrop-blur-md">
+          <CardContent className="p-0">
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow className="bg-muted/50 hover:bg-muted/50">
+                    <TableHead className="font-bold">Name</TableHead>
+                    <TableHead className="font-bold">Contact</TableHead>
+                    <TableHead className="font-bold">Status</TableHead>
+                    <TableHead className="font-bold">Notes</TableHead>
+                    <TableHead className="text-right font-bold">Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {leadsLoading ? (
+                    <TableRow>
+                      <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">
+                        Loading leads...
+                      </TableCell>
+                    </TableRow>
+                  ) : filteredLeads.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">
+                        No leads found. Create a new lead to get started.
+                      </TableCell>
+                    </TableRow>
+                  ) : (
+                    filteredLeads.map((lead) => (
+                      <TableRow key={lead.id} className="hover:bg-muted/30 transition-colors">
+                        <TableCell className="font-medium">
+                          {lead.name}
+                        </TableCell>
+                        <TableCell>
+                          <div className="text-sm">{lead.email}</div>
+                          <div className="text-xs text-muted-foreground">{lead.phone}</div>
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant="outline" className={
+                            lead.status === 'New' ? 'bg-blue-500/10 text-blue-500 border-blue-500/20' :
+                            lead.status === 'Contacted' ? 'bg-yellow-500/10 text-yellow-500 border-yellow-500/20' :
+                            lead.status === 'Converted' ? 'bg-green-500/10 text-green-500 border-green-500/20' :
+                            'bg-red-500/10 text-red-500 border-red-500/20'
+                          }>
+                            {lead.status || 'New'}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="text-muted-foreground text-sm max-w-[200px] truncate">
+                          {lead.notes || '-'}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <div className="flex justify-end gap-2">
+                            <Button variant="ghost" size="icon" onClick={() => handleEdit(lead)}>
+                              <Edit2 className="h-4 w-4 text-muted-foreground hover:text-foreground" />
+                            </Button>
+                            <Button variant="ghost" size="icon" onClick={() => openConvertDialog(lead.id)} disabled={lead.status === 'Converted'}>
+                              <ArrowRightCircle className="h-4 w-4 text-green-400 hover:text-green-300" />
+                            </Button>
+                            <Button variant="ghost" size="icon" onClick={() => { if(confirm('Delete lead?')) deleteLead(lead.id) }}>
+                              <Trash2 className="h-4 w-4 text-red-400 hover:text-red-300" />
+                            </Button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))
+                  )}
+                </TableBody>
+              </Table>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Convert Lead Dialog — with plan selection */}
+        <Dialog open={isConvertDialogOpen} onOpenChange={setIsConvertDialogOpen}>
+          <DialogContent className="sm:max-w-[425px]">
             <DialogHeader>
-              <DialogTitle>{editingId ? 'Edit Lead' : 'Add New Lead'}</DialogTitle>
-              <DialogDescription className="text-slate-400">
-                Enter prospect details to follow up later.
+              <DialogTitle>Convert Lead to Member</DialogTitle>
+              <DialogDescription>
+                {convertingLead
+                  ? `You are about to convert "${convertingLead.name}" into an active gym member.`
+                  : 'Select a membership plan for the new member.'}
               </DialogDescription>
             </DialogHeader>
-            
-            <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+            <div className="space-y-4 py-4">
               <div className="space-y-2">
-                <Label htmlFor="name">Full Name</Label>
-                <Input id="name" {...register('name')} className="bg-slate-800 border-slate-700" />
-                {errors.name && <p className="text-xs text-red-400">{errors.name.message}</p>}
-              </div>
-              
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="email">Email</Label>
-                  <Input id="email" type="email" {...register('email')} className="bg-slate-800 border-slate-700" />
-                  {errors.email && <p className="text-xs text-red-400">{errors.email.message}</p>}
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="phone">Phone</Label>
-                  <Input id="phone" {...register('phone')} className="bg-slate-800 border-slate-700" />
-                  {errors.phone && <p className="text-xs text-red-400">{errors.phone.message}</p>}
-                </div>
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="status">Status</Label>
-                <select id="status" {...register('status')} className="flex h-10 w-full rounded-md border border-slate-700 bg-slate-800 px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 text-slate-200">
-                  <option value="New">New</option>
-                  <option value="Contacted">Contacted</option>
-                  <option value="Converted">Converted</option>
-                  <option value="Lost">Lost</option>
+                <Label>Membership Plan *</Label>
+                <select
+                  value={selectedPlan}
+                  onChange={(e) => setSelectedPlan(e.target.value)}
+                  className="w-full h-10 px-3 rounded-md border border-input bg-background text-sm focus:ring-2 focus:ring-primary outline-none"
+                >
+                  {plans.length > 0 ? (
+                    plans.map((plan: any) => (
+                      <option key={plan.id} value={plan.name}>{plan.name} — ${plan.price}/{plan.durationMonths}mo</option>
+                    ))
+                  ) : (
+                    <>
+                      <option value="Basic">Basic</option>
+                      <option value="Premium">Premium</option>
+                      <option value="Elite">Elite</option>
+                    </>
+                  )}
                 </select>
               </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="notes">Notes</Label>
-                <Input id="notes" {...register('notes')} className="bg-slate-800 border-slate-700" />
-              </div>
-
-              <DialogFooter>
-                <Button type="submit" disabled={isSubmitting}>
-                  {isSubmitting ? 'Saving...' : (editingId ? 'Update Lead' : 'Save Lead')}
-                </Button>
-              </DialogFooter>
-            </form>
+            </div>
+            <DialogFooter>
+              <Button variant="ghost" onClick={() => setIsConvertDialogOpen(false)}>Cancel</Button>
+              <Button onClick={handleConvert} className="gap-2">
+                <ArrowRightCircle className="h-4 w-4" />
+                Confirm Conversion
+              </Button>
+            </DialogFooter>
           </DialogContent>
         </Dialog>
       </div>
-
-      <Card className="bg-slate-900 border-slate-800">
-        <CardHeader className="flex flex-row items-center justify-between pb-4">
-          <div className="relative w-64">
-            <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-slate-500" />
-            <Input
-              placeholder="Search leads..."
-              className="pl-9 bg-slate-800 border-slate-700"
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-            />
-          </div>
-        </CardHeader>
-        <CardContent>
-          <div className="rounded-md border border-slate-800 overflow-hidden">
-            <Table>
-              <TableHeader className="bg-slate-800/50">
-                <TableRow className="border-slate-800 hover:bg-slate-800/50">
-                  <TableHead className="font-semibold text-slate-300">Name</TableHead>
-                  <TableHead className="font-semibold text-slate-300">Contact</TableHead>
-                  <TableHead className="font-semibold text-slate-300">Status</TableHead>
-                  <TableHead className="font-semibold text-slate-300">Notes</TableHead>
-                  <TableHead className="text-right font-semibold text-slate-300">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {leadsLoading ? (
-                  <TableRow>
-                    <TableCell colSpan={5} className="text-center py-8 text-slate-500">
-                      Loading leads...
-                    </TableCell>
-                  </TableRow>
-                ) : filteredLeads.length === 0 ? (
-                  <TableRow>
-                    <TableCell colSpan={5} className="text-center py-8 text-slate-500">
-                      No leads found. Create a new lead to get started.
-                    </TableCell>
-                  </TableRow>
-                ) : (
-                  filteredLeads.map((lead) => (
-                    <TableRow key={lead.id} className="border-slate-800 hover:bg-slate-800/30">
-                      <TableCell className="font-medium text-slate-200">
-                        {lead.name}
-                      </TableCell>
-                      <TableCell>
-                        <div className="text-sm text-slate-300">{lead.email}</div>
-                        <div className="text-xs text-slate-500">{lead.phone}</div>
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant="outline" className={
-                          lead.status === 'New' ? 'bg-blue-500/10 text-blue-500 border-blue-500/20' :
-                          lead.status === 'Contacted' ? 'bg-yellow-500/10 text-yellow-500 border-yellow-500/20' :
-                          lead.status === 'Converted' ? 'bg-green-500/10 text-green-500 border-green-500/20' :
-                          'bg-red-500/10 text-red-500 border-red-500/20'
-                        }>
-                          {lead.status || 'New'}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="text-slate-400 text-sm max-w-[200px] truncate">
-                        {lead.notes || '-'}
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <div className="flex justify-end gap-2">
-                          <Button variant="ghost" size="icon" onClick={() => handleEdit(lead)}>
-                            <Edit2 className="h-4 w-4 text-slate-400 hover:text-white" />
-                          </Button>
-                          <Button variant="ghost" size="icon" onClick={() => handleConvert(lead.id)} disabled={lead.status === 'Converted'}>
-                            <ArrowRightCircle className="h-4 w-4 text-green-400 hover:text-green-300" />
-                          </Button>
-                          <Button variant="ghost" size="icon" onClick={() => { if(confirm('Delete lead?')) deleteLead(lead.id) }}>
-                            <Trash2 className="h-4 w-4 text-red-400 hover:text-red-300" />
-                          </Button>
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  ))
-                )}
-              </TableBody>
-            </Table>
-          </div>
-        </CardContent>
-      </Card>
     </ProtectedLayout>
   )
 }

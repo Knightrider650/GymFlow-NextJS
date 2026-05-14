@@ -1,0 +1,30 @@
+version: '3.8'
+
+services:
+  db:
+    image: postgres:15-alpine
+    restart: always
+    environment:
+      POSTGRES_USER: gymadmin
+      POSTGRES_PASSWORD: gympassword
+      POSTGRES_DB: gymflow
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "3000:3000"
+    environment:
+      - DATABASE_URL=postgresql://gymadmin:gympassword@db:5432/gymflow?schema=public
+      - NEXT_PUBLIC_JWT_SECRET=super_secret_gymflow_key_123
+      - NEXT_PUBLIC_API_URL=http://localhost:3000
+    depends_on:
+      - db
+
+volumes:
+  postgres_data:

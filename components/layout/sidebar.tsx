@@ -49,6 +49,9 @@ export function Sidebar() {
     { href: '/notifications', label: 'Notifications', icon: Bell },
     { href: '/feedback', label: 'Feedback', icon: MessageSquare },
     { href: '/settings', label: 'Settings', icon: Settings },
+    { href: '/invites', label: 'Invites', icon: Users },
+    { href: '/team', label: 'Team Management', icon: Users2 },
+    { href: '/activity-log', label: 'Activity Log', icon: BarChart3 },
   ]
 
   const isActive = (href: string) => pathname === href || pathname.startsWith(href + '/')
@@ -75,7 +78,7 @@ export function Sidebar() {
 
       {/* Sidebar */}
       <aside
-        className={`fixed left-0 top-0 z-40 h-screen w-64 bg-glass border-r border-white/5 shadow-2xl transition-transform duration-300 lg:relative lg:translate-x-0 ${
+        className={`fixed left-0 top-0 z-40 h-screen w-64 flex flex-col bg-glass border-r border-white/5 shadow-2xl transition-transform duration-300 lg:relative lg:translate-x-0 ${
           isOpen ? 'translate-x-0' : '-translate-x-full'
         }`}
       >

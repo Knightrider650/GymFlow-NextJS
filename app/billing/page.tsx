@@ -17,13 +17,15 @@ import {
   DialogTrigger,
 } from '@/components/ui/dialog'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
-import { useBilling, useMembers } from '@/hooks'
+import { useBilling, useMembers, usePlans, useSettings } from '@/hooks'
 import { formatCurrency, formatDate, getStatusBadgeColor } from '@/utils/format'
 import { Plus, DollarSign, Search, CreditCard, Receipt, Clock, CheckCircle2 } from 'lucide-react'
 
 export default function BillingPage() {
   const { invoices, isLoading, fetchInvoices, createInvoice, recordPayment } = useBilling()
   const { members, fetchMembers } = useMembers()
+  const { plans, fetchPlans } = usePlans()
+  const { settings, fetchSettings } = useSettings()
   const [isInvoiceDialogOpen, setIsInvoiceDialogOpen] = useState(false)
   const [isPaymentDialogOpen, setIsPaymentDialogOpen] = useState(false)
   const [selectedInvoiceId, setSelectedInvoiceId] = useState('')
@@ -49,7 +51,29 @@ export default function BillingPage() {
   useEffect(() => {
     fetchInvoices()
     fetchMembers()
+    fetchPlans()
+    fetchSettings()
   }, [])
+
+  // Auto-fill amount when member is selected
+  const handleMemberSelect = (memberId: string) => {
+    setInvoiceForm(prev => ({ ...prev, memberId }))
+    const member = members.find(m => m.id === memberId)
+    if (member && member.membershipType) {
+      const memberType = member.membershipType.toLowerCase()
+      // Exact match first, then fuzzy (contains) match
+      const plan = plans.find((p: any) => p.name.toLowerCase() === memberType)
+        || plans.find((p: any) => p.name.toLowerCase().includes(memberType) || memberType.includes(p.name.toLowerCase()))
+      if (plan) {
+        setInvoiceForm(prev => ({
+          ...prev,
+          memberId,
+          amount: plan.price.toString(),
+          description: `${plan.name} - Membership Fee`,
+        }))
+      }
+    }
+  }
 
   const handleCreateInvoice = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -153,7 +177,7 @@ export default function BillingPage() {
                   <select
                     id="member"
                     value={invoiceForm.memberId}
-                    onChange={(e) => setInvoiceForm({ ...invoiceForm, memberId: e.target.value })}
+                    onChange={(e) => handleMemberSelect(e.target.value)}
                     className="w-full h-10 px-3 rounded-md border border-input bg-background text-sm focus:ring-2 focus:ring-primary outline-none transition-all"
                     required
                   >
@@ -307,7 +331,7 @@ export default function BillingPage() {
                         <TableCell className="font-mono text-sm text-primary font-bold">{invoice.invoiceNumber}</TableCell>
                         <TableCell className="font-medium">{invoice.memberName}</TableCell>
                         <TableCell className="font-bold text-foreground">
-                          {formatCurrency(invoice.amount)}
+                          {formatCurrency(invoice.amount, settings?.currency)}
                         </TableCell>
                         <TableCell>
                           <Badge

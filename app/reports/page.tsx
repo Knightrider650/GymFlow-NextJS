@@ -25,10 +25,19 @@ type ReportType =
 
 const COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899']
 
+import { useGymStore } from '@/lib/store'
+import { formatCurrency } from '@/utils/format'
+
 export default function ReportsPage() {
   const [reportType, setReportType] = useState<ReportType>('member-summary')
   const [data, setData] = useState<any>(null)
   const [isLoading, setIsLoading] = useState(false)
+  const settings = useGymStore(state => state.settings)
+  const fetchSettings = useGymStore(state => state.fetchSettings)
+
+  useEffect(() => {
+    fetchSettings()
+  }, [])
 
   const fetchReport = async (type: ReportType) => {
     setIsLoading(true)
@@ -77,7 +86,7 @@ export default function ReportsPage() {
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <div className="text-2xl font-bold">$12,450.00</div>
+                  <div className="text-2xl font-bold">{formatCurrency(12450.00, settings?.currency)}</div>
                   <p className="text-xs text-muted-foreground mt-1 text-green-600">+12.5% from last month</p>
                 </CardContent>
               </Card>
@@ -94,7 +103,12 @@ export default function ReportsPage() {
                 ]}>
                   <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
                   <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fill: '#64748b'}} />
-                  <YAxis axisLine={false} tickLine={false} tick={{fill: '#64748b'}} />
+                  <YAxis 
+                    axisLine={false} 
+                    tickLine={false} 
+                    tick={{fill: '#64748b'}} 
+                    tickFormatter={(val) => formatCurrency(val, settings?.currency)}
+                  />
                   <Tooltip 
                     contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)' }}
                   />

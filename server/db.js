@@ -48,7 +48,11 @@ const INITIAL_DATA = {
     { id: 'p-1', name: 'Premium Plan', price: 99.99, durationMonths: 12, features: 'Full Access, Classes, Gym' },
     { id: 'p-2', name: 'Basic Plan', price: 49.99, durationMonths: 1, features: 'Gym Only' }
   ],
-  settings: {
+  feedback: [],
+  activity_logs: [],
+  campaigns: [],
+  reminders: [],
+  invites: [],
     gymName: 'GymFlow Pro',
     gymLogo: '',
     gymEmail: 'admin@gymflow.com',
@@ -101,6 +105,35 @@ const db = {
     data.users.push(user);
     await this.save();
     return user;
+  },
+
+  async getUsers() {
+    // Return users without password hashes
+    return data.users.map(u => ({
+      id: u.id,
+      email: u.email,
+      name: u.name,
+      role: u.role,
+      created_at: u.created_at
+    }));
+  },
+
+  async updateUser(id, updates) {
+    const user = data.users.find(u => u.id === id);
+    if (!user) return null;
+    Object.assign(user, updates);
+    await this.save();
+    return user;
+  },
+
+  async deleteUser(id) {
+    const originalLength = data.users.length;
+    data.users = data.users.filter(u => u.id !== id);
+    if (data.users.length < originalLength) {
+      await this.save();
+      return true;
+    }
+    return false;
   },
 
   // Member Methods
@@ -438,6 +471,198 @@ const db = {
     data.settings = { ...(data.settings || {}), ...settings };
     await fs.writeFile(DATA_FILE, JSON.stringify(data, null, 2));
     return data.settings;
+  },
+
+  // Feedback
+  async addFeedback(feedback, ownerId) {
+    data.feedback = data.feedback || [];
+    data.feedback.push(feedback);
+    await this.save();
+    return feedback;
+  },
+
+  async getFeedback(ownerId) {
+    return (data.feedback || []).sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+  },
+
+  async updateFeedback(id, updates, ownerId) {
+    const feedback = (data.feedback || []).find(f => f.id === id);
+    if (feedback) {
+      Object.assign(feedback, updates);
+      await this.save();
+      return feedback;
+    }
+    return null;
+  },
+
+  async deleteFeedback(id, ownerId) {
+    const originalLength = (data.feedback || []).length;
+    data.feedback = (data.feedback || []).filter(f => f.id !== id);
+    if (data.feedback.length < originalLength) {
+      await this.save();
+      return true;
+    }
+    return false;
+  },
+
+  // Activity Logs
+  async logActivity(userId, userName, action, entityType, entityId, entityName, details) {
+    data.activity_logs = data.activity_logs || [];
+    const activity = {
+      id: uuidv4(),
+      userId,
+      userName,
+      action,
+      entityType,
+      entityId,
+      entityName,
+      details,
+      createdAt: new Date().toISOString()
+    };
+    data.activity_logs.push(activity);
+    await this.save();
+    return activity;
+  },
+
+  async getActivityLogs(filters = {}) {
+    const logs = (data.activity_logs || []).sort((a, b) => 
+      new Date(b.createdAt) - new Date(a.createdAt)
+    );
+    
+    // Apply filters if needed
+    let filtered = logs;
+    if (filters.action) {
+      filtered = filtered.filter(log => log.action === filters.action);
+    }
+    if (filters.entityType) {
+      filtered = filtered.filter(log => log.entityType === filters.entityType);
+    }
+    if (filters.userId) {
+      filtered = filtered.filter(log => log.userId === filters.userId);
+    }
+    if (filters.dateFrom) {
+      filtered = filtered.filter(log => log.createdAt >= filters.dateFrom);
+    }
+    if (filters.dateTo) {
+      filtered = filtered.filter(log => log.createdAt <= filters.dateTo);
+    }
+    
+    return filtered.slice(0, filters.limit || 500);
+  },
+
+  async clearActivityLogs() {
+    data.activity_logs = [];
+    await this.save();
+    return true;
+  },
+
+  // Campaigns & Reminders
+  async createCampaign(campaign, ownerId) {
+    data.campaigns = data.campaigns || [];
+    data.campaigns.push(campaign);
+    await this.save();
+    return campaign;
+  },
+
+  async getCampaigns(ownerId) {
+    return (data.campaigns || []).sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+  },
+
+  async updateCampaign(id, updates, ownerId) {
+    const campaign = (data.campaigns || []).find(c => c.id === id);
+    if (campaign) {
+      Object.assign(campaign, updates);
+      await this.save();
+      return campaign;
+    }
+    return null;
+  },
+
+  async deleteCampaign(id, ownerId) {
+    const originalLength = (data.campaigns || []).length;
+    data.campaigns = (data.campaigns || []).filter(c => c.id !== id);
+    if (data.campaigns.length < originalLength) {
+      await this.save();
+      return true;
+    }
+    return false;
+  },
+
+  async createReminder(reminder, ownerId) {
+    data.reminders = data.reminders || [];
+    data.reminders.push(reminder);
+    await this.save();
+    return reminder;
+  },
+
+  async getReminders(ownerId) {
+    return (data.reminders || []).sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+  },
+
+  async getReminderStats(ownerId) {
+    const reminders = data.reminders || [];
+    return {
+      total: reminders.length,
+      sent: reminders.filter(r => r.status === 'sent').length,
+      pending: reminders.filter(r => r.status === 'pending').length,
+      failed: reminders.filter(r => r.status === 'failed').length
+    };
+  }
+
+  // Invites & Signup
+  async createInvite(invite) {
+    const newInvite = {
+      id: invite.id || uuidv4(),
+      email: invite.email,
+      token: invite.token,
+      inviter_id: invite.inviter_id,
+      inviter_name: invite.inviter_name,
+      status: 'pending',
+      created_at: new Date().toISOString(),
+      expires_at: invite.expires_at,
+      accepted_at: null
+    };
+    data.invites.push(newInvite);
+    await this.save();
+    return newInvite;
+  },
+
+  async getInvites(filters = {}) {
+    let invites = data.invites || [];
+    
+    if (filters.email) {
+      invites = invites.filter(i => i.email === filters.email);
+    }
+    if (filters.status) {
+      invites = invites.filter(i => i.status === filters.status);
+    }
+    if (filters.token) {
+      invites = invites.filter(i => i.token === filters.token);
+    }
+    
+    return invites.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+  },
+
+  async getInviteByToken(token) {
+    return (data.invites || []).find(i => i.token === token && i.status === 'pending');
+  },
+
+  async acceptInvite(token, userId) {
+    const invite = (data.invites || []).find(i => i.token === token);
+    if (!invite) return null;
+    
+    invite.status = 'accepted';
+    invite.accepted_at = new Date().toISOString();
+    await this.save();
+    return invite;
+  },
+
+  async deleteInvite(id) {
+    const idx = (data.invites || []).findIndex(i => i.id === id);
+    if (idx === -1) return false;
+    data.invites.splice(idx, 1);
+    await this.save();
+    return true;
   }
 };
 

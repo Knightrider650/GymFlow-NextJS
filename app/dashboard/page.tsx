@@ -24,7 +24,8 @@ export default function DashboardPage() {
   const { 
     fetchStats, stats, statsLoading,
     fetchInvoices, invoices, 
-    fetchAttendance, attendance 
+    fetchAttendance, attendance,
+    settings, fetchSettings 
   } = useGymStore()
   const [isInitialLoading, setIsInitialLoading] = useState(true)
 
@@ -35,7 +36,8 @@ export default function DashboardPage() {
         await Promise.all([
           fetchStats(),
           fetchInvoices(),
-          fetchAttendance()
+          fetchAttendance(),
+          fetchSettings()
         ])
       } catch (error) {
         console.error('Error loading dashboard data:', error)
@@ -106,7 +108,7 @@ export default function DashboardPage() {
           <div>
             <h1 className="text-3xl font-bold tracking-tight">Dashboard</h1>
             <p className="text-sm text-muted-foreground mt-1">
-              Welcome back! Here's your gym overview.
+              Welcome back! Here&apos;s your gym overview.
             </p>
           </div>
           <Button
@@ -132,7 +134,7 @@ export default function DashboardPage() {
           />
           <StatCard
             title="Today's Revenue"
-            value={formatCurrency(stats?.todayRevenue || 0)}
+            value={formatCurrency(stats?.todayRevenue || 0, settings?.currency)}
             icon={DollarSign}
             description="Paid invoices today"
             trend={8}
@@ -140,7 +142,7 @@ export default function DashboardPage() {
           />
           <StatCard
             title="Monthly Revenue"
-            value={formatCurrency(stats?.monthlyRevenue || 0)}
+            value={formatCurrency(stats?.monthlyRevenue || 0, settings?.currency)}
             icon={TrendingUp}
             description="Total this month"
             trend={15}
@@ -243,7 +245,7 @@ export default function DashboardPage() {
                       </p>
                     </div>
                     <div className="text-right">
-                      <p className="font-medium text-sm">{formatCurrency(invoice.amount)}</p>
+                      <p className="font-medium text-sm">{formatCurrency(invoice.amount, settings?.currency)}</p>
                       <Badge
                         variant={
                           invoice.status === 'paid'

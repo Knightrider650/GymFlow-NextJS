@@ -6,106 +6,139 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter }
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Send, CheckCircle2 } from 'lucide-react'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { Send, CheckCircle2, MessageSquare } from 'lucide-react'
+import { apiClient } from '@/lib/api-client'
+import { useActivityLogs } from '@/hooks'
 
 export default function FeedbackPage() {
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [isSubmitted, setIsSubmitted] = useState(false)
+  const { logActivity } = useActivityLogs()
+  const [formData, setFormData] = useState({
+    category: '',
+    title: '',
+    details: ''
+  })
   
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setIsSubmitting(true)
     
-    // Simulate submission flow without a strict backend since this is structural 
-    setTimeout(() => {
+    try {
+      const response = await apiClient.post('/api/feedback', formData)
+      if (response.success) {
+        await logActivity('Feedback Submitted', 'Feedback', response.data.id, formData.title)
+        setIsSubmitted(true)
+      }
+    } catch (err) {
+      console.error('Failed to submit feedback:', err)
+    } finally {
       setIsSubmitting(false)
-      setIsSubmitted(true)
-    }, 1200)
+    }
   }
 
   return (
     <ProtectedLayout>
-      <div className="flex justify-between items-center mb-6">
+      <div className="p-6 lg:p-8 space-y-8">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight text-white mb-1">Feedback</h1>
-          <p className="text-slate-400">Share your thoughts on the GymFlow experience</p>
+          <h1 className="text-3xl font-bold tracking-tight bg-gradient-to-r from-primary to-blue-600 bg-clip-text text-transparent flex items-center gap-3">
+            <MessageSquare className="h-8 w-8 text-primary" />
+            Feedback & Suggestions
+          </h1>
+          <p className="text-sm text-muted-foreground mt-1">
+            Help us improve GymFlow by sharing your thoughts and reporting issues
+          </p>
         </div>
-      </div>
 
-      <div className="w-full max-w-2xl mx-auto mt-10">
-        {isSubmitted ? (
-          <Card className="bg-slate-900 border-slate-800 text-center py-12 px-6">
-            <CardContent className="flex flex-col items-center">
-              <div className="w-16 h-16 bg-primary/20 text-primary rounded-full flex items-center justify-center mb-6">
-                <CheckCircle2 className="w-8 h-8" />
-              </div>
-              <h2 className="text-2xl font-bold text-white mb-2">Thank You!</h2>
-              <p className="text-slate-400 mb-6">
-                Your feedback has been successfully submitted and logged. We appreciate your input.
-              </p>
-              <Button onClick={() => setIsSubmitted(false)} variant="outline" className="border-slate-700 hover:bg-slate-800">
-                Submit Another Response
-              </Button>
-            </CardContent>
-          </Card>
-        ) : (
-          <Card className="bg-slate-900 border-slate-800">
-            <CardHeader>
-              <CardTitle>Submit Feedback</CardTitle>
-              <CardDescription className="text-slate-400">
-                Help us improve by providing suggestions or reporting issues.
-              </CardDescription>
-            </CardHeader>
-            <form onSubmit={handleSubmit}>
-              <CardContent className="space-y-6">
-                <div className="space-y-2">
-                  <Label htmlFor="category">Feedback Category</Label>
-                  <select 
-                    id="category" 
-                    required 
-                    className="flex h-10 w-full rounded-md border border-slate-700 bg-slate-800 px-3 py-2 text-sm text-slate-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
-                  >
-                    <option value="">Select a category...</option>
-                    <option value="bug">Bug Report</option>
-                    <option value="feature">Feature Request</option>
-                    <option value="improvement">General Improvement</option>
-                    <option value="other">Other</option>
-                  </select>
+        <div className="w-full max-w-2xl mx-auto pt-8">
+          {isSubmitted ? (
+            <Card className="border-none bg-card/40 backdrop-blur-md text-center py-12 px-6 shadow-2xl animate-in zoom-in-95 duration-300">
+              <CardContent className="flex flex-col items-center">
+                <div className="w-16 h-16 bg-primary/20 text-primary rounded-full flex items-center justify-center mb-6 shadow-lg shadow-primary/20">
+                  <CheckCircle2 className="w-8 h-8" />
                 </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="title">Summary Title</Label>
-                  <Input 
-                    id="title" 
-                    required 
-                    placeholder="Brief description of your feedback" 
-                    className="bg-slate-800 border-slate-700" 
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="details">Detailed Description</Label>
-                  <textarea 
-                    id="details" 
-                    required 
-                    placeholder="Please provide as much detail as possible..." 
-                    className="flex min-h-[150px] w-full rounded-md border border-slate-700 bg-slate-800 px-3 py-2 text-sm text-slate-200 placeholder:text-slate-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2" 
-                  />
-                </div>
-              </CardContent>
-              <CardFooter className="bg-slate-800/30 py-4 border-t border-slate-800 flex justify-end">
-                <Button type="submit" disabled={isSubmitting} className="w-full sm:w-auto">
-                  {isSubmitting ? 'Sending...' : (
-                    <>
-                      <Send className="mr-2 h-4 w-4" /> Send Feedback
-                    </>
-                  )}
+                <h2 className="text-2xl font-bold mb-2">Thank You!</h2>
+                <p className="text-muted-foreground mb-8">
+                  Your feedback has been successfully submitted and logged. We appreciate your input in making GymFlow better.
+                </p>
+                <Button onClick={() => {
+                  setIsSubmitted(false)
+                  setFormData({ category: '', title: '', details: '' })
+                }} variant="outline" className="gap-2">
+                  Submit Another Response
                 </Button>
-              </CardFooter>
-            </form>
-          </Card>
-        )}
+              </CardContent>
+            </Card>
+          ) : (
+            <Card className="border-none bg-card/40 backdrop-blur-md shadow-2xl overflow-hidden">
+              <CardHeader className="bg-primary/5 border-b border-white/5">
+                <CardTitle>Submit Feedback</CardTitle>
+                <CardDescription>
+                  Choose a category and provide details about your experience.
+                </CardDescription>
+              </CardHeader>
+              <form onSubmit={handleSubmit}>
+                <CardContent className="space-y-6 pt-6">
+                  <div className="space-y-2">
+                    <Label htmlFor="category">Feedback Category</Label>
+                    <Select 
+                      onValueChange={(val) => setFormData({...formData, category: val})}
+                      required
+                    >
+                      <SelectTrigger className="bg-background/50 border-white/10">
+                        <SelectValue placeholder="Select a category..." />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="bug">Bug Report</SelectItem>
+                        <SelectItem value="feature">Feature Request</SelectItem>
+                        <SelectItem value="improvement">General Improvement</SelectItem>
+                        <SelectItem value="other">Other</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="title">Summary Title</Label>
+                    <Input 
+                      id="title" 
+                      required 
+                      placeholder="e.g., Request for mobile app features" 
+                      value={formData.title}
+                      onChange={(e) => setFormData({...formData, title: e.target.value})}
+                      className="bg-background/50 border-white/10"
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="details">Detailed Description</Label>
+                    <textarea 
+                      id="details" 
+                      required 
+                      placeholder="Please provide as much detail as possible so we can better understand your feedback..." 
+                      className="flex min-h-[150px] w-full rounded-md border border-white/10 bg-background/50 px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50" 
+                      value={formData.details}
+                      onChange={(e) => setFormData({...formData, details: e.target.value})}
+                    />
+                  </div>
+                </CardContent>
+                <CardFooter className="bg-muted/30 py-6 border-t border-white/5 flex justify-end">
+                  <Button type="submit" disabled={isSubmitting} className="w-full sm:w-auto px-8 gap-2 shadow-lg shadow-primary/20">
+                    {isSubmitting ? (
+                      'Sending...'
+                    ) : (
+                      <>
+                        <Send className="h-4 w-4" /> Send Feedback
+                      </>
+                    )}
+                  </Button>
+                </CardFooter>
+              </form>
+            </Card>
+          )}
+        </div>
       </div>
     </ProtectedLayout>
   )
 }
+

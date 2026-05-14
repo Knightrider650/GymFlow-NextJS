@@ -16,13 +16,14 @@ import {
   DialogTitle,
   DialogTrigger,
 } from '@/components/ui/dialog'
-import { useStaff } from '@/hooks'
+import { useStaff, useSettings } from '@/hooks'
 import { Plus, Edit2, Trash2, Users, Mail, Phone, Briefcase } from 'lucide-react'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { formatCurrency } from '@/utils/format'
 
 export default function StaffPage() {
-  const { staff, isLoading, fetchStaff, addStaffMember } = useStaff()
+  const { staff, isLoading, fetchStaff, addStaffMember, updateStaffMember, deleteStaffMember } = useStaff()
+  const { settings, fetchSettings } = useSettings()
   const [isDialogOpen, setIsDialogOpen] = useState(false)
   const [formData, setFormData] = useState({
     name: '',
@@ -35,7 +36,8 @@ export default function StaffPage() {
 
   useEffect(() => {
     fetchStaff()
-  }, [])
+    fetchSettings()
+  }, [fetchStaff, fetchSettings])
 
   const handleAddStaff = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -70,7 +72,7 @@ export default function StaffPage() {
           <div>
             <h1 className="text-3xl font-bold tracking-tight">Staff Management</h1>
             <p className="text-sm text-muted-foreground mt-1">
-              Oversee your gym's team and personnel details
+              Oversee your gym&apos;s team and personnel details
             </p>
           </div>
           <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
@@ -84,7 +86,7 @@ export default function StaffPage() {
               <DialogHeader>
                 <DialogTitle>Add Staff Member</DialogTitle>
                 <DialogDescription>
-                  Enter the details for a new member of the gym's staff.
+                  Enter the details for a new member of the gym&apos;s staff.
                 </DialogDescription>
               </DialogHeader>
               <form onSubmit={handleAddStaff} className="space-y-4 py-4">
@@ -225,7 +227,7 @@ export default function StaffPage() {
                           </div>
                         </TableCell>
                         <TableCell className="font-bold text-foreground">
-                          {formatCurrency(member.salary)}
+                          {formatCurrency(member.salary, settings?.currency)}
                           <span className="text-[10px] ml-1 font-normal text-muted-foreground">/mo</span>
                         </TableCell>
                         <TableCell className="text-right">
@@ -239,10 +241,19 @@ export default function StaffPage() {
                         </TableCell>
                         <TableCell className="text-right">
                           <div className="flex justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                            <Button size="icon" variant="ghost" className="h-8 w-8">
+                            <Button size="icon" variant="ghost" className="h-8 w-8 hover:text-primary">
                               <Edit2 className="h-4 w-4" />
                             </Button>
-                            <Button size="icon" variant="ghost" className="h-8 w-8 text-destructive hover:bg-destructive/10">
+                            <Button 
+                              size="icon" 
+                              variant="ghost" 
+                              className="h-8 w-8 text-destructive hover:bg-destructive/10"
+                              onClick={() => {
+                                if (confirm('Are you sure you want to remove this staff member?')) {
+                                  deleteStaffMember(member.id)
+                                }
+                              }}
+                            >
                               <Trash2 className="h-4 w-4" />
                             </Button>
                           </div>

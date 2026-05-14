@@ -1,36 +1,42 @@
 import { format, parse } from 'date-fns'
 
-export const formatDate = (date: string | Date, formatStr = 'MMM dd, yyyy') => {
+export const formatDate = (date: string | Date | undefined | null, formatStr = 'MMM dd, yyyy') => {
+  if (!date) return '-'
   try {
     const dateObj = typeof date === 'string' ? new Date(date) : date
+    if (isNaN(dateObj.getTime())) return '-'
     return format(dateObj, formatStr)
   } catch (error) {
-    return 'Invalid date'
+    return '-'
   }
 }
 
-export const formatTime = (date: string | Date, formatStr = 'HH:mm') => {
+export const formatTime = (date: string | Date | undefined | null, formatStr = 'HH:mm') => {
+  if (!date) return '-'
   try {
     const dateObj = typeof date === 'string' ? new Date(date) : date
+    if (isNaN(dateObj.getTime())) return '-'
     return format(dateObj, formatStr)
   } catch (error) {
-    return 'Invalid time'
+    return '-'
   }
 }
 
-export const formatDateTime = (date: string | Date, formatStr = 'MMM dd, yyyy HH:mm') => {
+export const formatDateTime = (date: string | Date | undefined | null, formatStr = 'MMM dd, yyyy HH:mm') => {
+  if (!date) return '-'
   try {
     const dateObj = typeof date === 'string' ? new Date(date) : date
+    if (isNaN(dateObj.getTime())) return '-'
     return format(dateObj, formatStr)
   } catch (error) {
-    return 'Invalid date/time'
+    return '-'
   }
 }
 
 export const formatCurrency = (amount: number, currency = 'USD') => {
   return new Intl.NumberFormat('en-US', {
     style: 'currency',
-    currency,
+    currency: currency || 'USD',
   }).format(amount)
 }
 

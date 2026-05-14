@@ -3,6 +3,7 @@ const path = require('path')
 
 const nextConfig = {
   reactStrictMode: true,
+  output: 'standalone',
   images: {
     remotePatterns: [
       {
@@ -10,9 +11,6 @@ const nextConfig = {
         hostname: '**',
       },
     ],
-  },
-  turbopack: {
-    root: path.resolve(__dirname),
   },
   env: {
     NEXT_PUBLIC_API_URL: process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000',

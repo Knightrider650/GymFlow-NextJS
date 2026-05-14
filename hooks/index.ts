@@ -129,6 +129,7 @@ export const useInventory = () => {
     fetchInventory: store.fetchInventory,
     addInventoryItem: store.addInventoryItem,
     updateInventoryItem: store.updateInventoryItem,
+    deleteInventoryItem: store.deleteInventoryItem,
   }
 }
 
@@ -141,6 +142,7 @@ export const useStaff = () => {
     fetchStaff: store.fetchStaff,
     addStaffMember: store.addStaffMember,
     updateStaffMember: store.updateStaffMember,
+    deleteStaffMember: store.deleteStaffMember,
   }
 }
 
@@ -162,6 +164,30 @@ export const useSettings = () => {
     settings: store.settings,
     fetchSettings: store.fetchSettings,
     updateSettings: store.updateSettings,
+  }
+}
+
+// Hook for plans
+export const usePlans = () => {
+  const store = useGymStore()
+  return {
+    plans: store.plans,
+    isLoading: store.plansLoading,
+    fetchPlans: store.fetchPlans,
+    createPlan: store.createPlan,
+    updatePlan: store.updatePlan,
+    deletePlan: store.deletePlan,
+  }
+}
+
+// Hook for activity logs
+export const useActivityLogs = () => {
+  const store = useGymStore()
+  return {
+    activityLogs: store.activityLogs,
+    isLoading: store.activityLogsLoading,
+    fetchActivityLogs: store.fetchActivityLogs,
+    logActivity: store.logActivity,
   }
 }
 

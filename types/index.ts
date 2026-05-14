@@ -32,7 +32,7 @@ export interface Member {
   email: string
   phone: string
   address?: string
-  membershipType: 'Basic' | 'Premium' | 'Elite' | 'Trial'
+  membershipType: string
   status: 'active' | 'expired' | 'pending' | 'cancelled'
   joinDate: string
   expiryDate: string

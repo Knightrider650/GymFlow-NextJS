@@ -38,6 +38,8 @@ export default function PlansPage() {
   const createPlan = useGymStore(state => state.createPlan)
   const updatePlan = useGymStore(state => state.updatePlan)
   const deletePlan = useGymStore(state => state.deletePlan)
+  const settings = useGymStore(state => state.settings)
+  const fetchSettings = useGymStore(state => state.fetchSettings)
   const plansLoading = useGymStore(state => state.plansLoading)
 
   const [isDialogOpen, setIsDialogOpen] = useState(false)
@@ -57,7 +59,8 @@ export default function PlansPage() {
 
   useEffect(() => {
     fetchPlans()
-  }, [fetchPlans])
+    fetchSettings()
+  }, [fetchPlans, fetchSettings])
 
   const onOpenChange = (open: boolean) => {
     setIsDialogOpen(open)
@@ -93,11 +96,12 @@ export default function PlansPage() {
 
   return (
     <ProtectedLayout>
-      <div className="flex justify-between items-center mb-6">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight text-white mb-1">Membership Plans</h1>
-          <p className="text-slate-400">Configure pricing tiers and durations</p>
-        </div>
+      <div className="p-6 lg:p-8 space-y-8">
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+          <div>
+            <h1 className="text-3xl font-bold tracking-tight bg-gradient-to-r from-primary to-indigo-600 bg-clip-text text-transparent">Membership Plans</h1>
+            <p className="text-sm text-muted-foreground mt-1">Configure pricing tiers and durations</p>
+          </div>
 
         <Dialog open={isDialogOpen} onOpenChange={onOpenChange}>
           <DialogTrigger asChild>
@@ -183,8 +187,8 @@ export default function PlansPage() {
                       <TableCell className="text-slate-300">
                         {plan.durationMonths || plan.duration_months} Months
                       </TableCell>
-                      <TableCell className="text-slate-300 font-bold">
-                        {formatCurrency(Number(plan.price))}
+                      <TableCell className="font-bold">
+                        {formatCurrency(plan.price, settings?.currency)}
                       </TableCell>
                       <TableCell className="text-slate-400 text-sm max-w-[200px] truncate">
                         {plan.features || '-'}
@@ -207,6 +211,7 @@ export default function PlansPage() {
           </div>
         </CardContent>
       </Card>
+      </div>
     </ProtectedLayout>
   )
 }

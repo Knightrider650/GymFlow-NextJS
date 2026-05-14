@@ -16,13 +16,14 @@ import {
   DialogTitle,
   DialogTrigger,
 } from '@/components/ui/dialog'
-import { useInventory } from '@/hooks'
-import { Plus, AlertCircle, Package } from 'lucide-react'
+import { useInventory, useSettings } from '@/hooks'
+import { Plus, AlertCircle, Package, Edit2, Trash2 } from 'lucide-react'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { formatCurrency, getStatusBadgeColor } from '@/utils/format'
 
 export default function InventoryPage() {
-  const { inventory, isLoading, fetchInventory, addInventoryItem } = useInventory()
+  const { inventory, isLoading, fetchInventory, addInventoryItem, updateInventoryItem, deleteInventoryItem } = useInventory()
+  const { settings, fetchSettings } = useSettings()
   const [isDialogOpen, setIsDialogOpen] = useState(false)
   const [formData, setFormData] = useState({
     name: '',
@@ -34,6 +35,7 @@ export default function InventoryPage() {
 
   useEffect(() => {
     fetchInventory()
+    fetchSettings()
   }, [])
 
   const handleAddItem = async (e: React.FormEvent) => {
@@ -192,12 +194,13 @@ export default function InventoryPage() {
                     <TableHead className="text-center">Min. Threshold</TableHead>
                     <TableHead>Unit Cost</TableHead>
                     <TableHead className="text-right">Status</TableHead>
+                    <TableHead className="text-right">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {inventory.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={6} className="text-center py-12 text-muted-foreground">
+                      <TableCell colSpan={7} className="text-center py-12 text-muted-foreground">
                         {isLoading ? (
                           <div className="flex flex-col items-center gap-2">
                             <div className="h-6 w-6 animate-spin rounded-full border-2 border-primary border-t-transparent" />
@@ -208,7 +211,7 @@ export default function InventoryPage() {
                     </TableRow>
                   ) : (
                     inventory.map((item) => (
-                      <TableRow key={item.id} className="hover:bg-muted/30 transition-colors">
+                      <TableRow key={item.id} className="hover:bg-muted/30 transition-colors group">
                         <TableCell className="font-semibold text-primary">{item.name}</TableCell>
                         <TableCell>
                           <Badge variant="outline" className="font-normal">{item.category}</Badge>
@@ -219,13 +222,34 @@ export default function InventoryPage() {
                           </span>
                         </TableCell>
                         <TableCell className="text-center text-muted-foreground">{item.minThreshold}</TableCell>
-                        <TableCell className="font-medium">{formatCurrency(item.costPerUnit)}</TableCell>
+                        <TableCell className="font-medium text-foreground">
+                          {formatCurrency(item.costPerUnit, settings?.currency)}
+                        </TableCell>
                         <TableCell className="text-right">
                           <Badge
                             className={item.quantity <= item.minThreshold ? 'bg-red-500/10 text-red-600 hover:bg-red-500/20' : 'bg-green-500/10 text-green-600 hover:bg-green-500/20'}
                           >
                             {item.quantity <= item.minThreshold ? 'Restock Soon' : 'Optimal'}
                           </Badge>
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <div className="flex justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                            <Button size="icon" variant="ghost" className="h-8 w-8 text-slate-400 hover:text-primary">
+                              <Edit2 className="h-4 w-4" />
+                            </Button>
+                            <Button 
+                              size="icon" 
+                              variant="ghost" 
+                              className="h-8 w-8 text-slate-400 hover:text-rose-500"
+                              onClick={() => {
+                                if (confirm('Are you sure you want to delete this item?')) {
+                                  deleteInventoryItem(item.id)
+                                }
+                              }}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </div>
                         </TableCell>
                       </TableRow>
                     ))

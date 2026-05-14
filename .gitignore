@@ -41,3 +41,5 @@ yarn-error.log*
 # Misc
 .eslintcache
 .stylelintcache
+
+/generated/prisma

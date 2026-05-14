@@ -51,7 +51,7 @@ export default function ClassesPage() {
 
   return (
     <ProtectedLayout>
-      <div className="p-6 lg:p-8 space-y-8 bg-slate-50/30 min-h-screen">
+      <div className="p-6 lg:p-8 space-y-8 min-h-screen">
         {/* Header */}
         <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
           <div>
@@ -165,8 +165,8 @@ export default function ClassesPage() {
               const enrollmentPercent = Math.min(100, (fitnessClass.currentEnrollment / (fitnessClass.maxCapacity || 1)) * 100)
               
               return (
-                <Card key={fitnessClass.id} className="group overflow-hidden border-none shadow-xl hover:shadow-2xl transition-all duration-300 bg-white/80 backdrop-blur-sm">
-                  <CardHeader className="bg-gradient-to-br from-slate-50 to-white pb-3 border-b border-slate-50">
+                <Card key={fitnessClass.id} className="group overflow-hidden border-none shadow-xl hover:shadow-2xl transition-all duration-300 bg-card/60 backdrop-blur-sm">
+                  <CardHeader className="bg-muted/30 pb-3 border-b border-white/5">
                     <div className="flex items-start justify-between">
                       <div className="space-y-1">
                         <CardTitle className="text-xl font-bold group-hover:text-primary transition-colors line-clamp-1">{fitnessClass.name}</CardTitle>
@@ -176,7 +176,22 @@ export default function ClassesPage() {
                         </div>
                       </div>
                       <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                        <Button size="icon" variant="ghost" className="h-8 w-8 text-slate-400 hover:text-primary">
+                        <Button 
+                          size="icon" 
+                          variant="ghost" 
+                          className="h-8 w-8 text-slate-400 hover:text-primary"
+                          onClick={() => {
+                            setFormData({
+                              name: fitnessClass.name,
+                              instructorName: fitnessClass.instructorName || '',
+                              maxCapacity: fitnessClass.maxCapacity.toString(),
+                              description: fitnessClass.description || '',
+                              time: fitnessClass.time || '10:00 AM',
+                              days: fitnessClass.days || 'Mon, Wed, Fri'
+                            })
+                            setIsAddDialogOpen(true)
+                          }}
+                        >
                           <Edit2 className="h-4 w-4" />
                         </Button>
                         <Button size="icon" variant="ghost" className="h-8 w-8 text-slate-400 hover:text-red-500" onClick={() => deleteClass(fitnessClass.id)}>

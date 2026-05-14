@@ -52,6 +52,7 @@ interface GymState {
   fetchInventory: (filters?: import('../types').InventoryFilters, force?: boolean) => Promise<void>
   addInventoryItem: (item: Omit<InventoryItem, 'id' | 'createdAt' | 'lastUpdated'>) => Promise<void>
   updateInventoryItem: (id: string, item: Partial<InventoryItem>) => Promise<void>
+  deleteInventoryItem: (id: string) => Promise<void>
 
   // Staff
   staff: Staff[]
@@ -59,6 +60,7 @@ interface GymState {
   fetchStaff: () => Promise<void>
   addStaffMember: (staffData: Omit<Staff, 'id' | 'createdAt' | 'updatedAt'>) => Promise<void>
   updateStaffMember: (id: string, staffData: Partial<Staff>) => Promise<void>
+  deleteStaffMember: (id: string) => Promise<void>
 
   // Notifications
   notifications: Notification[]
@@ -104,7 +106,11 @@ interface GymState {
   createPlan: (plan: any) => Promise<void>
   updatePlan: (id: string, plan: any) => Promise<void>
   deletePlan: (id: string) => Promise<void>
-
+  // Activity Logs
+  activityLogs: any[]
+  activityLogsLoading: boolean
+  fetchActivityLogs: (filters?: any) => Promise<any[]>
+  logActivity: (action: string, entityType: string, entityId?: string, entityName?: string, details?: string) => Promise<void>
   // Real-time
   initStream: () => void
 }
@@ -436,6 +442,17 @@ export const useGymStore = create<GymState>()((set, get) => ({
     }
   },
 
+  deleteInventoryItem: async (id: string) => {
+    try {
+      const response = await apiClient.delete(`/api/inventory/${id}`)
+      if (response.success) {
+        await get().fetchInventory()
+      }
+    } catch (error) {
+      console.error('Error deleting inventory item:', error)
+    }
+  },
+
   // Staff
   staff: [],
   staffLoading: false,
@@ -472,6 +489,17 @@ export const useGymStore = create<GymState>()((set, get) => ({
       }
     } catch (error) {
       console.error('Error updating staff member:', error)
+    }
+  },
+
+  deleteStaffMember: async (id: string) => {
+    try {
+      const response = await apiClient.delete(`/api/staff/${id}`)
+      if (response.success) {
+        await get().fetchStaff()
+      }
+    } catch (error) {
+      console.error('Error deleting staff member:', error)
     }
   },
 
@@ -595,6 +623,43 @@ export const useGymStore = create<GymState>()((set, get) => ({
   deletePlan: async (id: string) => {
     const res = await apiClient.delete(`/api/plans/${id}`)
     if (res.success) await get().fetchPlans(true)
+  },
+
+  // Activity Logs
+  activityLogs: [],
+  activityLogsLoading: false,
+  fetchActivityLogs: async (filters?: any) => {
+    set({ activityLogsLoading: true })
+    try {
+      const response = await apiClient.get('/api/activity-logs', { params: filters || {} })
+      if (response.success) {
+        set({ activityLogs: response.data || [] })
+        return response.data || []
+      }
+      return []
+    } catch (error) {
+      console.error('Error fetching activity logs:', error)
+      return []
+    } finally {
+      set({ activityLogsLoading: false })
+    }
+  },
+  logActivity: async (action: string, entityType: string, entityId?: string, entityName?: string, details?: string) => {
+    try {
+      const response = await apiClient.post('/api/activity-logs', {
+        action,
+        entityType,
+        entityId,
+        entityName,
+        details
+      })
+      if (response.success) {
+        // Refresh activity logs
+        await get().fetchActivityLogs()
+      }
+    } catch (error) {
+      console.error('Error logging activity:', error)
+    }
   },
 
   // Real-time SSE

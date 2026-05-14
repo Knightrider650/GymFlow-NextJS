@@ -1,0 +1,235 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Gym {
+  id               String   @id @default(cuid())
+  name             String
+  logo             String?
+  email            String
+  phone            String
+  address          String
+  currency         String   @default("USD")
+  dateFormat       String   @default("MM/DD/YYYY")
+  timeZone         String   @default("UTC")
+  invoicePrefix    String   @default("INV-")
+  nextInvoiceNumber Int      @default(1000)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  users            User[]
+  members          Member[]
+  staff            Staff[]
+  plans            Plan[]
+  classes          FitnessClass[]
+  inventory        InventoryItem[]
+  leads            Lead[]
+  invoices         Invoice[]
+  notifications    Notification[]
+  activityLogs     ActivityLog[]
+  feedback         Feedback[]
+  invites          Invite[]
+}
+
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  password  String
+  fullname  String
+  role      String   @default("staff") // admin, manager, staff, trainer
+  gymId     String
+  gym       Gym      @relation(fields: [gymId], references: [id])
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  notifications Notification[]
+  activityLogs  ActivityLog[]
+}
+
+model Member {
+  id               String   @id @default(cuid())
+  name             String
+  email            String
+  phone            String
+  address          String?
+  membershipType   String
+  status           String   @default("active") // active, expired, pending, cancelled
+  joinDate         DateTime @default(now())
+  expiryDate       DateTime
+  emergencyContact String?
+  emergencyPhone   String?
+  gymId            String
+  gym              Gym      @relation(fields: [gymId], references: [id])
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  attendance Attendance[]
+  invoices   Invoice[]
+}
+
+model Attendance {
+  id           String   @id @default(cuid())
+  memberId     String
+  member       Member   @relation(fields: [memberId], references: [id])
+  checkInTime  DateTime @default(now())
+  checkOutTime DateTime?
+  notes        String?
+  recordedDate String   // YYYY-MM-DD
+  createdAt    DateTime @default(now())
+}
+
+model Plan {
+  id             String   @id @default(cuid())
+  name           String
+  price          Float
+  durationMonths Int
+  features       String?  // Comma separated or JSON string
+  gymId          String
+  gym            Gym      @relation(fields: [gymId], references: [id])
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+}
+
+model FitnessClass {
+  id                String   @id @default(cuid())
+  name              String
+  description       String?
+  instructorName    String?
+  time              String?  // e.g., "10:00 AM"
+  days              String?  // e.g., "Mon, Wed, Fri"
+  maxCapacity       Int
+  currentEnrollment Int      @default(0)
+  gymId             String
+  gym               Gym      @relation(fields: [gymId], references: [id])
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+}
+
+model InventoryItem {
+  id           String   @id @default(cuid())
+  name         String
+  category     String   // Equipment, Consumables, etc.
+  quantity     Int
+  minThreshold Int
+  costPerUnit  Float
+  supplier     String?
+  gymId        String
+  gym          Gym      @relation(fields: [gymId], references: [id])
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
+model Staff {
+  id               String   @id @default(cuid())
+  name             String
+  email            String
+  phone            String
+  position         String   // Trainer, Manager, etc.
+  salary           Float
+  status           String   @default("active")
+  joinDate         DateTime @default(now())
+  emergencyContact String?
+  gymId            String
+  gym              Gym      @relation(fields: [gymId], references: [id])
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+}
+
+model Invoice {
+  id            String   @id @default(cuid())
+  invoiceNumber String
+  amount        Float
+  status        String   @default("pending") // paid, pending, overdue
+  description   String
+  invoiceDate   DateTime @default(now())
+  dueDate       DateTime
+  memberId      String
+  member        Member   @relation(fields: [memberId], references: [id])
+  gymId         String
+  gym           Gym      @relation(fields: [gymId], references: [id])
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  payments Payment[]
+}
+
+model Payment {
+  id            String   @id @default(cuid())
+  amount        Float
+  method        String   // cash, card, etc.
+  transactionId String?
+  paymentDate   DateTime @default(now())
+  notes         String?
+  invoiceId     String
+  invoice       Invoice  @relation(fields: [invoiceId], references: [id])
+  createdAt     DateTime @default(now())
+}
+
+model Lead {
+  id        String   @id @default(cuid())
+  name      String
+  email     String
+  phone     String
+  status    String   @default("New") // New, Contacted, Converted, Lost
+  notes     String?
+  gymId     String
+  gym       Gym      @relation(fields: [gymId], references: [id])
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Notification {
+  id        String   @id @default(cuid())
+  userId    String?
+  user      User?    @relation(fields: [userId], references: [id])
+  type      String   // membership_expiry, system, etc.
+  title     String
+  message   String
+  read      Boolean  @default(false)
+  gymId     String
+  gym       Gym      @relation(fields: [gymId], references: [id])
+  createdAt DateTime @default(now())
+}
+
+model ActivityLog {
+  id         String   @id @default(cuid())
+  action     String
+  details    String?
+  entityType String?
+  entityId   String?
+  userName   String?
+  userId     String?
+  user       User?    @relation(fields: [userId], references: [id])
+  gymId      String
+  gym        Gym      @relation(fields: [gymId], references: [id])
+  timestamp  DateTime @default(now())
+}
+
+model Feedback {
+  id        String   @id @default(cuid())
+  category  String
+  title     String
+  details   String
+  gymId     String
+  gym       Gym      @relation(fields: [gymId], references: [id])
+  createdAt DateTime @default(now())
+}
+
+model Invite {
+  id        String   @id @default(cuid())
+  email     String
+  role      String
+  status    String   @default("pending") // pending, accepted, expired
+  sentAt    DateTime @default(now())
+  expiresAt DateTime
+  gymId     String
+  gym       Gym      @relation(fields: [gymId], references: [id])
+}
