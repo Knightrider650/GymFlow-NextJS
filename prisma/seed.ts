@@ -28,14 +28,42 @@ async function main() {
   })
 
   // Create an admin user
-  const hashedPassword = await bcrypt.hash('admin123', 10)
-  const admin = await prisma.user.upsert({
+  const adminPassword = await bcrypt.hash('admin123', 10)
+  await prisma.user.upsert({
     where: { email: 'admin@gym.com' },
     update: {},
     create: {
       email: 'admin@gym.com',
-      password: hashedPassword,
+      password: adminPassword,
       fullname: 'Admin User',
+      role: 'admin',
+      gymId: gym.id,
+    },
+  })
+
+  // Create CTO user
+  const ctoPassword = await bcrypt.hash('cto123', 10)
+  await prisma.user.upsert({
+    where: { email: 'cto@gym.com' },
+    update: {},
+    create: {
+      email: 'cto@gym.com',
+      password: ctoPassword,
+      fullname: 'CTO User',
+      role: 'admin',
+      gymId: gym.id,
+    },
+  })
+
+  // Create CEO user
+  const ceoPassword = await bcrypt.hash('ceo123', 10)
+  await prisma.user.upsert({
+    where: { email: 'ceo@gym.com' },
+    update: {},
+    create: {
+      email: 'ceo@gym.com',
+      password: ceoPassword,
+      fullname: 'CEO User',
       role: 'admin',
       gymId: gym.id,
     },
