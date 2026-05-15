@@ -50,7 +50,7 @@ async function main() {
       email: 'cto@gym.com',
       password: ctoPassword,
       fullname: 'CTO User',
-      role: 'admin',
+      role: 'cto',
       gymId: gym.id,
     },
   })
@@ -64,7 +64,7 @@ async function main() {
       email: 'ceo@gym.com',
       password: ceoPassword,
       fullname: 'CEO User',
-      role: 'admin',
+      role: 'ceo',
       gymId: gym.id,
     },
   })

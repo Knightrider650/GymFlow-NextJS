@@ -78,7 +78,7 @@ const loginLimiter = rateLimit({
   message: { error: 'Account temporarily locked after 5 failed attempts. Please try again in 30 minutes.' }
 });
 
-app.post('/api/auth/register', authMiddleware, authorizeRoles(['admin']), async (req, res) => {
+app.post('/api/auth/register', authMiddleware, authorizeRoles(['admin', 'ceo', 'cto']), async (req, res) => {
   try {
     const { email, password, name, role } = req.body;
     if (!email || !password || !name) return res.status(400).json({ error: 'Missing required fields' });
@@ -209,7 +209,7 @@ app.post('/api/members/bulk', authMiddleware, async (req, res) => {
   }
 });
 
-app.delete('/api/members/:id', authMiddleware, authorizeRoles(['admin']), async (req, res) => {
+app.delete('/api/members/:id', authMiddleware, authorizeRoles(['admin', 'ceo', 'cto']), async (req, res) => {
   const success = await db.deleteMember(req.params.id, req.user.id);
   if (success) broadcast('members:delete', { id: req.params.id });
   res.json({ success });
@@ -264,7 +264,7 @@ app.put('/api/staff/:id', authMiddleware, async (req, res) => {
   res.json({ success: !!member, data: member });
 });
 
-app.delete('/api/staff/:id', authMiddleware, authorizeRoles(['admin']), async (req, res) => {
+app.delete('/api/staff/:id', authMiddleware, authorizeRoles(['admin', 'ceo', 'cto']), async (req, res) => {
   const success = await db.deleteStaff(req.params.id, req.user.id);
   if (success) broadcast('staff:delete', { id: req.params.id });
   res.json({ success });
@@ -297,7 +297,7 @@ app.put('/api/inventory/:id', authMiddleware, async (req, res) => {
   res.json({ success: !!item, data: item });
 });
 
-app.delete('/api/inventory/:id', authMiddleware, authorizeRoles(['admin']), async (req, res) => {
+app.delete('/api/inventory/:id', authMiddleware, authorizeRoles(['admin', 'ceo', 'cto']), async (req, res) => {
   const success = await db.deleteInventoryItem(req.params.id, req.user.id);
   if (success) broadcast('inventory:delete', { id: req.params.id });
   res.json({ success });
@@ -330,7 +330,7 @@ app.put('/api/billing/:id', authMiddleware, async (req, res) => {
   res.json({ success: !!invoice, data: invoice });
 });
 
-app.delete('/api/billing/:id', authMiddleware, authorizeRoles(['admin']), async (req, res) => {
+app.delete('/api/billing/:id', authMiddleware, authorizeRoles(['admin', 'ceo', 'cto']), async (req, res) => {
   const success = await db.deleteInvoice(req.params.id, req.user.id);
   if (success) broadcast('billing:delete', { id: req.params.id });
   res.json({ success });
@@ -357,7 +357,7 @@ app.put('/api/classes/:id', authMiddleware, async (req, res) => {
   res.json({ success: !!cls, data: cls });
 });
 
-app.delete('/api/classes/:id', authMiddleware, authorizeRoles(['admin']), async (req, res) => {
+app.delete('/api/classes/:id', authMiddleware, authorizeRoles(['admin', 'ceo', 'cto']), async (req, res) => {
   const success = await db.deleteClass(req.params.id, req.user.id);
   if (success) broadcast('classes:delete', { id: req.params.id });
   res.json({ success });
@@ -372,7 +372,7 @@ app.get('/api/settings', authMiddleware, async (req, res) => {
   res.json({ success: true, data });
 });
 
-app.put('/api/settings', authMiddleware, authorizeRoles(['admin']), async (req, res) => {
+app.put('/api/settings', authMiddleware, authorizeRoles(['admin', 'ceo', 'cto']), async (req, res) => {
   const data = await db.updateSettings(req.body, req.user.id);
   res.json({ success: true, data });
 });
@@ -472,7 +472,7 @@ app.get('/api/settings', authMiddleware, async (req, res) => {
   }
 });
 
-app.put('/api/settings', authMiddleware, authorizeRoles(['admin']), async (req, res) => {
+app.put('/api/settings', authMiddleware, authorizeRoles(['admin', 'ceo', 'cto']), async (req, res) => {
   try {
     const data = await db.updateSettings ? await db.updateSettings(req.body, req.user.id) : req.body;
     res.json({ success: true, data });
@@ -481,7 +481,7 @@ app.put('/api/settings', authMiddleware, authorizeRoles(['admin']), async (req, 
   }
 });
 
-app.post('/api/settings', authMiddleware, authorizeRoles(['admin']), async (req, res) => {
+app.post('/api/settings', authMiddleware, authorizeRoles(['admin', 'ceo', 'cto']), async (req, res) => {
   try {
     const data = await db.updateSettings ? await db.updateSettings(req.body, req.user.id) : req.body;
     res.json({ success: true, data });
@@ -503,7 +503,7 @@ app.get('/api/dashboard-stats', authMiddleware, async (req, res) => {
   }
 });
 
-app.get('/api/reports/:type', authMiddleware, authorizeRoles(['admin']), async (req, res) => {
+app.get('/api/reports/:type', authMiddleware, authorizeRoles(['admin', 'ceo', 'cto']), async (req, res) => {
   try {
     const { type } = req.params;
     let data;
@@ -675,7 +675,7 @@ app.get('/api/activity-logs', authMiddleware, async (req, res) => {
 // TEAM MANAGEMENT API
 // ============================================================================
 
-app.get('/api/team/members', authMiddleware, authorizeRoles(['admin']), async (req, res) => {
+app.get('/api/team/members', authMiddleware, authorizeRoles(['admin', 'ceo', 'cto']), async (req, res) => {
   try {
     const response = await db.getUsers();
     res.json({ success: true, data: response || [] });
@@ -685,7 +685,7 @@ app.get('/api/team/members', authMiddleware, authorizeRoles(['admin']), async (r
   }
 });
 
-app.post('/api/team/members', authMiddleware, authorizeRoles(['admin']), async (req, res) => {
+app.post('/api/team/members', authMiddleware, authorizeRoles(['admin', 'ceo', 'cto']), async (req, res) => {
   try {
     const { email, name, password, role } = req.body;
     
@@ -733,7 +733,7 @@ app.post('/api/team/members', authMiddleware, authorizeRoles(['admin']), async (
   }
 });
 
-app.put('/api/team/members/:id', authMiddleware, authorizeRoles(['admin']), async (req, res) => {
+app.put('/api/team/members/:id', authMiddleware, authorizeRoles(['admin', 'ceo', 'cto']), async (req, res) => {
   try {
     const { id } = req.params;
     const { role } = req.body;
@@ -770,7 +770,7 @@ app.put('/api/team/members/:id', authMiddleware, authorizeRoles(['admin']), asyn
   }
 });
 
-app.delete('/api/team/members/:id', authMiddleware, authorizeRoles(['admin']), async (req, res) => {
+app.delete('/api/team/members/:id', authMiddleware, authorizeRoles(['admin', 'ceo', 'cto']), async (req, res) => {
   try {
     const { id } = req.params;
 

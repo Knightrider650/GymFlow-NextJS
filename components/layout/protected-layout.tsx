@@ -25,13 +25,15 @@ export function ProtectedLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname()
 
   const routePermissions: Record<string, string[]> = {
-    '/staff': ['admin', 'owner'],
-    '/settings': ['admin', 'owner'],
-    '/activity-log': ['admin', 'owner'],
-    '/billing': ['admin', 'owner', 'manager'],
-    '/inventory': ['admin', 'owner', 'manager'],
-    '/communications': ['admin', 'owner', 'manager'],
-    '/plans': ['admin', 'owner', 'manager'],
+    '/staff': ['admin', 'owner', 'ceo', 'cto'],
+    '/settings': ['admin', 'owner', 'ceo', 'cto'],
+    '/activity-log': ['admin', 'owner', 'ceo', 'cto'],
+    '/billing': ['admin', 'owner', 'manager', 'ceo', 'cto'],
+    '/inventory': ['admin', 'owner', 'manager', 'ceo', 'cto'],
+    '/communications': ['admin', 'owner', 'manager', 'ceo', 'cto'],
+    '/plans': ['admin', 'owner', 'manager', 'ceo', 'cto'],
+    '/team': ['admin', 'owner', 'ceo', 'cto'],
+    '/invites': ['admin', 'owner', 'ceo', 'cto'],
   }
 
   useEffect(() => {
