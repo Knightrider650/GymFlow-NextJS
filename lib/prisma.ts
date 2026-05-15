@@ -12,7 +12,9 @@ declare global {
   }
 }
 
-const prisma = (global as any).prisma || new PrismaClient();
+const prisma = (global as any).prisma || new PrismaClient({
+  datasourceUrl: process.env.DATABASE_URL,
+});
 
 if (process.env.NODE_ENV !== "production") (global as any).prisma = prisma;
 
