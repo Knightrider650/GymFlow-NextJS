@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import prisma from '@/lib/prisma'
 import { getAuthUser } from '@/lib/auth'
+import { isTrainer } from '@/lib/permissions'
 
 export async function GET(req: NextRequest) {
   try {
@@ -13,7 +14,7 @@ export async function GET(req: NextRequest) {
     })
 
     // Report requirement: No money/salary visibility for trainers
-    if (user.role === 'trainer') {
+    if (isTrainer(user.role)) {
       const sanitizedData = data.map(({ salary, ...rest }) => rest)
       return NextResponse.json({ success: true, data: sanitizedData })
     }
@@ -31,7 +32,7 @@ export async function POST(req: NextRequest) {
     if (!user) return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 })
 
     // Report requirement: Trainer should not manage staff
-    if (user.role === 'trainer') {
+    if (isTrainer(user.role)) {
       return NextResponse.json({ success: false, error: 'Trainers cannot manage staff records' }, { status: 403 })
     }
 

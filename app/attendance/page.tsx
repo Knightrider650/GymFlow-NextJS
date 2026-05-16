@@ -17,21 +17,25 @@ import {
   DialogTrigger,
 } from '@/components/ui/dialog'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
-import { useAttendance, useMembers } from '@/hooks'
+import { useAttendance, useMembers, useBranches } from '@/hooks'
 import { formatDateTime, calculateDuration, formatDuration } from '@/utils/format'
-import { Plus, LogOut, Search } from 'lucide-react'
+import { Plus, LogOut, Search, Filter, MapPin } from 'lucide-react'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 
 export default function AttendancePage() {
   const { attendance, isLoading, fetchAttendance, checkInMember, checkOutMember } = useAttendance()
   const { members, fetchMembers } = useMembers()
+  const { branches, fetchBranches } = useBranches()
   const [isDialogOpen, setIsDialogOpen] = useState(false)
   const [selectedMemberId, setSelectedMemberId] = useState('')
   const [notes, setNotes] = useState('')
   const [searchTerm, setSearchTerm] = useState('')
+  const [selectedBranch, setSelectedBranch] = useState<string>('all')
 
   useEffect(() => {
     fetchAttendance()
     fetchMembers()
+    fetchBranches()
   }, [])
 
   const handleCheckIn = async (e: React.FormEvent) => {
@@ -70,13 +74,28 @@ export default function AttendancePage() {
               Track member check-ins and check-outs
             </p>
           </div>
-          <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-            <DialogTrigger asChild>
-              <Button className="gap-2 w-fit">
-                <Plus className="h-4 w-4" />
-                Check-in Member
-              </Button>
-            </DialogTrigger>
+          <div className="flex items-center gap-4">
+            <div className="flex items-center gap-2 bg-muted/50 px-3 py-1.5 rounded-lg border">
+              <Filter className="h-4 w-4 text-muted-foreground" />
+              <Select value={selectedBranch} onValueChange={setSelectedBranch}>
+                <SelectTrigger className="w-[180px] border-none bg-transparent focus:ring-0">
+                  <SelectValue placeholder="All Branches" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Branches</SelectItem>
+                  {branches.map(b => (
+                    <SelectItem key={b.id} value={b.id}>{b.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+              <DialogTrigger asChild>
+                <Button className="gap-2 w-fit">
+                  <Plus className="h-4 w-4" />
+                  Check-in Member
+                </Button>
+              </DialogTrigger>
             <DialogContent>
               <DialogHeader>
                 <DialogTitle>Check-in Member</DialogTitle>
@@ -89,17 +108,20 @@ export default function AttendancePage() {
                   <Label htmlFor="member">Select Member *</Label>
                   <select
                     id="member"
+                    aria-label="Select member"
                     value={selectedMemberId}
                     onChange={(e) => setSelectedMemberId(e.target.value)}
                     className="w-full h-10 px-3 rounded-md border border-input text-sm"
                     required
                   >
                     <option value="">-- Select a member --</option>
-                    {members.filter(m => m.status === 'active').map(member => (
-                      <option key={member.id} value={member.id}>
-                        {member.name} ({member.email})
-                      </option>
-                    ))}
+                    {members
+                      .filter(m => m.status === 'active' && (selectedBranch === 'all' || m.branchId === selectedBranch))
+                      .map(member => (
+                        <option key={member.id} value={member.id}>
+                          {member.name} ({member.email})
+                        </option>
+                      ))}
                   </select>
                 </div>
 
@@ -121,6 +143,7 @@ export default function AttendancePage() {
               </form>
             </DialogContent>
           </Dialog>
+          </div>
         </div>
 
         {/* Today's Attendence Summary */}

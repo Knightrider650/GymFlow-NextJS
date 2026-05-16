@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import prisma from '@/lib/prisma'
 import { getAuthUser } from '@/lib/auth'
+import { isTrainer as checkIsTrainer } from '@/lib/permissions'
 import { startOfDay, endOfDay, startOfMonth, subDays, format } from 'date-fns'
 
 export async function GET(req: NextRequest) {
@@ -15,49 +16,72 @@ export async function GET(req: NextRequest) {
     const todayStart = startOfDay(now)
     const todayEnd = endOfDay(now)
     const monthStart = startOfMonth(now)
-    const todayStr = format(now, 'yyyy-MM-dd')
+    
+    // Standardize today string to YYYY-MM-DD in local-relative time for consistency with check-ins
+    const todayStr = now.toISOString().split('T')[0]
+
+    // Role-based filters
+    const isTrainer = checkIsTrainer(user.role)
+    const memberFilter: any = { gymId }
+    if (isTrainer) {
+      memberFilter.assignedTrainerId = user.userId
+    }
+
+    const attendanceFilter: any = { member: memberFilter }
+    const invoiceFilter: any = { gymId }
+    if (isTrainer) {
+      invoiceFilter.member = { assignedTrainerId: user.userId }
+    }
 
     // 1. Basic counts
     const [activeMembers, totalMembers, pendingPayments, todayVisits] = await Promise.all([
-      prisma.member.count({ where: { gymId, status: 'active' } }),
-      prisma.member.count({ where: { gymId } }),
-      prisma.invoice.count({ where: { gymId, status: 'pending' } }),
+      prisma.member.count({ where: { ...memberFilter, status: 'active' } }),
+      prisma.member.count({ where: memberFilter }),
+      prisma.invoice.count({ where: { ...invoiceFilter, status: 'pending' } }),
       prisma.attendance.count({ 
         where: { 
           recordedDate: todayStr,
-          member: { gymId }
+          ...attendanceFilter
         } 
       })
     ])
 
-    // 2. Revenue calculations
-    const todayRevenueData = await prisma.payment.aggregate({
-      where: {
-        paymentDate: { gte: todayStart, lte: todayEnd },
-        invoice: { gymId }
-      },
-      _sum: { amount: true }
-    })
+    // 2. Revenue calculations (Hide or filter for trainers)
+    let todayRevenue = 0
+    let monthlyRevenue = 0
 
-    const monthlyRevenueData = await prisma.payment.aggregate({
-      where: {
-        paymentDate: { gte: monthStart },
-        invoice: { gymId }
-      },
-      _sum: { amount: true }
-    })
+    if (!isTrainer) {
+      const [todayRevenueData, monthlyRevenueData] = await Promise.all([
+        prisma.payment.aggregate({
+          where: {
+            paymentDate: { gte: todayStart, lte: todayEnd },
+            invoice: { gymId }
+          },
+          _sum: { amount: true }
+        }),
+        prisma.payment.aggregate({
+          where: {
+            paymentDate: { gte: monthStart },
+            invoice: { gymId }
+          },
+          _sum: { amount: true }
+        })
+      ])
+      todayRevenue = todayRevenueData._sum.amount || 0
+      monthlyRevenue = monthlyRevenueData._sum.amount || 0
+    }
 
     // 3. Trends (Last 7 days)
     const last7Days = Array.from({ length: 7 }, (_, i) => {
       const d = subDays(now, 6 - i)
       return {
         date: d,
-        dateStr: format(d, 'yyyy-MM-dd'),
+        dateStr: d.toISOString().split('T')[0],
         name: format(d, 'EEE')
       }
     })
 
-    const revenueTrend = await Promise.all(
+    const revenueTrend = isTrainer ? [] : await Promise.all(
       last7Days.map(async (day) => {
         const sum = await prisma.payment.aggregate({
           where: {
@@ -78,7 +102,7 @@ export async function GET(req: NextRequest) {
         const count = await prisma.attendance.count({
           where: {
             recordedDate: day.dateStr,
-            member: { gymId }
+            ...attendanceFilter
           }
         })
         return {
@@ -93,13 +117,13 @@ export async function GET(req: NextRequest) {
       data: {
         activeMembers,
         totalMembers,
-        todayRevenue: todayRevenueData._sum.amount || 0,
-        monthlyRevenue: monthlyRevenueData._sum.amount || 0,
+        todayRevenue,
+        monthlyRevenue,
         todayVisits,
         pendingPayments,
         revenueTrend,
         attendanceTrend,
-        retention: '98%' // Simplified for now
+        retention: '98%'
       }
     })
   } catch (error: any) {

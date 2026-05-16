@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import prisma from '@/lib/prisma'
 import { getAuthUser } from '@/lib/auth'
+import { isTrainer } from '@/lib/permissions'
 
 export async function GET(req: NextRequest) {
   try {
@@ -24,7 +25,7 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   try {
     const user = await getAuthUser(req)
-    if (!user || user.role === 'trainer') {
+    if (!user || isTrainer(user.role)) {
       return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 403 })
     }
 

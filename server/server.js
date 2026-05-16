@@ -12,6 +12,11 @@ const { v4: uuidv4 } = require('uuid');
 const db = process.env.DATABASE_URL ? require('./db-postgres') : require('./db');
 const { authMiddleware, generateToken, generateRefreshToken, authorizeRoles } = require('./middleware/auth');
 
+// Local role helper for this server process
+function isTrainerRole(role) {
+  return role === 'trainer'
+}
+
 const app = express();
 const httpServer = http.createServer(app);
 const io = new Server(httpServer, {
@@ -173,7 +178,7 @@ app.post('/api/auth/logout', authMiddleware, async (req, res) => {
 // ============================================================================
 
 app.get('/api/members', authMiddleware, async (req, res) => {
-  const trainerId = req.user.role === 'trainer' ? req.user.id : null;
+  const trainerId = isTrainerRole(req.user.role) ? req.user.id : null;
   let members = await db.getMembers(req.user.id, trainerId);
   members = members.map(m => ({
     ...m,
@@ -228,7 +233,8 @@ app.put('/api/members/:id', authMiddleware, async (req, res) => {
 // ============================================================================
 
 app.get('/api/attendance', authMiddleware, async (req, res) => {
-  const data = await db.getAttendance(req.query, req.user.id);
+  const trainerId = req.user.role === 'trainer' ? req.user.id : null;
+  const data = await db.getAttendance(req.query, req.user.id, trainerId);
   res.json({ success: true, data });
 });
 
@@ -252,7 +258,7 @@ app.get('/api/staff', authMiddleware, async (req, res) => {
   let data = await db.getStaff(req.user.id);
   
   // Report requirement: No money/salary visibility for trainers
-  if (req.user.role === 'trainer') {
+  if (isTrainerRole(req.user.role)) {
     data = data.map(({ salary, ...rest }) => rest);
   }
   
@@ -348,7 +354,7 @@ app.delete('/api/billing/:id', authMiddleware, authorizeRoles(['admin', 'ceo', '
 // ============================================================================
 
 app.get('/api/classes', authMiddleware, async (req, res) => {
-  const instructorId = req.user.role === 'trainer' ? req.user.id : null;
+  const instructorId = isTrainerRole(req.user.role) ? req.user.id : null;
   const data = await db.getClasses(req.user.id, instructorId);
   res.json({ success: true, data });
 });
@@ -371,6 +377,27 @@ app.delete('/api/classes/:id', authMiddleware, authorizeRoles(['admin', 'ceo', '
   res.json({ success });
 });
 
+app.get('/api/classes/:id/bookings', authMiddleware, async (req, res) => {
+  const data = await db.getClassBookings(req.params.id, req.user.id);
+  res.json({ success: true, data });
+});
+
+app.post('/api/bookings', authMiddleware, async (req, res) => {
+  try {
+    const data = await db.bookClass(req.body.memberId, req.body.classId, req.user.id);
+    broadcast('bookings:update', data);
+    res.status(201).json({ success: true, data });
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+app.delete('/api/bookings/:id', authMiddleware, async (req, res) => {
+  const success = await db.cancelBooking(req.params.id, req.user.id);
+  if (success) broadcast('bookings:delete', { id: req.params.id });
+  res.json({ success });
+});
+
 // ============================================================================
 // SETTINGS & STATS
 // ============================================================================
@@ -386,17 +413,23 @@ app.put('/api/settings', authMiddleware, authorizeRoles(['admin', 'ceo', 'cto', 
 });
 
 app.get('/api/dashboard-stats', authMiddleware, async (req, res) => {
-  let data = await db.getDashboardStats(req.user.id);
-  
-  // Report requirement: Trainers should not see revenue/money
-  if (req.user.role === 'trainer') {
-    delete data.todayRevenue;
-    delete data.monthlyRevenue;
-    delete data.revenueTrend;
-    delete data.pendingPayments;
+  try {
+    const trainerId = req.user.role === 'trainer' ? req.user.id : null;
+    let data = await db.getDashboardStats(req.user.id, trainerId);
+    
+    // Report requirement: Trainers should not see revenue/money
+    if (isTrainerRole(req.user.role)) {
+      delete data.todayRevenue;
+      delete data.monthlyRevenue;
+      delete data.revenueTrend;
+      delete data.pendingPayments;
+    }
+    
+    res.json({ success: true, data });
+  } catch (err) {
+    console.error('Dashboard stats error:', err);
+    res.status(500).json({ error: 'Failed to fetch dashboard stats' });
   }
-  
-  res.json({ success: true, data });
 });
 
 // ============================================================================
@@ -508,48 +541,86 @@ app.post('/api/settings', authMiddleware, authorizeRoles(['admin', 'ceo', 'cto']
 });
 
 // ============================================================================
-// REPORTS API
+// BRANCHES API
 // ============================================================================
 
-app.get('/api/dashboard-stats', authMiddleware, async (req, res) => {
+app.get('/api/branches', authMiddleware, async (req, res) => {
   try {
-    const data = await db.getDashboardStats(req.user.id);
+    const data = await db.getBranches(req.user.id);
     res.json({ success: true, data });
-  } catch(e) {
-    res.status(500).json({ error: 'Failed' });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to fetch branches' });
   }
 });
 
-app.get('/api/reports/:type', authMiddleware, authorizeRoles(['admin', 'ceo', 'cto']), async (req, res) => {
+app.post('/api/branches', authMiddleware, authorizeRoles(['admin', 'ceo', 'cto']), async (req, res) => {
+  try {
+    const branch = await db.addBranch(req.body, req.user.id);
+    res.status(201).json({ success: true, data: branch });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to create branch' });
+  }
+});
+
+app.put('/api/branches/:id', authMiddleware, authorizeRoles(['admin', 'ceo', 'cto']), async (req, res) => {
+  try {
+    const branch = await db.updateBranch(req.params.id, req.body, req.user.id);
+    res.json({ success: true, data: branch });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to update branch' });
+  }
+});
+
+app.delete('/api/branches/:id', authMiddleware, authorizeRoles(['admin', 'ceo', 'cto']), async (req, res) => {
+  try {
+    await db.deleteBranch(req.params.id, req.user.id);
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to delete branch' });
+  }
+});
+
+// ============================================================================
+// REPORTS API
+// ============================================================================
+
+
+
+app.get('/api/reports/:type', authMiddleware, authorizeRoles(['admin', 'ceo', 'cto', 'manager', 'staff', 'trainer']), async (req, res) => {
   try {
     const { type } = req.params;
+    const trainerId = req.user.role === 'trainer' ? req.user.id : null;
     let data;
     
     switch(type) {
       case 'member-summary':
       case 'expiring-members':
-        data = await db.getMembers(req.user.id);
+        data = await db.getMembers(req.user.id, trainerId);
         break;
       case 'revenue':
+        // Double check permissions for revenue report
+        if (req.user.role === 'trainer') return res.status(403).json({ error: 'Access denied' });
         data = await db.getInvoices(req.user.id);
         break;
       case 'attendance':
-        data = await db.getAttendance({}, req.user.id);
+        data = await db.getAttendance({}, req.user.id, trainerId);
         break;
       case 'class-utilization':
-        data = await db.getClasses(req.user.id);
+        data = await db.getClasses(req.user.id, trainerId);
         break;
       case 'equipment-status':
         data = await db.getInventory(req.user.id);
         break;
       case 'leads-conversion':
+        if (req.user.role === 'trainer') return res.status(403).json({ error: 'Access denied' });
         data = await db.getLeads(req.user.id);
         break;
       case 'staff-performance':
+        if (req.user.role === 'trainer') return res.status(403).json({ error: 'Access denied' });
         data = await db.getStaff(req.user.id);
         break;
       default:
-        data = await db.getDashboardStats(req.user.id);
+        data = await db.getDashboardStats(req.user.id, trainerId);
     }
     
     res.json({ success: true, data });
@@ -1055,42 +1126,35 @@ app.get('/api/invites/:token/verify', async (req, res) => {
 
 app.post('/api/auth/signup-invite', async (req, res) => {
   try {
-    const { email, password, name, token } = req.body;
+    const { email, password, name, token } = req.body || {}
 
     if (!email || !password || !name || !token) {
-      return res.status(400).json({ error: 'Email, password, name, and token are required' });
-    }
-});
-    // Verify invite token
-    const invite = await db.getInviteByToken(token);
-    if (!invite) {
-      return res.status(401).json({ error: 'Invalid or expired invite' });
+      return res.status(400).json({ error: 'Email, password, name, and token are required' })
     }
 
-    if (invite.email !== email) {
-      return res.status(401).json({ error: 'Email does not match invite' });
-    }
+    // Verify invite token
+    const invite = await db.getInviteByToken(token)
+    if (!invite) return res.status(401).json({ error: 'Invalid or expired invite' })
+
+    if (invite.email !== email) return res.status(401).json({ error: 'Email does not match invite' })
 
     // Check if user already exists
-    const existingUser = await db.getUserByEmail(email);
-    if (existingUser) {
-      return res.status(409).json({ error: 'User already exists' });
-    }
-db.init().then(() => {
+    const existingUser = await db.getUserByEmail(email)
+    if (existingUser) return res.status(409).json({ error: 'User already exists' })
+
     // Create new user
-    const userId = uuidv4();
-    const user = await db.createUser({
+    const userId = uuidv4()
+    const newUser = await db.createUser({
       id: userId,
       email,
       password,
       name,
-      role: 'staff'
-    });
-  httpServer.listen(PORT, () => {
-    // Accept invite
-    await db.acceptInvite(token, userId);
-    console.log(`🚀 Production server running at http://localhost:${PORT}`);
-    // Log activity
+      role: 'staff',
+      gymId: invite.gym_id || invite.gymId || 'gym-001',
+    })
+
+    // Accept the invite and log activity
+    await db.acceptInvite(token, userId)
     await db.logActivity(
       userId,
       name,
@@ -1099,26 +1163,27 @@ db.init().then(() => {
       userId,
       email,
       'Registered via invite'
-    );
-  });
-    // Generate tokens
-    const accessToken = generateToken(user.id, user.email, user.role);
-    const refreshToken = generateRefreshToken(user.id);
+    )
 
-    broadcast('user:registered', { email, name });
-    res.json({ 
-      success: true, 
+    // Generate tokens
+    const accessToken = generateToken(newUser)
+    const refreshToken = generateRefreshToken(newUser)
+
+    broadcast('user:registered', { email, name })
+
+    return res.json({
+      success: true,
       data: {
-        user: { id: user.id, email: user.email, name: user.name, role: user.role },
+        user: { id: newUser.id, email: newUser.email, name: newUser.name, role: newUser.role },
         accessToken,
-        refreshToken
-      }
-    });
+        refreshToken,
+      },
+    })
   } catch (err) {
-    console.error('Signup via invite error:', err);
-    res.status(500).json({ error: 'Failed to complete signup' });
+    console.error('Signup via invite error:', err)
+    return res.status(500).json({ error: 'Failed to complete signup' })
   }
-});
+})
 
 app.delete('/api/invites/:id', authMiddleware, authorizeRoles(['admin']), async (req, res) => {
   try {
@@ -1147,22 +1212,23 @@ app.delete('/api/invites/:id', authMiddleware, authorizeRoles(['admin']), async 
   }
 });
   // ============================================================================
-db.init().then(() => {
+async function startServer() {
+  if (db.init) await db.init();
   const AUTO_EXPIRY_INTERVAL = 60 * 60 * 1000; // 1 hour
-  
+
   const runAutoExpiryJob = async () => {
     try {
       console.log('🔄 Running auto-expiry job...');
       const today = new Date().toISOString().split('T')[0];
-      
+
       // Get all members
       const allMembers = await db.getMembers();
-      
+
       if (!allMembers || allMembers.length === 0) {
         console.log('✓ No members to check');
         return;
       }
-      
+
       // Find expired members
       let expiredCount = 0;
       for (const member of allMembers) {
@@ -1170,7 +1236,7 @@ db.init().then(() => {
           // Mark as expired
           await db.updateMember(member.id, { status: 'expired' });
           expiredCount++;
-          
+
           // Log the expiry activity
           await db.logActivity(
             'system',
@@ -1181,25 +1247,32 @@ db.init().then(() => {
             member.name,
             `Membership expired on ${member.expiry_date}`
           );
-          
+
           // Broadcast expiry event for real-time UI update
           broadcast('member:expired', {
             memberId: member.id,
             memberName: member.name,
-            expiryDate: member.expiry_date
+            expiryDate: member.expiry_date,
           });
         }
       }
-      
+
       if (expiredCount > 0) {
         console.log(`✓ Auto-expiry job: ${expiredCount} member(s) marked as expired`);
       }
     } catch (error) {
-      console.error('❌ Auto-expiry job error:', error);
+      console.error('Auto-expiry job error:', error);
     }
   };
-  
+
   // Run immediately on startup, then every hour
-  runAutoExpiryJob();
+  await runAutoExpiryJob();
   setInterval(runAutoExpiryJob, AUTO_EXPIRY_INTERVAL);
-});
+
+  const PORT = process.env.PORT || 3001;
+  httpServer.listen(PORT, () => {
+    console.log(`Server running on port ${PORT}`);
+  });
+}
+
+startServer().catch((err) => console.error('Startup error:', err));

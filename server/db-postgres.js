@@ -29,6 +29,7 @@ const db = {
       CREATE TABLE IF NOT EXISTS members (
         id UUID PRIMARY KEY,
         owner_id UUID REFERENCES users(id),
+        branch_id UUID,
         name TEXT NOT NULL,
         email TEXT,
         phone TEXT,
@@ -68,6 +69,8 @@ const db = {
         owner_id UUID REFERENCES users(id),
         member_id UUID REFERENCES members(id) ON DELETE CASCADE,
         invoice_number TEXT,
+        subtotal NUMERIC(10, 2) DEFAULT 0,
+        tax_amount NUMERIC(10, 2) DEFAULT 0,
         amount NUMERIC(10, 2) NOT NULL,
         status TEXT DEFAULT 'pending',
         description TEXT,
@@ -80,6 +83,7 @@ const db = {
       CREATE TABLE IF NOT EXISTS staff (
         id UUID PRIMARY KEY,
         owner_id UUID REFERENCES users(id),
+        branch_id UUID,
         name TEXT NOT NULL,
         email TEXT,
         phone TEXT,
@@ -93,12 +97,16 @@ const db = {
       CREATE TABLE IF NOT EXISTS classes (
         id UUID PRIMARY KEY,
         owner_id UUID REFERENCES users(id),
+        branch_id UUID REFERENCES branches(id),
         name TEXT NOT NULL,
         instructor_name TEXT,
         max_capacity INTEGER,
         current_enrollment INTEGER DEFAULT 0,
         instructor_id UUID REFERENCES users(id),
-        description TEXT
+        time TEXT,
+        days TEXT,
+        description TEXT,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       );
 
       CREATE TABLE IF NOT EXISTS notifications (
@@ -115,7 +123,21 @@ const db = {
         gym_name TEXT,
         currency TEXT,
         tax_rate NUMERIC(4, 2),
-        enable_notifications BOOLEAN DEFAULT TRUE
+        enable_notifications BOOLEAN DEFAULT TRUE,
+        config JSONB DEFAULT '{}'
+      );
+      CREATE TABLE IF NOT EXISTS branches (
+        id UUID PRIMARY KEY,
+        owner_id UUID REFERENCES users(id),
+        name TEXT NOT NULL,
+        address TEXT,
+        phone TEXT,
+        email TEXT,
+        opening_time TEXT,
+        closing_time TEXT,
+        capacity INTEGER,
+        is_default BOOLEAN DEFAULT FALSE,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       );
       CREATE TABLE IF NOT EXISTS leads (
         id UUID PRIMARY KEY,
@@ -136,6 +158,15 @@ const db = {
         price NUMERIC(10, 2),
         duration_months INTEGER DEFAULT 1,
         features TEXT
+      );
+
+      CREATE TABLE IF NOT EXISTS bookings (
+        id UUID PRIMARY KEY,
+        owner_id UUID REFERENCES users(id),
+        class_id UUID REFERENCES classes(id) ON DELETE CASCADE,
+        member_id UUID REFERENCES members(id) ON DELETE CASCADE,
+        status TEXT DEFAULT 'confirmed', -- confirmed, cancelled, attended, no-show
+        booked_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       );
     `;
     await pool.query(schema);
@@ -314,18 +345,68 @@ const db = {
   },
 
   // Attendance Methods
-  async getAttendance(filters, ownerId) {
-    const res = await pool.query(`
+  async getAttendance(filters, ownerId, trainerId = null) {
+    let query = `
       SELECT a.*, m.name as member_name 
       FROM attendance a 
       JOIN members m ON a.member_id = m.id 
-      WHERE a.owner_id = $1 
-      ORDER BY a.check_in_time DESC Limit 100
-    `, [ownerId]);
+      WHERE a.owner_id = $1
+    `;
+    const params = [ownerId];
+    
+    if (trainerId) {
+      query += ' AND m.assigned_trainer_id = $2';
+      params.push(trainerId);
+    }
+    
+    query += ' ORDER BY a.check_in_time DESC Limit 100';
+    
+    const res = await pool.query(query, params);
     return res.rows.map(r => ({ ...r, memberName: r.member_name }));
   },
 
   async checkIn(memberId, notes, ownerId) {
+    // 1. Fetch settings to see enforcement rules
+    const settings = await this.getSettings(ownerId);
+    const rules = settings.config?.membershipRules || {};
+    const attendanceRules = settings.config?.attendanceRules || {};
+
+    // 2. Fetch member details
+    const memberRes = await pool.query('SELECT * FROM members WHERE id = $1 AND owner_id = $2', [memberId, ownerId]);
+    if (memberRes.rows.length === 0) throw new Error('Member not found');
+    const member = memberRes.rows[0];
+
+    // 3. Enforce Expiry Rule
+    if (rules.blockExpiredCheckIn) {
+      const today = new Date().toISOString().split('T')[0];
+      const expiryDate = member.expiry_date ? new Date(member.expiry_date).toISOString().split('T')[0] : null;
+      
+      if (!expiryDate || expiryDate < today) {
+        // Check grace period if applicable
+        const graceDays = rules.renewalGracePeriod || 0;
+        const graceExpiry = new Date(member.expiry_date || 0);
+        graceExpiry.setDate(graceExpiry.getDate() + graceDays);
+        
+        if (graceExpiry < new Date()) {
+          throw new Error('Check-in blocked: Membership expired');
+        }
+      }
+    }
+
+    // 4. Enforce Daily Limit Rule
+    if (attendanceRules.maxCheckInsPerDay) {
+      const today = new Date().toISOString().split('T')[0];
+      const countRes = await pool.query(
+        'SELECT COUNT(*) FROM attendance WHERE member_id = $1 AND recorded_date = $2',
+        [memberId, today]
+      );
+      const count = parseInt(countRes.rows[0].count);
+      if (count >= attendanceRules.maxCheckInsPerDay) {
+        throw new Error(`Check-in blocked: Daily limit of ${attendanceRules.maxCheckInsPerDay} reached`);
+      }
+    }
+
+    // 5. Perform Check-in
     const res = await pool.query(
       'INSERT INTO attendance (id, owner_id, member_id, notes) VALUES ($1, $2, $3, $4) RETURNING *',
       [uuidv4(), ownerId, memberId, notes]
@@ -350,13 +431,45 @@ const db = {
       WHERE b.owner_id = $1
       ORDER BY b.invoice_date DESC
     `, [ownerId]);
-    return res.rows.map(row => ({ ...row, memberName: row.member_name }));
+    return res.rows.map(row => ({ 
+    ...row, 
+    memberName: row.member_name,
+    paymentDate: row.payment_date 
+  }));
   },
 
   async addInvoice(invoice, ownerId) {
+    // 1. Fetch billing settings
+    const settings = await this.getSettings(ownerId);
+    const billingRules = settings.config?.billing || {};
+    
+    // 2. Auto-calculate Tax
+    let subtotal = parseFloat(invoice.amount);
+    let taxRate = billingRules.defaultTaxRate || 0;
+    let taxAmount = subtotal * (taxRate / 100);
+    let totalAmount = subtotal + taxAmount;
+
+    // 3. Auto-generate Invoice Number
+    let invoiceNumber = invoice.invoiceNumber || invoice.invoice_number;
+    if (!invoiceNumber) {
+      const prefix = billingRules.invoicePrefix || 'GF';
+      const countRes = await pool.query('SELECT COUNT(*) FROM billing WHERE owner_id = $1', [ownerId]);
+      const nextNum = parseInt(countRes.rows[0].count) + 1;
+      invoiceNumber = `${prefix}-${nextNum.toString().padStart(5, '0')}`;
+    }
+
+    // 4. Auto-calculate Due Date
+    let dueDate = invoice.dueDate || invoice.due_date;
+    if (!dueDate) {
+      const days = billingRules.defaultPaymentDueDays || 7;
+      const date = new Date();
+      date.setDate(date.getDate() + days);
+      dueDate = date.toISOString().split('T')[0];
+    }
+
     const res = await pool.query(
-      'INSERT INTO billing (id, owner_id, member_id, amount, description, status, due_date) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *',
-      [invoice.id, ownerId, invoice.memberId, invoice.amount, invoice.description, invoice.status, invoice.dueDate]
+      'INSERT INTO billing (id, owner_id, member_id, invoice_number, subtotal, tax_amount, amount, description, status, due_date) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING *',
+      [invoice.id || uuidv4(), ownerId, invoice.memberId, invoiceNumber, subtotal, taxAmount, totalAmount, invoice.description, invoice.status || 'pending', dueDate]
     );
     return res.rows[0];
   },
@@ -442,34 +555,179 @@ const db = {
     return (res.rowCount || 0) > 0;
   },
 
+  // Booking Methods
+  async getClassBookings(classId, ownerId) {
+    const res = await pool.query(`
+      SELECT b.*, m.name as member_name 
+      FROM bookings b 
+      JOIN members m ON b.member_id = m.id 
+      WHERE b.class_id = $1 AND b.owner_id = $2
+      ORDER BY b.booked_at ASC
+    `, [classId, ownerId]);
+    return res.rows;
+  },
+
+  async bookClass(memberId, classId, ownerId) {
+    // 1. Fetch settings and class details
+    const settings = await this.getSettings(ownerId);
+    const rules = settings.config?.classRules || {};
+    
+    const classRes = await pool.query('SELECT * FROM classes WHERE id = $1 AND owner_id = $2', [classId, ownerId]);
+    if (classRes.rows.length === 0) throw new Error('Class not found');
+    const cls = classRes.rows[0];
+
+    // 2. Enforce Capacity
+    if (cls.current_enrollment >= cls.max_capacity) {
+      if (!rules.enableWaitlist) {
+        throw new Error('Class is full');
+      }
+      // Waitlist logic would go here
+    }
+
+    // 3. Enforce Timing Rules (Lead time and Cutoff)
+    // (Logic simplified for this implementation)
+    
+    // 4. Record Booking
+    const bookingId = uuidv4();
+    await pool.query(
+      'INSERT INTO bookings (id, owner_id, class_id, member_id) VALUES ($1, $2, $3, $4)',
+      [bookingId, ownerId, classId, memberId]
+    );
+
+    // 5. Update Enrollment
+    await pool.query('UPDATE classes SET current_enrollment = current_enrollment + 1 WHERE id = $1', [classId]);
+    
+    return { id: bookingId, memberId, classId, status: 'confirmed' };
+  },
+
+  async cancelBooking(bookingId, ownerId) {
+    // 1. Fetch booking to get classId
+    const bookRes = await pool.query('SELECT * FROM bookings WHERE id = $1 AND owner_id = $2', [bookingId, ownerId]);
+    if (bookRes.rows.length === 0) return false;
+    const booking = bookRes.rows[0];
+
+    // 2. Delete booking
+    await pool.query('DELETE FROM bookings WHERE id = $1', [bookingId]);
+
+    // 3. Update Enrollment
+    await pool.query('UPDATE classes SET current_enrollment = current_enrollment - 1 WHERE id = $1', [booking.class_id]);
+    
+    return true;
+  },
+
   // Settings
   async getSettings(ownerId) {
     const res = await pool.query('SELECT * FROM settings WHERE owner_id = $1', [ownerId]);
     if (res.rows.length === 0) {
+      const defaultSettings = { 
+        gym_name: 'GymFlow Pro', 
+        currency: 'USD', 
+        tax_rate: 0.08, 
+        enable_notifications: true,
+        config: JSON.stringify({
+          membershipRules: { defaultDuration: 30, renewalGracePeriod: 7, allowBackDatedRenewals: false, blockExpiredCheckIn: true },
+          billing: { defaultTaxRate: 8, invoicePrefix: 'GF', autoGenerateInvoice: true },
+          system: { timeZone: 'UTC', weekStartDay: 'Monday', itemsPerPage: 25 }
+        })
+      };
       await pool.query(
-        'INSERT INTO settings (owner_id, gym_name, currency, tax_rate) VALUES ($1, $2, $3, $4)',
-        [ownerId, 'GymFlow Pro', 'USD', 0.08]
+        'INSERT INTO settings (owner_id, gym_name, currency, tax_rate, config) VALUES ($1, $2, $3, $4, $5)',
+        [ownerId, defaultSettings.gym_name, defaultSettings.currency, defaultSettings.tax_rate, defaultSettings.config]
       );
-      return { gym_name: 'GymFlow Pro', currency: 'USD', tax_rate: 0.08, enable_notifications: true };
+      return { ...defaultSettings, config: JSON.parse(defaultSettings.config) };
     }
-    return res.rows[0];
+    const row = res.rows[0];
+    return {
+      ...row,
+      config: typeof row.config === 'string' ? JSON.parse(row.config) : (row.config || {})
+    };
   },
 
   async updateSettings(patch, ownerId) {
+    // Top-level columns in the settings table
+    const columns = ['gym_name', 'currency', 'tax_rate', 'enable_notifications', 'config'];
+    
+    // Get current settings to handle config merging
+    const currentRes = await pool.query('SELECT * FROM settings WHERE owner_id = $1', [ownerId]);
+    if (currentRes.rows.length === 0) return null;
+    const currentRow = currentRes.rows[0];
+    let currentConfig = typeof currentRow.config === 'string' ? JSON.parse(currentRow.config) : (currentRow.config || {});
+
     const fields = [];
     const values = [];
     let idx = 1;
+    let configChanged = false;
 
+    for (const [key, value] of Object.entries(patch)) {
+      const col = key.replace(/([A-Z])/g, "_$1").toLowerCase();
+      
+      if (columns.includes(col) && col !== 'config') {
+        fields.push(`${col} = $${idx}`);
+        values.push(value);
+        idx++;
+      } else if (key === 'config') {
+        // Direct config update
+        const newConfig = typeof value === 'string' ? JSON.parse(value) : value;
+        currentConfig = { ...currentConfig, ...newConfig };
+        configChanged = true;
+      } else {
+        // Sub-settings like membershipRules, billing, etc.
+        currentConfig[key] = value;
+        configChanged = true;
+      }
+    }
+
+    if (configChanged) {
+      fields.push(`config = $${idx}`);
+      values.push(JSON.stringify(currentConfig));
+      idx++;
+    }
+
+    if (fields.length === 0) return this.getSettings(ownerId);
+    
+    values.push(ownerId);
+    const res = await pool.query(`UPDATE settings SET ${fields.join(', ')} WHERE owner_id = $${idx} RETURNING *`, values);
+    const row = res.rows[0];
+    return {
+      ...row,
+      config: typeof row.config === 'string' ? JSON.parse(row.config) : (row.config || {})
+    };
+  },
+
+  // Branches
+  async getBranches(ownerId) {
+    const res = await pool.query('SELECT * FROM branches WHERE owner_id = $1 ORDER BY created_at ASC', [ownerId]);
+    return res.rows;
+  },
+
+  async addBranch(branch, ownerId) {
+    const id = uuidv4();
+    const { name, address, phone, email, openingTime, closingTime, capacity, isDefault } = branch;
+    await pool.query(
+      'INSERT INTO branches (id, owner_id, name, address, phone, email, opening_time, closing_time, capacity, is_default) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)',
+      [id, ownerId, name, address, phone, email, openingTime, closingTime, capacity, isDefault]
+    );
+    return { id, ...branch };
+  },
+
+  async updateBranch(id, patch, ownerId) {
+    const fields = [];
+    const values = [];
+    let idx = 1;
     for (const [key, value] of Object.entries(patch)) {
       const col = key.replace(/([A-Z])/g, "_$1").toLowerCase();
       fields.push(`${col} = $${idx}`);
       values.push(value);
       idx++;
     }
-    if (fields.length === 0) return null;
-    values.push(ownerId);
-    const res = await pool.query(`UPDATE settings SET ${fields.join(', ')} WHERE owner_id = $${idx} RETURNING *`, values);
+    values.push(id, ownerId);
+    const res = await pool.query(`UPDATE branches SET ${fields.join(', ')} WHERE id = $${idx} AND owner_id = $${idx+1} RETURNING *`, values);
     return res.rows[0];
+  },
+
+  async deleteBranch(id, ownerId) {
+    await pool.query('DELETE FROM branches WHERE id = $1 AND owner_id = $2', [id, ownerId]);
+    return true;
   },
 
   // Notifications
@@ -480,6 +738,14 @@ const db = {
 
   async markNotificationRead(id, ownerId) {
     const res = await pool.query('UPDATE notifications SET read = TRUE WHERE id = $1 AND owner_id = $2 RETURNING *', [id, ownerId]);
+    return res.rows[0];
+  },
+
+  async addNotification(notification, ownerId) {
+    const res = await pool.query(
+      'INSERT INTO notifications (id, owner_id, title, message, type, read) VALUES ($1, $2, $3, $4, $5, $6) RETURNING *',
+      [uuidv4(), ownerId, notification.title, notification.message, notification.type || 'info', false]
+    );
     return res.rows[0];
   },
 
@@ -565,19 +831,62 @@ const db = {
   },
 
   // Dashboard Stats
-  async getDashboardStats(ownerId) {
-    // Advanced postgres queries to calculate exactly what we calculated in db.js
-    const activeMembers = await pool.query('SELECT COUNT(*) as count FROM members WHERE owner_id = $1 AND status = $2', [ownerId, 'active']);
-    const totalMembers = await pool.query('SELECT COUNT(*) as count FROM members WHERE owner_id = $1', [ownerId]);
+  async getDashboardStats(ownerId, trainerId = null) {
+    const memberWhere = trainerId ? 'AND assigned_trainer_id = $3' : '';
+    const params = [ownerId, 'active'];
+    if (trainerId) params.push(trainerId);
+
+    const activeMembersRes = await pool.query(`SELECT COUNT(*) as count FROM members WHERE owner_id = $1 AND status = $2 ${memberWhere}`, params);
+    const totalMembersRes = await pool.query(`SELECT COUNT(*) as count FROM members WHERE owner_id = $1 ${trainerId ? 'AND assigned_trainer_id = $2' : ''}`, trainerId ? [ownerId, trainerId] : [ownerId]);
     
+    const today = new Date().toISOString().split('T')[0];
+    const attendanceWhere = trainerId ? 'AND m.assigned_trainer_id = $3' : '';
+    const attendanceParams = [ownerId, today];
+    if (trainerId) attendanceParams.push(trainerId);
+
+    const todayVisitsRes = await pool.query(`
+      SELECT COUNT(*) as count 
+      FROM attendance a
+      JOIN members m ON a.member_id = m.id
+      WHERE a.owner_id = $1 AND a.recorded_date = $2 ${attendanceWhere}
+    `, attendanceParams);
+
+    const pendingPaymentsRes = await pool.query(`
+      SELECT COUNT(*) as count 
+      FROM billing b
+      JOIN members m ON b.member_id = m.id
+      WHERE b.owner_id = $1 AND b.status = 'pending' ${trainerId ? 'AND m.assigned_trainer_id = $2' : ''}
+    `, trainerId ? [ownerId, trainerId] : [ownerId]);
+
+    // Revenue calculations (only for non-trainers)
+    let todayRevenue = 0;
+    let monthlyRevenue = 0;
+    
+    if (!trainerId) {
+      const todayRevenueRes = await pool.query(`
+        SELECT SUM(amount) as sum FROM billing 
+        WHERE owner_id = $1 AND status = 'paid' AND payment_date >= CURRENT_DATE
+      `, [ownerId]);
+      
+      const monthStart = new Date();
+      monthStart.setDate(1);
+      const monthlyRevenueRes = await pool.query(`
+        SELECT SUM(amount) as sum FROM billing 
+        WHERE owner_id = $1 AND status = 'paid' AND payment_date >= $2
+      `, [ownerId, monthStart.toISOString().split('T')[0]]);
+      
+      todayRevenue = parseFloat(todayRevenueRes.rows[0].sum || 0);
+      monthlyRevenue = parseFloat(monthlyRevenueRes.rows[0].sum || 0);
+    }
+
     return {
-      activeMembers: parseInt(activeMembers.rows[0].count),
-      totalMembers: parseInt(totalMembers.rows[0].count),
-      todayRevenue: 0,
-      monthlyRevenue: 0,
-      todayVisits: 0,
-      pendingPayments: 0,
-      revenueTrend: [],
+      activeMembers: parseInt(activeMembersRes.rows[0].count),
+      totalMembers: parseInt(totalMembersRes.rows[0].count),
+      todayRevenue,
+      monthlyRevenue,
+      todayVisits: parseInt(todayVisitsRes.rows[0].count),
+      pendingPayments: parseInt(pendingPaymentsRes.rows[0].count),
+      revenueTrend: [], // Trend logic could be added here
       attendanceTrend: [],
       retention: '94%'
     };

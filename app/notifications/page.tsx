@@ -57,7 +57,7 @@ export default function NotificationsPage() {
                   <div className="flex-1">
                     <div className="flex items-center gap-2 mb-2">
                       <Badge variant={typeColors[notification.type] as any}>
-                        {notification.type.replace('_', ' ')}
+                        {String(notification.type).replace('_', ' ')}
                       </Badge>
                       {!notification.read && (
                         <div className="h-2 w-2 rounded-full bg-primary" />

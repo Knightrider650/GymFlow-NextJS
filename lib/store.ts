@@ -1,6 +1,6 @@
 import { create } from 'zustand'
 import { devtools, persist } from 'zustand/middleware'
-import { User, Member, Attendance, Invoice, FitnessClass, InventoryItem, Staff, Notification, AppSettings } from '../types'
+import { User, Member, Attendance, Invoice, FitnessClass, InventoryItem, Staff, Notification, AppSettings, Branch } from '../types'
 import { apiClient } from './api-client'
 
 interface AuthState {
@@ -99,6 +99,14 @@ interface GymState {
   updateLead: (id: string, lead: any) => Promise<void>
   deleteLead: (id: string) => Promise<void>
   convertLead: (id: string, memberData: any) => Promise<void>
+
+  // Branches
+  branches: import('../types').Branch[]
+  branchesLoading: boolean
+  fetchBranches: () => Promise<void>
+  addBranch: (branchData: Omit<import('../types').Branch, 'id'>) => Promise<void>
+  updateBranch: (id: string, branchData: Partial<import('../types').Branch>) => Promise<void>
+  deleteBranch: (id: string) => Promise<void>
 
   // Membership Plans
   plans: any[]
@@ -310,6 +318,7 @@ export const useGymStore = create<GymState>()((set, get) => ({
       const response = await apiClient.post('/api/attendance/checkin', { memberId, notes })
       if (response.success) {
         await get().fetchAttendance(undefined, true)
+        await get().fetchStats(true)
       }
     } catch (error) {
       console.error('Error checking in member:', error)
@@ -321,6 +330,7 @@ export const useGymStore = create<GymState>()((set, get) => ({
       const response = await apiClient.post(`/api/attendance/${attendanceId}/checkout`)
       if (response.success) {
         await get().fetchAttendance(undefined, true)
+        await get().fetchStats(true)
       }
     } catch (error) {
       console.error('Error checking out member:', error)
@@ -372,6 +382,7 @@ export const useGymStore = create<GymState>()((set, get) => ({
       const response = await apiClient.post(`/api/billing/${invoiceId}/pay`, { amount, method })
       if (response.success) {
         await get().fetchInvoices(undefined, true)
+        await get().fetchStats(true)
       }
     } catch (error) {
       console.error('Error recording payment:', error)
@@ -579,6 +590,56 @@ export const useGymStore = create<GymState>()((set, get) => ({
       }
     } catch (error) {
       console.error('Error updating settings:', error)
+    }
+  },
+  
+  // Branches
+  branches: [],
+  branchesLoading: false,
+  fetchBranches: async () => {
+    set({ branchesLoading: true })
+    try {
+      const response = await apiClient.get('/api/branches')
+      if (response.success && response.data) {
+        set({ branches: response.data })
+      }
+    } catch (error) {
+      console.error('Error fetching branches:', error)
+    } finally {
+      set({ branchesLoading: false })
+    }
+  },
+
+  addBranch: async (branchData: Omit<Branch, 'id'>) => {
+    try {
+      const response = await apiClient.post('/api/branches', branchData)
+      if (response.success) {
+        await get().fetchBranches()
+      }
+    } catch (error) {
+      console.error('Error adding branch:', error)
+    }
+  },
+
+  updateBranch: async (id: string, branchData: Partial<Branch>) => {
+    try {
+      const response = await apiClient.put(`/api/branches/${id}`, branchData)
+      if (response.success) {
+        await get().fetchBranches()
+      }
+    } catch (error) {
+      console.error('Error updating branch:', error)
+    }
+  },
+
+  deleteBranch: async (id: string) => {
+    try {
+      const response = await apiClient.delete(`/api/branches/${id}`)
+      if (response.success) {
+        await get().fetchBranches()
+      }
+    } catch (error) {
+      console.error('Error deleting branch:', error)
     }
   },
 

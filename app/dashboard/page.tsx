@@ -6,6 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { useMembers, useAttendance, useBilling } from '@/hooks'
+import { isTrainer } from '@/lib/permissions'
 import {
   Users,
   TrendingUp,
@@ -133,7 +134,7 @@ export default function DashboardPage() {
             trend={12}
             gradient="bg-blue-600 text-white"
           />
-          {user?.role !== 'trainer' && (
+          {!isTrainer(user?.role) && (
             <>
               <StatCard
                 title="Today's Revenue"
@@ -160,7 +161,7 @@ export default function DashboardPage() {
             description="Members checked in"
             gradient="bg-orange-500 text-white"
           />
-          {user?.role !== 'trainer' && (
+          {!isTrainer(user?.role) && (
             <StatCard
               title="Pending Payments"
               value={stats?.pendingPayments || 0}
@@ -181,7 +182,7 @@ export default function DashboardPage() {
         {/* Charts */}
         <div className="grid gap-4 lg:grid-cols-2">
           {/* Revenue Chart */}
-          {user?.role !== 'trainer' && (
+          {!isTrainer(user?.role) && (
             <Card className="shadow-md">
               <CardHeader>
                 <CardTitle>Revenue Trend</CardTitle>
@@ -236,7 +237,7 @@ export default function DashboardPage() {
         {/* Recent Activity */}
         <div className="grid gap-4 lg:grid-cols-2">
           {/* Recent Invoices */}
-          {user?.role !== 'trainer' && (
+          {!isTrainer(user?.role) && (
             <Card>
               <CardHeader>
                 <CardTitle className="text-lg">Recent Invoices</CardTitle>

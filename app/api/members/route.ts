@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import prisma from '@/lib/prisma'
 import { getAuthUser } from '@/lib/auth'
+import { isTrainer } from '@/lib/permissions'
 
 export async function GET(req: NextRequest) {
   try {
@@ -19,7 +20,7 @@ export async function GET(req: NextRequest) {
     }
 
     // Report requirement: Trainers view assigned members only
-    if (user.role === 'trainer') {
+    if (isTrainer(user.role)) {
       where.assignedTrainerId = user.userId
     }
 
@@ -53,7 +54,7 @@ export async function POST(req: NextRequest) {
     }
 
     // Report requirement: Trainer should not manage broad member records
-    if (user.role === 'trainer') {
+    if (isTrainer(user.role)) {
       return NextResponse.json({ success: false, error: 'Trainers cannot create member records' }, { status: 403 })
     }
 

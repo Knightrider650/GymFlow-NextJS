@@ -2,10 +2,12 @@
 
 import { useEffect, useState, useRef } from 'react'
 import { ProtectedLayout } from '@/components/layout/protected-layout'
-import { useMembers, usePlans, useDebouncedSearch } from '@/hooks'
+import { useMembers, usePlans, useDebouncedSearch, useBranches } from '@/hooks'
 import { useAuthStore } from '@/lib/store'
+import { isTrainer } from '@/lib/permissions'
 import { Plus, Search, Edit, Trash2, Calendar, AlertTriangle, UploadCloud, FileSpreadsheet, CheckCircle2, MoreHorizontal, Mail, Phone, MapPin, Download, Shield } from 'lucide-react'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent } from '@/components/ui/card'
 import {
@@ -44,6 +46,7 @@ const memberSchema = z.object({
   status: z.enum(['active', 'pending', 'expired', 'cancelled']),
   joinDate: z.string(),
   expiryDate: z.string(),
+  branchId: z.string().optional(),
   emergencyContact: z.string().optional(),
   emergencyPhone: z.string().optional(),
 })
@@ -53,6 +56,7 @@ type MemberFormValues = z.infer<typeof memberSchema>
 export default function MembersPage() {
   const { members, isLoading, fetchMembers, createMember, bulkCreateMembers, updateMember, deleteMember } = useMembers()
   const { plans, fetchPlans } = usePlans()
+  const { branches, fetchBranches } = useBranches()
   const user = useAuthStore(state => state.user)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [isDialogOpen, setIsDialogOpen] = useState(false)
@@ -61,17 +65,22 @@ export default function MembersPage() {
   const [memberToDelete, setMemberToDelete] = useState<string | null>(null)
   const [searchTerm, setSearchTerm] = useState('')
   const [debouncedSearch, setDebouncedSearch] = useState('')
+  const [selectedBranch, setSelectedBranch] = useState<string>('all')
 
   useEffect(() => {
     const timer = setTimeout(() => setDebouncedSearch(searchTerm), 300)
     return () => clearTimeout(timer)
   }, [searchTerm])
 
-  const filteredMembers = members.filter(member =>
-    member.name.toLowerCase().includes(debouncedSearch.toLowerCase()) ||
-    member.email.toLowerCase().includes(debouncedSearch.toLowerCase()) ||
-    member.phone.includes(debouncedSearch)
-  )
+  const filteredMembers = members.filter(member => {
+    const matchesSearch = member.name.toLowerCase().includes(debouncedSearch.toLowerCase()) ||
+      member.email.toLowerCase().includes(debouncedSearch.toLowerCase()) ||
+      member.phone.includes(debouncedSearch)
+    
+    const matchesBranch = selectedBranch === 'all' || member.branchId === selectedBranch
+    
+    return matchesSearch && matchesBranch
+  })
 
   const form = useForm<MemberFormValues>({
     resolver: zodResolver(memberSchema),
@@ -84,6 +93,7 @@ export default function MembersPage() {
       status: 'active',
       joinDate: new Date().toISOString().split('T')[0],
       expiryDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+      branchId: '',
       emergencyContact: '',
       emergencyPhone: '',
     },
@@ -100,6 +110,7 @@ export default function MembersPage() {
   useEffect(() => {
     fetchMembers()
     fetchPlans()
+    fetchBranches()
   }, [])
 
   const onFormSubmit = async (data: MemberFormValues) => {
@@ -127,6 +138,7 @@ export default function MembersPage() {
       status: 'active',
       joinDate: new Date().toISOString().split('T')[0],
       expiryDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+      branchId: '',
       emergencyContact: '',
       emergencyPhone: '',
     })
@@ -144,6 +156,7 @@ export default function MembersPage() {
         status: editingMember.status as any,
         joinDate: editingMember.joinDate.split('T')[0],
         expiryDate: editingMember.expiryDate.split('T')[0],
+        branchId: editingMember.branchId || '',
         emergencyContact: editingMember.emergencyContact || '',
         emergencyPhone: editingMember.emergencyPhone || '',
       })
@@ -204,18 +217,19 @@ export default function MembersPage() {
           <div>
             <h1 className="text-3xl font-bold tracking-tight bg-gradient-to-r from-primary to-indigo-600 bg-clip-text text-transparent">Member Management</h1>
             <p className="text-sm text-muted-foreground mt-1">
-              Maintain your gym&apos;s community and membership status
+              Maintain your gym&apos;s community and membership status across {branches.length} branches
             </p>
           </div>
           <div className="flex flex-wrap gap-3">
             <input
               type="file"
+              aria-label="Import members file"
               ref={fileInputRef}
               onChange={handleFileChange}
               accept=".xlsx, .xls, .csv"
               className="hidden"
             />
-            {user?.role !== 'trainer' && (
+            {!isTrainer(user?.role) && (
               <>
                 <Button variant="outline" className="gap-2 shadow-sm" onClick={handleImportClick}>
                   <UploadCloud className="h-4 w-4" />
@@ -226,10 +240,23 @@ export default function MembersPage() {
                   if (!open) resetForm()
                 }}>
                   <DialogTrigger asChild>
-                    <Button className="gap-2 shadow-lg shadow-primary/20">
-                      <Plus className="h-4 w-4" />
-                      Add New Member
-                    </Button>
+                    <div className="flex gap-2">
+                      <Select value={selectedBranch} onValueChange={setSelectedBranch}>
+                        <SelectTrigger className="w-[180px] h-10 shadow-sm bg-card border-muted-foreground/20">
+                          <SelectValue placeholder="All Branches" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="all">All Branches</SelectItem>
+                          {branches.map(b => (
+                            <SelectItem key={b.id} value={b.id}>{b.name}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <Button className="gap-2 shadow-lg shadow-primary/20">
+                        <Plus className="h-4 w-4" />
+                        Add New Member
+                      </Button>
+                    </div>
                   </DialogTrigger>
                   <DialogContent className="sm:max-w-[600px]">
                     <DialogHeader>
@@ -342,6 +369,20 @@ export default function MembersPage() {
                         </div>
                       </div>
 
+                      <div className="space-y-2">
+                        <Label htmlFor="branchId">Assigned Branch *</Label>
+                        <select
+                          id="branchId"
+                          {...register('branchId')}
+                          className="w-full h-10 px-3 rounded-md border border-input text-sm bg-background"
+                        >
+                          <option value="">Select a branch</option>
+                          {branches.map(b => (
+                            <SelectItem key={b.id} value={b.id}>{b.name}</SelectItem>
+                          ))}
+                        </select>
+                      </div>
+
                       <div className="grid grid-cols-2 gap-4">
                         <div className="space-y-2">
                           <Label htmlFor="emergencyContact">Emergency Contact</Label>
@@ -423,7 +464,8 @@ export default function MembersPage() {
                           <div className="flex flex-col">
                             <span className="font-bold text-slate-700">{member.name}</span>
                             <span className="text-xs text-muted-foreground flex items-center gap-1 mt-0.5">
-                              <Mail className="h-3 w-3" /> {member.email}
+                              <MapPin className="h-2.5 w-2.5 text-primary" />
+                              {branches.find(b => b.id === member.branchId)?.name || 'Default Branch'}
                             </span>
                           </div>
                         </TableCell>
@@ -448,7 +490,7 @@ export default function MembersPage() {
                           </div>
                         </TableCell>
                         <TableCell className="text-right">
-                          {user?.role !== 'trainer' && (
+                          {!isTrainer(user?.role) && (
                             <DropdownMenu>
                               <DropdownMenuTrigger asChild>
                                 <Button variant="ghost" size="icon" className="opacity-0 group-hover:opacity-100 transition-opacity">

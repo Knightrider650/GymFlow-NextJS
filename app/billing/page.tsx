@@ -91,12 +91,14 @@ export default function BillingPage() {
       console.log('Selected member found:', selectedMember);
       try {
         await createInvoice({
+          invoiceNumber: `${settings?.invoicePrefix || 'INV'}-${Date.now()}`,
           memberId: invoiceForm.memberId,
           memberName: selectedMember.name,
           amount: parseFloat(invoiceForm.amount),
+          subtotal: parseFloat(invoiceForm.amount),
+          taxAmount: 0,
           description: invoiceForm.description || 'Membership Fee',
           status: 'pending',
-          invoiceNumber: `INV-${Date.now().toString().slice(-6)}`,
           invoiceDate: new Date().toISOString().split('T')[0],
           dueDate: invoiceForm.dueDate,
         })
@@ -137,15 +139,29 @@ export default function BillingPage() {
     invoice.invoiceNumber.toLowerCase().includes(searchTerm.toLowerCase())
   )
 
+  const now = new Date()
+  const currentMonth = now.getMonth()
+  const currentYear = now.getFullYear()
+
   const stats = {
     totalRevenue: invoices
       .filter(i => i.status === 'paid')
       .reduce((sum, i) => sum + i.amount, 0),
-    pendingAmount: invoices
-      .filter(i => i.status === 'pending' || i.status === 'overdue')
+    taxRevenue: invoices
+      .filter(i => i.status === 'paid')
+      .reduce((sum, i) => sum + (i.taxAmount || 0), 0),
+    monthlyRevenue: invoices
+      .filter(i => {
+        if (i.status !== 'paid' || !i.paymentDate) return false
+        const d = new Date(i.paymentDate)
+        return d.getMonth() === currentMonth && d.getFullYear() === currentYear
+      })
       .reduce((sum, i) => sum + i.amount, 0),
     totalInvoices: invoices.length,
     paidInvoices: invoices.filter(i => i.status === 'paid').length,
+    pendingAmount: invoices
+      .filter(i => i.status !== 'paid')
+      .reduce((sum, i) => sum + (i.amount || 0), 0),
   }
 
   const actorRole = useAuthStore(s => s.user?.role) as UserRole
@@ -284,16 +300,14 @@ export default function BillingPage() {
 
             <Card className="border-none shadow-lg bg-card/50 backdrop-blur-sm">
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Recovery Rate</CardTitle>
+                <CardTitle className="text-sm font-medium">Tax Collected</CardTitle>
                 <div className="p-2 bg-muted rounded-lg">
                   <DollarSign className="h-4 w-4 text-muted-foreground" />
                 </div>
               </CardHeader>
               <CardContent>
-                <p className="text-2xl font-bold">
-                  {stats.totalInvoices > 0 ? Math.round((stats.paidInvoices / stats.totalInvoices) * 100) : 0}%
-                </p>
-                <p className="text-xs text-muted-foreground mt-1">Payment completion</p>
+                <p className="text-2xl font-bold">{formatCurrency(stats.taxRevenue, settings?.currency)}</p>
+                <p className="text-xs text-muted-foreground mt-1">Included in total revenue</p>
               </CardContent>
             </Card>
           </div>
@@ -317,12 +331,15 @@ export default function BillingPage() {
                 <Table>
                   <TableHeader>
                     <TableRow className="bg-muted/50 hover:bg-muted/50">
+                    <TableRow className="bg-muted/50 hover:bg-muted/50">
                       <TableHead className="w-[150px]">Invoice Ref</TableHead>
                       <TableHead>Member</TableHead>
-                      <TableHead>Amount</TableHead>
+                      <TableHead>Subtotal</TableHead>
+                      <TableHead>Tax</TableHead>
+                      <TableHead>Total</TableHead>
                       <TableHead>Status</TableHead>
-                      <TableHead>Due Date</TableHead>
                       <TableHead className="text-right">Action</TableHead>
+                    </TableRow>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -337,6 +354,12 @@ export default function BillingPage() {
                       <TableRow key={invoice.id} className="hover:bg-muted/30 transition-colors group">
                         <TableCell className="font-mono text-sm text-primary font-bold">{invoice.invoiceNumber}</TableCell>
                         <TableCell className="font-medium">{invoice.memberName}</TableCell>
+                        <TableCell className="text-sm text-muted-foreground">
+                          {formatCurrency(invoice.subtotal || invoice.amount, settings?.currency)}
+                        </TableCell>
+                        <TableCell className="text-sm text-muted-foreground">
+                          {formatCurrency(invoice.taxAmount || 0, settings?.currency)}
+                        </TableCell>
                         <TableCell className="font-bold text-foreground">
                           {formatCurrency(invoice.amount, settings?.currency)}
                         </TableCell>

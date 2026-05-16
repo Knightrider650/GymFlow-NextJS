@@ -33,6 +33,7 @@ export interface Member {
   email: string
   phone: string
   address?: string
+  branchId?: string
   membershipType: string
   status: 'active' | 'expired' | 'pending' | 'cancelled'
   joinDate: string
@@ -76,11 +77,14 @@ export interface Invoice {
   invoiceNumber: string
   memberId: string
   memberName: string
+  subtotal: number
+  taxAmount: number
   amount: number
   status: 'paid' | 'pending' | 'overdue' | 'partial'
   description: string
   invoiceDate: string
   dueDate: string
+  paymentDate?: string
   createdAt: string
   updatedAt: string
 }
@@ -108,6 +112,7 @@ export interface FitnessClass {
   id: string
   name: string
   description?: string
+  branchId?: string
   instructorId?: string
   instructorName?: string
   time?: string
@@ -155,6 +160,7 @@ export interface Staff {
   salary: number
   joinDate: string
   status: 'active' | 'inactive'
+  branchId?: string
   emergencyContact?: string
   createdAt: string
   updatedAt: string
@@ -217,11 +223,118 @@ export interface Notification {
 
 // Settings Types
 export interface AppSettings {
+  // 1. Gym Profile & Branding
   gymName: string
-  gymLogo?: string
+  legalName?: string
   gymEmail: string
   gymPhone: string
+  secondaryPhone?: string
+  supportEmail?: string
   gymAddress: string
+  taxId?: string
+  gymLogo?: string
+  favicon?: string
+  primaryColor?: string
+  secondaryColor?: string
+  themeMode: 'light' | 'dark' | 'auto'
+  dashboardBackground?: string
+  websiteUrl?: string
+  socialLinks?: {
+    instagram?: string
+    facebook?: string
+    twitter?: string
+  }
+  invoiceFooterText?: string
+
+  // 2. Branches (Basic metadata stored here, full list in branches table)
+  defaultBranchId?: string
+
+  // 3. Membership & Plan Rules
+  membershipRules: {
+    defaultDuration: number
+    renewalGracePeriod: number
+    allowBackDatedRenewals: boolean
+    allowFutureDatedStarts: boolean
+    minFreezeDays: number
+    maxFreezeDays: number
+    allowMultipleFreezes: boolean
+    inactiveAfterExpiryDays: number
+    blockExpiredCheckIn: boolean
+  }
+
+  // 4. Billing & Taxes
+  billing: {
+    defaultTaxRate: number
+    additionalTaxes?: { label: string; rate: number }[]
+    invoicePrefix: string
+    invoiceFormat: string
+    autoGenerateInvoice: boolean
+    allowPartialPayments: boolean
+    requireRefundReason: boolean
+    requireRefundApproval: boolean
+    defaultPaymentDueDays: number
+  }
+
+  // 5. Payments & POS
+  pos: {
+    enabledMethods: string[]
+    methodLabels?: Record<string, string>
+    autoPrintReceipt: boolean
+    allowGuestSales: boolean
+    defaultBranchId?: string
+  }
+
+  // 6. Notifications & Automation
+  notifications: {
+    enabledChannels: ('sms' | 'whatsapp' | 'email' | 'in-app')[]
+    providers: Record<string, any>
+    automations: AutomationRule[]
+  }
+
+  // 8. Attendance & Access
+  attendanceRules: {
+    maxCheckInsPerDay: number
+    lateCutoffMinutes: number
+    autoNoShow: boolean
+    blockExpiredCheckIn: boolean
+  }
+
+  // 9. Classes & Booking
+  classRules: {
+    defaultDuration: number
+    defaultCapacity: number
+    bookingLeadTimeHours: number
+    bookingCutoffMinutes: number
+    cancellationWindowMinutes: number
+    enableWaitlist: boolean
+    autoFillWaitlist: boolean
+  }
+
+  // 10. Inventory
+  inventoryRules: {
+    lowStockThreshold: number
+    allowNegativeStock: boolean
+    trackBatches: boolean
+    enablePosModule: boolean
+  }
+
+  // 14. System & UI
+  system: {
+    // Legacy/alias support: some components use `timezone` lowercase
+    timeZone?: string
+    timezone?: string
+    weekStartDay: 'Monday' | 'Sunday'
+    timeFormat: '12h' | '24h'
+    itemsPerPage: number
+    // UI preferences
+    theme?: 'light' | 'dark' | 'auto'
+    language?: string
+    compactMode?: boolean
+    showHelpTooltips?: boolean
+    fontSize?: 'small' | 'medium' | 'large'
+  }
+
+  // Legacy fields (kept for compatibility during migration)
   currency: string
   dateFormat: string
   timeZone: string
@@ -229,6 +342,36 @@ export interface AppSettings {
   nextInvoiceNumber: number
   membershipTypes: MembershipType[]
   defaultMembershipDays: number
+}
+
+export interface Branch {
+  id: string
+  name: string
+  address: string
+  phone: string
+  email: string
+  openingTime: string
+  closingTime: string
+  capacity: number
+  isDefault: boolean
+}
+
+export interface NotificationTemplate {
+  id: string
+  name: string
+  subject: string
+  body: string
+  placeholders: string[]
+  enabled: boolean
+}
+
+export interface AutomationRule {
+  id: string
+  trigger: string
+  days: number
+  channel: string
+  templateId: string
+  enabled: boolean
 }
 
 export interface MembershipType {

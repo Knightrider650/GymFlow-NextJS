@@ -16,17 +16,21 @@ import {
   DialogTitle,
   DialogTrigger,
 } from '@/components/ui/dialog'
-import { useStaff, useSettings } from '@/hooks'
+import { useStaff, useSettings, useBranches } from '@/hooks'
 import { useAuthStore } from '@/lib/store'
-import { Plus, Edit2, Trash2, Users, Mail, Phone, Briefcase } from 'lucide-react'
+import { isTrainer } from '@/lib/permissions'
+import { Plus, Edit2, Trash2, Users, Mail, Phone, Briefcase, MapPin, Filter } from 'lucide-react'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { formatCurrency } from '@/utils/format'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 
 export default function StaffPage() {
   const { staff, isLoading, fetchStaff, addStaffMember, updateStaffMember, deleteStaffMember } = useStaff()
   const { settings, fetchSettings } = useSettings()
+  const { branches, fetchBranches } = useBranches()
   const user = useAuthStore((state: any) => state.user)
   const [isDialogOpen, setIsDialogOpen] = useState(false)
+  const [selectedBranch, setSelectedBranch] = useState<string>('all')
   const [formData, setFormData] = useState({
     name: '',
     email: '',
@@ -34,12 +38,18 @@ export default function StaffPage() {
     position: 'Trainer' as const,
     salary: '',
     status: 'active' as const,
+    branchId: '',
   })
 
   useEffect(() => {
     fetchStaff()
     fetchSettings()
-  }, [fetchStaff, fetchSettings])
+    fetchBranches()
+  }, [fetchStaff, fetchSettings, fetchBranches])
+
+  const filteredStaff = selectedBranch === 'all'
+    ? staff
+    : staff.filter(s => s.branchId === selectedBranch)
 
   const handleAddStaff = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -51,6 +61,7 @@ export default function StaffPage() {
         position: formData.position,
         salary: parseFloat(formData.salary),
         status: formData.status,
+        branchId: formData.branchId,
         joinDate: new Date().toISOString().split('T')[0],
       })
       setIsDialogOpen(false)
@@ -61,6 +72,7 @@ export default function StaffPage() {
         position: 'Trainer',
         salary: '',
         status: 'active',
+        branchId: '',
       })
       await fetchStaff()
     }
@@ -77,14 +89,29 @@ export default function StaffPage() {
               Oversee your gym&apos;s team and personnel details
             </p>
           </div>
-          {user?.role !== 'trainer' && (
-            <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-              <DialogTrigger asChild>
-                <Button className="gap-2 w-fit bg-primary hover:bg-primary/90 shadow-lg shadow-primary/20">
-                  <Plus className="h-4 w-4" />
-                  Add Staff Member
-                </Button>
-              </DialogTrigger>
+          <div className="flex items-center gap-4">
+            <div className="flex items-center gap-2 bg-muted/50 px-3 py-1.5 rounded-lg border">
+              <Filter className="h-4 w-4 text-muted-foreground" />
+              <Select value={selectedBranch} onValueChange={setSelectedBranch}>
+                <SelectTrigger className="w-[180px] border-none bg-transparent focus:ring-0">
+                  <SelectValue placeholder="All Branches" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Branches</SelectItem>
+                  {branches.map(b => (
+                    <SelectItem key={b.id} value={b.id}>{b.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            {!isTrainer(user?.role) && (
+              <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+                <DialogTrigger asChild>
+                  <Button className="gap-2 w-fit bg-primary hover:bg-primary/90 shadow-lg shadow-primary/20">
+                    <Plus className="h-4 w-4" />
+                    Add Staff Member
+                  </Button>
+                </DialogTrigger>
               <DialogContent className="sm:max-w-[500px]">
                 <DialogHeader>
                   <DialogTitle>Add Staff Member</DialogTitle>
@@ -129,6 +156,7 @@ export default function StaffPage() {
                       <Label htmlFor="staff-position">Position *</Label>
                       <select
                         id="staff-position"
+                        aria-label="Staff position"
                         value={formData.position}
                         onChange={(e) => setFormData({ ...formData, position: e.target.value as any })}
                         className="w-full h-10 px-3 rounded-md border border-input bg-background text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring"
@@ -152,9 +180,27 @@ export default function StaffPage() {
                       />
                     </div>
                     <div className="space-y-2 col-span-2">
+                      <Label htmlFor="staff-branch">Assigned Branch *</Label>
+                      <Select 
+                        value={formData.branchId} 
+                        onValueChange={(val) => setFormData({ ...formData, branchId: val })}
+                        required
+                      >
+                        <SelectTrigger id="staff-branch">
+                          <SelectValue placeholder="Select a branch" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {branches.map(b => (
+                            <SelectItem key={b.id} value={b.id}>{b.name}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-2 col-span-2">
                       <Label htmlFor="staff-status">Initial Status</Label>
                       <select
                         id="staff-status"
+                        aria-label="Staff status"
                         value={formData.status}
                         onChange={(e) => setFormData({ ...formData, status: e.target.value as any })}
                         className="w-full h-10 px-3 rounded-md border border-input bg-background text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring"
@@ -171,6 +217,7 @@ export default function StaffPage() {
               </DialogContent>
             </Dialog>
           )}
+          </div>
         </div>
 
         {/* Staff Table */}
@@ -189,15 +236,15 @@ export default function StaffPage() {
                     <TableHead className="w-[250px]">Staff Name</TableHead>
                     <TableHead>Contact info</TableHead>
                     <TableHead>Role & Position</TableHead>
-                    {user?.role !== 'trainer' && <TableHead>Compensation</TableHead>}
+                    {!isTrainer(user?.role) && <TableHead>Compensation</TableHead>}
                     <TableHead className="text-right">Status</TableHead>
-                    {user?.role !== 'trainer' && <TableHead className="text-right">Actions</TableHead>}
+                    {!isTrainer(user?.role) && <TableHead className="text-right">Actions</TableHead>}
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {staff.length === 0 ? (
+                  {filteredStaff.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={6} className="text-center py-12 text-muted-foreground">
+                      <TableCell colSpan={7} className="text-center py-12 text-muted-foreground">
                         {isLoading ? (
                           <div className="flex flex-col items-center gap-2">
                             <div className="h-6 w-6 animate-spin rounded-full border-2 border-primary border-t-transparent" />
@@ -207,11 +254,14 @@ export default function StaffPage() {
                       </TableCell>
                     </TableRow>
                   ) : (
-                    staff.map((member) => (
+                    filteredStaff.map((member) => (
                       <TableRow key={member.id} className="hover:bg-muted/30 transition-colors group">
                         <TableCell>
                           <div className="font-semibold text-primary text-base">{member.name}</div>
-                          <div className="text-xs text-muted-foreground">Emp ID: {member.id.substring(0, 8)}</div>
+                          <div className="text-xs text-muted-foreground flex items-center gap-1">
+                            <MapPin className="h-2.5 w-2.5" />
+                            {branches.find(b => b.id === member.branchId)?.name || 'Main Branch'}
+                          </div>
                         </TableCell>
                         <TableCell>
                           <div className="flex flex-col gap-1">
@@ -231,7 +281,7 @@ export default function StaffPage() {
                             <span className="font-medium text-sm">{member.position}</span>
                           </div>
                         </TableCell>
-                        {user?.role !== 'trainer' && (
+                        {!isTrainer(user?.role) && (
                           <TableCell className="font-bold text-foreground">
                             {formatCurrency(member.salary, settings?.currency)}
                             <span className="text-[10px] ml-1 font-normal text-muted-foreground">/mo</span>
@@ -246,7 +296,7 @@ export default function StaffPage() {
                             {member.status}
                           </Badge>
                         </TableCell>
-                        {user?.role !== 'trainer' && (
+                        {!isTrainer(user?.role) && (
                           <TableCell className="text-right">
                             <div className="flex justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                               <Button size="icon" variant="ghost" className="h-8 w-8 hover:text-primary">
@@ -279,3 +329,5 @@ export default function StaffPage() {
     </ProtectedLayout>
   )
 }
+
+

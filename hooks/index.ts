@@ -167,6 +167,19 @@ export const useSettings = () => {
   }
 }
 
+// Hook for branches
+export const useBranches = () => {
+  const store = useGymStore()
+  return {
+    branches: store.branches,
+    isLoading: store.branchesLoading,
+    fetchBranches: store.fetchBranches,
+    addBranch: store.addBranch,
+    updateBranch: store.updateBranch,
+    deleteBranch: store.deleteBranch,
+  }
+}
+
 // Hook for plans
 export const usePlans = () => {
   const store = useGymStore()

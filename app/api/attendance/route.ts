@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import prisma from '@/lib/prisma'
 import { getAuthUser } from '@/lib/auth'
+import { isTrainer } from '@/lib/permissions'
 
 export async function GET(req: NextRequest) {
   try {
@@ -13,6 +14,11 @@ export async function GET(req: NextRequest) {
 
     const where: any = {
       member: { gymId: user.gymId }
+    }
+
+    // Role-based isolation for trainers
+    if (isTrainer(user.role)) {
+      where.member.assignedTrainerId = user.userId
     }
 
     if (date) where.recordedDate = date

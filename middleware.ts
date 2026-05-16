@@ -1,0 +1,44 @@
+import { NextResponse } from 'next/server'
+import type { NextRequest } from 'next/server'
+import { getAuthUser } from './lib/auth'
+import { ROUTE_PERMISSIONS, canAccessRoute } from './lib/permissions'
+
+// Middleware to enforce route-level RBAC based on ROUTE_PERMISSIONS
+export async function middleware(req: NextRequest) {
+  const { pathname } = req.nextUrl
+
+  // Allow static, api and next internals
+  if (
+    pathname.startsWith('/api') ||
+    pathname.startsWith('/_next') ||
+    pathname.startsWith('/static') ||
+    pathname === '/favicon.ico'
+  ) {
+    return NextResponse.next()
+  }
+
+  // If route isn't listed in permissions, allow by default
+  const matchesPermission = Object.keys(ROUTE_PERMISSIONS).some((r) => {
+    return pathname === r || pathname.startsWith(r + '/')
+  })
+  if (!matchesPermission) return NextResponse.next()
+
+  // Authenticate user from Authorization header (bearer token)
+  const actor = await getAuthUser(req as any)
+  if (!actor) {
+    const loginUrl = new URL('/login', req.url)
+    return NextResponse.redirect(loginUrl)
+  }
+
+  // Authorize based on role
+  if (!canAccessRoute(actor.role as any, pathname)) {
+    const forbiddenUrl = new URL('/403', req.url)
+    return NextResponse.redirect(forbiddenUrl)
+  }
+
+  return NextResponse.next()
+}
+
+export const config = {
+  matcher: ['/((?!api|_next/static|_next/image|favicon.ico).*)'],
+}

@@ -181,3 +181,16 @@ export const ROUTE_PERMISSIONS: Record<string, UserRole[]> = {
 export const NAV_VISIBILITY: Record<string, UserRole[]> = {
   ...ROUTE_PERMISSIONS,
 }
+
+// ─── Convenience role helpers ───────────────────────────────────────────────
+/** Returns true if the supplied role string equals 'trainer' */
+export function isTrainer(role?: string | null): boolean {
+  return role === 'trainer'
+}
+
+/** Safe cast helper: returns the role as `UserRole` if valid, otherwise `undefined` */
+export function asUserRole(role?: string | null): UserRole | undefined {
+  if (!role) return undefined
+  const keys = Object.keys(ROLE_HIERARCHY) as UserRole[]
+  return keys.includes(role as UserRole) ? (role as UserRole) : undefined
+}

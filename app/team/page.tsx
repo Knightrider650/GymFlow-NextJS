@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
+import React from 'react'
 import { ProtectedLayout } from '@/components/layout/protected-layout'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -502,6 +503,7 @@ export default function TeamPage() {
                 <Label htmlFor="cu-role">Role</Label>
                 <select
                   id="cu-role"
+                  aria-label="Select role for new user"
                   className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                   value={createForm.role}
                   onChange={(e) => setCreateForm({ ...createForm, role: e.target.value as UserRole })}
@@ -605,9 +607,11 @@ export default function TeamPage() {
               Update role for <span className="font-semibold">{roleTarget?.fullname}</span>.
             </DialogDescription>
           </DialogHeader>
-          <div className="space-y-3 py-2">
-            <Label>New Role</Label>
+            <div className="space-y-3 py-2">
+            <Label htmlFor="change-role-select">New Role</Label>
             <select
+              id="change-role-select"
+              aria-label="Change user role"
               className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
               value={newRole}
               onChange={(e) => setNewRole(e.target.value as UserRole)}

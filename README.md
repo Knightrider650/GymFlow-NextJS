@@ -199,6 +199,18 @@ Password: password123
 2. Enter demo credentials (admin@gym.com / password123)
 3. Click "Sign In"
 
+---
+
+## 🧭 Testing
+
+- Unit tests are located in the `tests/` folder. A small suite validates the RBAC helpers in `lib/permissions.ts` (hierarchy ordering, management checks, route visibility, and helper utilities).
+- Run the tests with:
+
+```bash
+npm run test
+```
+
+
 ### Add Your First Member
 1. Go to **Members** page
 2. Click **"Add Member"** button
