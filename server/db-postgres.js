@@ -169,7 +169,40 @@ const db = {
         booked_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       );
     `;
-    await pool.query(schema);
+
+    try {
+      await pool.query(schema);
+
+      // Schema Migrations - Ensure new columns exist in existing tables
+      const migrations = [
+        // Members table
+        "ALTER TABLE members ADD COLUMN IF NOT EXISTS branch_id UUID;",
+        // Staff table
+        "ALTER TABLE staff ADD COLUMN IF NOT EXISTS branch_id UUID;",
+        // Billing table
+        "ALTER TABLE billing ADD COLUMN IF NOT EXISTS subtotal NUMERIC(10, 2) DEFAULT 0;",
+        "ALTER TABLE billing ADD COLUMN IF NOT EXISTS tax_amount NUMERIC(10, 2) DEFAULT 0;",
+        // Classes table
+        "ALTER TABLE classes ADD COLUMN IF NOT EXISTS branch_id UUID REFERENCES branches(id);",
+        "ALTER TABLE classes ADD COLUMN IF NOT EXISTS time TEXT;",
+        "ALTER TABLE classes ADD COLUMN IF NOT EXISTS days TEXT;",
+        // Settings table
+        "ALTER TABLE settings ADD COLUMN IF NOT EXISTS config JSONB DEFAULT '{}';"
+      ];
+
+      for (const migration of migrations) {
+        try {
+          await pool.query(migration);
+        } catch (e) {
+          console.warn(`Migration skipped or failed: ${migration}`, e.message);
+        }
+      }
+
+      console.log('✓ PostgreSQL schema synchronized.');
+    } catch (err) {
+      console.error('✗ Database initialization failed:', err);
+      throw err;
+    }
   },
 
   // Auth Methods
