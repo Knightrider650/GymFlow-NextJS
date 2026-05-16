@@ -158,11 +158,11 @@ export function canAccessRoute(actorRole: UserRole, route: string): boolean {
 export const ELEVATED_ROLES: UserRole[] = ['cto', 'ceo', 'admin']
 
 /** Administrative roles — top-level authority */
-export const ADMIN_ROLES: UserRole[] = ['cto', 'ceo']
+export const ADMIN_ROLES: UserRole[] = ['cto', 'ceo', 'admin']
 
 // ─── Route Permission Map ──────────────────────────────────────────────────────
 export const ROUTE_PERMISSIONS: Record<string, UserRole[]> = {
-  '/super-dashboard': ['cto', 'ceo'],
+  '/super-dashboard': ['cto', 'ceo', 'admin'],
   '/dashboard': ['cto', 'ceo', 'admin', 'manager', 'trainer', 'staff'],
   '/members': ['cto', 'ceo', 'admin', 'manager', 'trainer', 'staff'],
   '/attendance': ['cto', 'ceo', 'admin', 'manager', 'trainer', 'staff'],

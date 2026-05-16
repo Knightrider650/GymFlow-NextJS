@@ -5,6 +5,7 @@ export interface User {
   fullname: string
   role: 'cto' | 'ceo' | 'admin' | 'manager' | 'trainer' | 'staff'
   gymId?: string
+  isGlobal?: boolean
   createdAt: string
 }
 

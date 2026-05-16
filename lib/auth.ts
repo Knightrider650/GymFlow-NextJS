@@ -11,6 +11,7 @@ export interface AuthUser {
   email: string
   role: string
   gymId: string
+  isGlobal?: boolean
 }
 
 export async function getAuthUser(req: NextRequest): Promise<AuthUser | null> {

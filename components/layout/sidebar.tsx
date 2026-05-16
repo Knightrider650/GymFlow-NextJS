@@ -3,6 +3,7 @@
 import { usePathname, useRouter } from 'next/navigation'
 import { useAuth, useSettings } from '@/hooks'
 import { Button } from '@/components/ui/button'
+import { Badge } from '@/components/ui/badge'
 import Link from 'next/link'
 import {
   BarChart3,
@@ -137,11 +138,26 @@ export function Sidebar() {
 
         {/* User Info */}
         <div className="p-4 border-b border-border">
-          <p className="text-sm font-semibold text-foreground">{user?.fullname}</p>
+          <div className="flex items-center justify-between mb-1">
+            <p className="text-sm font-semibold text-foreground">{user?.fullname}</p>
+            {user?.isGlobal && (
+              <Badge variant="outline" className="text-[9px] h-4 bg-violet-500/10 text-violet-400 border-violet-500/20 px-1 py-0 leading-none">
+                GLOBAL
+              </Badge>
+            )}
+          </div>
           <p className="text-xs text-muted-foreground">{user?.email}</p>
-          <span className="inline-block mt-2 px-2 py-1 text-xs font-medium rounded bg-primary/10 text-primary uppercase tracking-wider">
-            {user?.role}
-          </span>
+          <div className="flex items-center gap-2 mt-2">
+            <span className="inline-block px-2 py-0.5 text-[10px] font-medium rounded bg-primary/10 text-primary uppercase tracking-wider">
+              {user?.role}
+            </span>
+            {user?.isGlobal && pathname !== '/super-dashboard' && (
+              <Link href="/super-dashboard" className="text-[10px] text-violet-400 hover:text-violet-300 flex items-center gap-1 transition-colors">
+                <Globe className="h-3 w-3" />
+                Global View
+              </Link>
+            )}
+          </div>
         </div>
 
         {/* Navigation — role-filtered, grouped by section */}

@@ -31,7 +31,11 @@ export async function GET(req: NextRequest) {
 
     return NextResponse.json({
       success: true,
-      data: userWithoutPassword
+      data: {
+        ...userWithoutPassword,
+        gymId: user.gymId, // Use gymId from JWT (contextual)
+        isGlobal: user.isGlobal // Include isGlobal from JWT
+      }
     })
   } catch (error) {
     console.error('Auth Me error:', error)

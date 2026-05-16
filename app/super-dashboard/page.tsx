@@ -21,6 +21,9 @@ import {
 import { apiClient } from '@/lib/api-client'
 import { Input } from '@/components/ui/input'
 
+import { useAuthStore } from '@/lib/store'
+import { useRouter } from 'next/navigation'
+
 interface SuperStats {
   totalGyms: number
   totalMembers: number
@@ -46,6 +49,8 @@ export default function SuperDashboard() {
   const [gyms, setGyms] = useState<GymOverview[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState('')
+  const switchGym = useAuthStore(state => state.switchGym)
+  const router = useRouter()
 
   useEffect(() => {
     const fetchData = async () => {
@@ -67,6 +72,15 @@ export default function SuperDashboard() {
 
     fetchData()
   }, [])
+
+  const handleManageGym = async (gymId: string, gymName: string) => {
+    const success = await switchGym(gymId)
+    if (success) {
+      router.push('/dashboard')
+    } else {
+      alert(`Failed to switch to ${gymName}`)
+    }
+  }
 
   const filteredGyms = gyms.filter(gym => 
     gym.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -239,9 +253,14 @@ export default function SuperDashboard() {
                         {new Date(gym.createdAt).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' })}
                       </TableCell>
                       <TableCell className="text-right">
-                        <Button variant="ghost" size="sm" className="gap-2 hover:bg-violet-500/10 hover:text-violet-400">
+                        <Button 
+                          variant="ghost" 
+                          size="sm" 
+                          className="gap-2 hover:bg-violet-500/10 hover:text-violet-400"
+                          onClick={() => handleManageGym(gym.id, gym.name)}
+                        >
                           <LayoutDashboard className="h-4 w-4" />
-                          View Details
+                          Manage Gym
                         </Button>
                       </TableCell>
                     </TableRow>

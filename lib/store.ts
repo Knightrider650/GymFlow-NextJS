@@ -11,6 +11,7 @@ interface AuthState {
   login: (email: string, password: string) => Promise<void>
   logout: () => Promise<void>
   checkAuth: () => Promise<void>
+  switchGym: (gymId: string) => Promise<boolean>
 }
 
 interface GymState {
@@ -171,6 +172,32 @@ export const useAuthStore = create<AuthState>()(
           } catch (error) {
             localStorage.clear()
             set({ user: null, isAuthenticated: false })
+          } finally {
+            set({ isLoading: false })
+          }
+        },
+        switchGym: async (gymId: string) => {
+          set({ isLoading: true, error: null })
+          try {
+            const response = await apiClient.post('/api/auth/switch-gym', { gymId })
+            if (response.success && response.data) {
+              const { accessToken, refreshToken } = response.data
+              localStorage.setItem('accessToken', accessToken)
+              if (refreshToken) {
+                localStorage.setItem('refreshToken', refreshToken)
+              }
+              // After switching tokens, we need to refresh the user data from /api/auth/me
+              const meRes = await apiClient.get('/api/auth/me')
+              if (meRes.success && meRes.data) {
+                set({ user: meRes.data, isAuthenticated: true })
+                return true
+              }
+            }
+            set({ error: response.error || 'Failed to switch gym' })
+            return false
+          } catch (error: any) {
+            set({ error: error.message })
+            return false
           } finally {
             set({ isLoading: false })
           }

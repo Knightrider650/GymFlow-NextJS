@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import bcrypt from 'bcryptjs'
 import jwt from 'jsonwebtoken'
 import prisma from '@/lib/prisma'
+import { ADMIN_ROLES } from '@/lib/permissions'
 
 const JWT_SECRET = process.env.NEXT_PUBLIC_JWT_SECRET || 'fallback_secret'
 
@@ -37,8 +38,16 @@ export async function POST(request: Request) {
       )
     }
 
+    const isGlobal = ADMIN_ROLES.includes(user.role as any)
+
     const accessToken = jwt.sign(
-      { userId: user.id, email: user.email, role: user.role, gymId: user.gymId },
+      { 
+        userId: user.id, 
+        email: user.email, 
+        role: user.role, 
+        gymId: user.gymId,
+        isGlobal 
+      },
       JWT_SECRET,
       { expiresIn: '1d' }
     )
