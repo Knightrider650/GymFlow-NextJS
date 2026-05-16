@@ -162,6 +162,7 @@ export const ADMIN_ROLES: UserRole[] = ['cto', 'ceo']
 
 // ─── Route Permission Map ──────────────────────────────────────────────────────
 export const ROUTE_PERMISSIONS: Record<string, UserRole[]> = {
+  '/super-dashboard': ['cto', 'ceo'],
   '/dashboard': ['cto', 'ceo', 'admin', 'manager', 'trainer', 'staff'],
   '/members': ['cto', 'ceo', 'admin', 'manager', 'trainer', 'staff'],
   '/attendance': ['cto', 'ceo', 'admin', 'manager', 'trainer', 'staff'],

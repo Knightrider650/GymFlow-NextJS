@@ -24,6 +24,7 @@ import {
   UserCog,
   UserPlus,
   FileText,
+  Globe,
 } from 'lucide-react'
 import { useState } from 'react'
 import { NAV_VISIBILITY, type UserRole } from '@/lib/permissions'
@@ -37,6 +38,7 @@ interface NavItem {
 
 const ALL_NAV_ITEMS: NavItem[] = [
   // ── Core ──────────────────────────────────────────────────────────────
+  { href: '/super-dashboard', label: 'Global Dashboard', icon: Globe, section: 'core' },
   { href: '/dashboard',      label: 'Dashboard',       icon: Home,         section: 'core' },
   { href: '/notifications',  label: 'Notifications',   icon: Bell,         section: 'core' },
   // ── Operations ────────────────────────────────────────────────────────
