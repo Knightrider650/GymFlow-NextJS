@@ -61,10 +61,10 @@ interface SystemUser {
 }
 
 const ROLE_LABELS: Record<UserRole, string> = {
-  cto: 'CTO',
-  ceo: 'CEO',
-  admin: 'Admin',
-  manager: 'Manager',
+  cto: 'Super Admin (CTO)',
+  ceo: 'Super Admin (CEO)',
+  admin: 'Super Admin (Admin)',
+  manager: 'Gym Manager',
   trainer: 'Trainer',
   staff: 'Staff',
 }

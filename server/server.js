@@ -173,7 +173,8 @@ app.post('/api/auth/logout', authMiddleware, async (req, res) => {
 // ============================================================================
 
 app.get('/api/members', authMiddleware, async (req, res) => {
-  let members = await db.getMembers(req.user.id);
+  const trainerId = req.user.role === 'trainer' ? req.user.id : null;
+  let members = await db.getMembers(req.user.id, trainerId);
   members = members.map(m => ({
     ...m,
     membershipType: m.membership_type || m.membershipType,
@@ -183,13 +184,13 @@ app.get('/api/members', authMiddleware, async (req, res) => {
   res.json({ success: true, data: members });
 });
 
-app.post('/api/members', authMiddleware, async (req, res) => {
+app.post('/api/members', authMiddleware, authorizeRoles(['admin', 'ceo', 'cto', 'manager', 'staff']), async (req, res) => {
   const member = await db.addMember({ ...req.body, id: uuidv4() }, req.user.id);
   broadcast('members:update', member);
   res.status(201).json({ success: true, data: member });
 });
 
-app.post('/api/members/bulk', authMiddleware, async (req, res) => {
+app.post('/api/members/bulk', authMiddleware, authorizeRoles(['admin', 'ceo', 'cto', 'manager']), async (req, res) => {
   try {
     if (!Array.isArray(req.body.members)) {
       return res.status(400).json({ success: false, error: 'Expected "members" array in payload' });
@@ -248,17 +249,23 @@ app.post('/api/attendance/:id/checkout', authMiddleware, async (req, res) => {
 // ============================================================================
 
 app.get('/api/staff', authMiddleware, async (req, res) => {
-  const data = await db.getStaff(req.user.id);
+  let data = await db.getStaff(req.user.id);
+  
+  // Report requirement: No money/salary visibility for trainers
+  if (req.user.role === 'trainer') {
+    data = data.map(({ salary, ...rest }) => rest);
+  }
+  
   res.json({ success: true, data });
 });
 
-app.post('/api/staff', authMiddleware, async (req, res) => {
+app.post('/api/staff', authMiddleware, authorizeRoles(['admin', 'ceo', 'cto', 'manager']), async (req, res) => {
   const member = await db.addStaff({ ...req.body, id: uuidv4() }, req.user.id);
   broadcast('staff:update', member);
   res.status(201).json({ success: true, data: member });
 });
 
-app.put('/api/staff/:id', authMiddleware, async (req, res) => {
+app.put('/api/staff/:id', authMiddleware, authorizeRoles(['admin', 'ceo', 'cto', 'manager']), async (req, res) => {
   const member = await db.updateStaff(req.params.id, req.body, req.user.id);
   if (member) broadcast('staff:update', member);
   res.json({ success: !!member, data: member });
@@ -274,7 +281,7 @@ app.delete('/api/staff/:id', authMiddleware, authorizeRoles(['admin', 'ceo', 'ct
 // INVENTORY ROUTES
 // ============================================================================
 
-app.get('/api/inventory', authMiddleware, async (req, res) => {
+app.get('/api/inventory', authMiddleware, authorizeRoles(['admin', 'ceo', 'cto', 'manager', 'staff']), async (req, res) => {
   let data = await db.getInventory(req.user.id);
   data = data.map(i => ({
     ...i,
@@ -307,7 +314,7 @@ app.delete('/api/inventory/:id', authMiddleware, authorizeRoles(['admin', 'ceo',
 // BILLING ROUTES
 // ============================================================================
 
-app.get('/api/billing', authMiddleware, async (req, res) => {
+app.get('/api/billing', authMiddleware, authorizeRoles(['admin', 'ceo', 'cto', 'manager', 'staff']), async (req, res) => {
   const data = await db.getInvoices(req.user.id);
   res.json({ success: true, data });
 });
@@ -341,11 +348,12 @@ app.delete('/api/billing/:id', authMiddleware, authorizeRoles(['admin', 'ceo', '
 // ============================================================================
 
 app.get('/api/classes', authMiddleware, async (req, res) => {
-  const data = await db.getClasses(req.user.id);
+  const instructorId = req.user.role === 'trainer' ? req.user.id : null;
+  const data = await db.getClasses(req.user.id, instructorId);
   res.json({ success: true, data });
 });
 
-app.post('/api/classes', authMiddleware, async (req, res) => {
+app.post('/api/classes', authMiddleware, authorizeRoles(['admin', 'ceo', 'cto', 'manager', 'staff']), async (req, res) => {
   const cls = await db.addClass({ ...req.body, id: uuidv4(), currentEnrollment: 0 }, req.user.id);
   broadcast('classes:update', cls);
   res.status(201).json({ success: true, data: cls });
@@ -372,13 +380,22 @@ app.get('/api/settings', authMiddleware, async (req, res) => {
   res.json({ success: true, data });
 });
 
-app.put('/api/settings', authMiddleware, authorizeRoles(['admin', 'ceo', 'cto']), async (req, res) => {
+app.put('/api/settings', authMiddleware, authorizeRoles(['admin', 'ceo', 'cto', 'manager']), async (req, res) => {
   const data = await db.updateSettings(req.body, req.user.id);
   res.json({ success: true, data });
 });
 
 app.get('/api/dashboard-stats', authMiddleware, async (req, res) => {
-  const data = await db.getDashboardStats(req.user.id);
+  let data = await db.getDashboardStats(req.user.id);
+  
+  // Report requirement: Trainers should not see revenue/money
+  if (req.user.role === 'trainer') {
+    delete data.todayRevenue;
+    delete data.monthlyRevenue;
+    delete data.revenueTrend;
+    delete data.pendingPayments;
+  }
+  
   res.json({ success: true, data });
 });
 

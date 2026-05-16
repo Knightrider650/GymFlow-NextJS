@@ -20,6 +20,8 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { useBilling, useMembers, usePlans, useSettings } from '@/hooks'
 import { formatCurrency, formatDate, getStatusBadgeColor } from '@/utils/format'
 import { Plus, DollarSign, Search, CreditCard, Receipt, Clock, CheckCircle2 } from 'lucide-react'
+import { useAuthStore } from '@/lib/store'
+import { UserRole } from '@/lib/permissions'
 
 export default function BillingPage() {
   const { invoices, isLoading, fetchInvoices, createInvoice, recordPayment } = useBilling()
@@ -146,6 +148,9 @@ export default function BillingPage() {
     paidInvoices: invoices.filter(i => i.status === 'paid').length,
   }
 
+  const actorRole = useAuthStore(s => s.user?.role) as UserRole
+  const isManagerOrAdmin = ['cto', 'ceo', 'admin', 'manager'].includes(actorRole)
+
   return (
     <ProtectedLayout>
       <div className="p-6 lg:p-8 space-y-8">
@@ -236,61 +241,63 @@ export default function BillingPage() {
         </div>
 
         {/* Stats Cards */}
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-          <Card className="border-none shadow-lg bg-gradient-to-br from-green-500/10 to-emerald-500/10 backdrop-blur-sm">
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Total Collected</CardTitle>
-              <div className="p-2 bg-green-500/20 rounded-lg">
-                <CheckCircle2 className="h-4 w-4 text-green-600" />
-              </div>
-            </CardHeader>
-            <CardContent>
-              <p className="text-2xl font-bold text-green-700">{formatCurrency(stats.totalRevenue)}</p>
-              <p className="text-xs text-green-600/70 mt-1">Successfully processed</p>
-            </CardContent>
-          </Card>
+        {isManagerOrAdmin && (
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+            <Card className="border-none shadow-lg bg-gradient-to-br from-green-500/10 to-emerald-500/10 backdrop-blur-sm">
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Total Collected</CardTitle>
+                <div className="p-2 bg-green-500/20 rounded-lg">
+                  <CheckCircle2 className="h-4 w-4 text-green-600" />
+                </div>
+              </CardHeader>
+              <CardContent>
+                <p className="text-2xl font-bold text-green-700">{formatCurrency(stats.totalRevenue)}</p>
+                <p className="text-xs text-green-600/70 mt-1">Successfully processed</p>
+              </CardContent>
+            </Card>
 
-          <Card className="border-none shadow-lg bg-gradient-to-br from-amber-500/10 to-orange-500/10 backdrop-blur-sm">
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Outstanding</CardTitle>
-              <div className="p-2 bg-amber-500/20 rounded-lg">
-                <Clock className="h-4 w-4 text-amber-600" />
-              </div>
-            </CardHeader>
-            <CardContent>
-              <p className="text-2xl font-bold text-amber-700">{formatCurrency(stats.pendingAmount)}</p>
-              <p className="text-xs text-amber-600/70 mt-1">Pending verification</p>
-            </CardContent>
-          </Card>
+            <Card className="border-none shadow-lg bg-gradient-to-br from-amber-500/10 to-orange-500/10 backdrop-blur-sm">
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Outstanding</CardTitle>
+                <div className="p-2 bg-amber-500/20 rounded-lg">
+                  <Clock className="h-4 w-4 text-amber-600" />
+                </div>
+              </CardHeader>
+              <CardContent>
+                <p className="text-2xl font-bold text-amber-700">{formatCurrency(stats.pendingAmount)}</p>
+                <p className="text-xs text-amber-600/70 mt-1">Pending verification</p>
+              </CardContent>
+            </Card>
 
-          <Card className="border-none shadow-lg bg-card/50 backdrop-blur-sm">
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Active Invoices</CardTitle>
-              <div className="p-2 bg-muted rounded-lg">
-                <Receipt className="h-4 w-4 text-muted-foreground" />
-              </div>
-            </CardHeader>
-            <CardContent>
-              <p className="text-2xl font-bold">{stats.totalInvoices}</p>
-              <p className="text-xs text-muted-foreground mt-1 text-balance overflow-hidden">Total generated this term</p>
-            </CardContent>
-          </Card>
+            <Card className="border-none shadow-lg bg-card/50 backdrop-blur-sm">
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Active Invoices</CardTitle>
+                <div className="p-2 bg-muted rounded-lg">
+                  <Receipt className="h-4 w-4 text-muted-foreground" />
+                </div>
+              </CardHeader>
+              <CardContent>
+                <p className="text-2xl font-bold">{stats.totalInvoices}</p>
+                <p className="text-xs text-muted-foreground mt-1 text-balance overflow-hidden">Total generated this term</p>
+              </CardContent>
+            </Card>
 
-          <Card className="border-none shadow-lg bg-card/50 backdrop-blur-sm">
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Recovery Rate</CardTitle>
-              <div className="p-2 bg-muted rounded-lg">
-                <DollarSign className="h-4 w-4 text-muted-foreground" />
-              </div>
-            </CardHeader>
-            <CardContent>
-              <p className="text-2xl font-bold">
-                {stats.totalInvoices > 0 ? Math.round((stats.paidInvoices / stats.totalInvoices) * 100) : 0}%
-              </p>
-              <p className="text-xs text-muted-foreground mt-1">Payment completion</p>
-            </CardContent>
-          </Card>
-        </div>
+            <Card className="border-none shadow-lg bg-card/50 backdrop-blur-sm">
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Recovery Rate</CardTitle>
+                <div className="p-2 bg-muted rounded-lg">
+                  <DollarSign className="h-4 w-4 text-muted-foreground" />
+                </div>
+              </CardHeader>
+              <CardContent>
+                <p className="text-2xl font-bold">
+                  {stats.totalInvoices > 0 ? Math.round((stats.paidInvoices / stats.totalInvoices) * 100) : 0}%
+                </p>
+                <p className="text-xs text-muted-foreground mt-1">Payment completion</p>
+              </CardContent>
+            </Card>
+          </div>
+        )}
 
         {/* Search & Table */}
         <div className="space-y-4">

@@ -137,8 +137,12 @@ const db = {
   },
 
   // Member Methods
-  async getMembers(ownerId) {
-    return data.members;
+  async getMembers(ownerId, trainerId = null) {
+    let members = data.members.filter(m => m.owner_id === ownerId || !m.owner_id);
+    if (trainerId) {
+      members = members.filter(m => m.assigned_trainer_id === trainerId);
+    }
+    return members;
   },
 
   async addMember(member, ownerId) {
@@ -287,8 +291,12 @@ const db = {
   },
 
   // Classes Methods
-  async getClasses(ownerId) {
-    return data.classes;
+  async getClasses(ownerId, instructorId = null) {
+    let classes = data.classes.filter(c => c.owner_id === ownerId || !c.owner_id);
+    if (instructorId) {
+      classes = classes.filter(c => c.instructor_id === instructorId);
+    }
+    return classes;
   },
 
   async addClass(cls, ownerId) {

@@ -18,9 +18,10 @@ import {
 import { formatCurrency, formatDate } from '@/utils/format'
 import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
 
-import { useGymStore } from '@/lib/store'
+import { useAuthStore, useGymStore } from '@/lib/store'
 
 export default function DashboardPage() {
+  const { user } = useAuthStore()
   const { 
     fetchStats, stats, statsLoading,
     fetchInvoices, invoices, 
@@ -132,22 +133,26 @@ export default function DashboardPage() {
             trend={12}
             gradient="bg-blue-600 text-white"
           />
-          <StatCard
-            title="Today's Revenue"
-            value={formatCurrency(stats?.todayRevenue || 0, settings?.currency)}
-            icon={DollarSign}
-            description="Paid invoices today"
-            trend={8}
-            gradient="bg-emerald-600 text-white"
-          />
-          <StatCard
-            title="Monthly Revenue"
-            value={formatCurrency(stats?.monthlyRevenue || 0, settings?.currency)}
-            icon={TrendingUp}
-            description="Total this month"
-            trend={15}
-            gradient="bg-purple-600 text-white"
-          />
+          {user?.role !== 'trainer' && (
+            <>
+              <StatCard
+                title="Today's Revenue"
+                value={formatCurrency(stats?.todayRevenue || 0, settings?.currency)}
+                icon={DollarSign}
+                description="Paid invoices today"
+                trend={8}
+                gradient="bg-emerald-600 text-white"
+              />
+              <StatCard
+                title="Monthly Revenue"
+                value={formatCurrency(stats?.monthlyRevenue || 0, settings?.currency)}
+                icon={TrendingUp}
+                description="Total this month"
+                trend={15}
+                gradient="bg-purple-600 text-white"
+              />
+            </>
+          )}
           <StatCard
             title="Today's Visits"
             value={stats?.todayVisits || 0}
@@ -155,13 +160,15 @@ export default function DashboardPage() {
             description="Members checked in"
             gradient="bg-orange-500 text-white"
           />
-          <StatCard
-            title="Pending Payments"
-            value={stats?.pendingPayments || 0}
-            icon={AlertCircle}
-            description="Invoices awaiting payment"
-            gradient="bg-rose-500 text-white"
-          />
+          {user?.role !== 'trainer' && (
+            <StatCard
+              title="Pending Payments"
+              value={stats?.pendingPayments || 0}
+              icon={AlertCircle}
+              description="Invoices awaiting payment"
+              gradient="bg-rose-500 text-white"
+            />
+          )}
           <StatCard
             title="Data Consistency"
             value={stats?.retention || '100%'}
@@ -174,30 +181,32 @@ export default function DashboardPage() {
         {/* Charts */}
         <div className="grid gap-4 lg:grid-cols-2">
           {/* Revenue Chart */}
-          <Card className="shadow-md">
-            <CardHeader>
-              <CardTitle>Revenue Trend</CardTitle>
-              <CardDescription>Daily revenue this week</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <ResponsiveContainer width="100%" height={300}>
-                <LineChart data={stats?.revenueTrend || []}>
-                  <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                  <XAxis dataKey="name" axisLine={false} tickLine={false} />
-                  <YAxis axisLine={false} tickLine={false} />
-                  <Tooltip />
-                  <Line
-                    type="monotone"
-                    dataKey="revenue"
-                    stroke="#10b981"
-                    strokeWidth={3}
-                    dot={{ r: 4, fill: '#10b981', strokeWidth: 0 }}
-                    activeDot={{ r: 6, strokeWidth: 0 }}
-                  />
-                </LineChart>
-              </ResponsiveContainer>
-            </CardContent>
-          </Card>
+          {user?.role !== 'trainer' && (
+            <Card className="shadow-md">
+              <CardHeader>
+                <CardTitle>Revenue Trend</CardTitle>
+                <CardDescription>Daily revenue this week</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <ResponsiveContainer width="100%" height={300}>
+                  <LineChart data={stats?.revenueTrend || []}>
+                    <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                    <XAxis dataKey="name" axisLine={false} tickLine={false} />
+                    <YAxis axisLine={false} tickLine={false} />
+                    <Tooltip />
+                    <Line
+                      type="monotone"
+                      dataKey="revenue"
+                      stroke="#10b981"
+                      strokeWidth={3}
+                      dot={{ r: 4, fill: '#10b981', strokeWidth: 0 }}
+                      activeDot={{ r: 6, strokeWidth: 0 }}
+                    />
+                  </LineChart>
+                </ResponsiveContainer>
+              </CardContent>
+            </Card>
+          )}
 
           {/* Attendance Chart */}
           <Card className="shadow-md">
@@ -227,43 +236,45 @@ export default function DashboardPage() {
         {/* Recent Activity */}
         <div className="grid gap-4 lg:grid-cols-2">
           {/* Recent Invoices */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-lg">Recent Invoices</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                {invoices.slice(0, 5).map((invoice) => (
-                  <div
-                    key={invoice.id}
-                    className="flex items-center justify-between py-2 border-b last:border-b-0"
-                  >
-                    <div>
-                      <p className="font-medium text-sm">{invoice.memberName}</p>
-                      <p className="text-xs text-muted-foreground">
-                        {formatDate(invoice.invoiceDate)}
-                      </p>
+          {user?.role !== 'trainer' && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-lg">Recent Invoices</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  {invoices.slice(0, 5).map((invoice) => (
+                    <div
+                      key={invoice.id}
+                      className="flex items-center justify-between py-2 border-b last:border-b-0"
+                    >
+                      <div>
+                        <p className="font-medium text-sm">{invoice.memberName}</p>
+                        <p className="text-xs text-muted-foreground">
+                          {formatDate(invoice.invoiceDate)}
+                        </p>
+                      </div>
+                      <div className="text-right">
+                        <p className="font-medium text-sm">{formatCurrency(invoice.amount, settings?.currency)}</p>
+                        <Badge
+                          variant={
+                            invoice.status === 'paid'
+                              ? 'success'
+                              : invoice.status === 'pending'
+                              ? 'warning'
+                              : 'danger'
+                          }
+                          className="text-xs"
+                        >
+                          {invoice.status}
+                        </Badge>
+                      </div>
                     </div>
-                    <div className="text-right">
-                      <p className="font-medium text-sm">{formatCurrency(invoice.amount, settings?.currency)}</p>
-                      <Badge
-                        variant={
-                          invoice.status === 'paid'
-                            ? 'success'
-                            : invoice.status === 'pending'
-                            ? 'warning'
-                            : 'danger'
-                        }
-                        className="text-xs"
-                      >
-                        {invoice.status}
-                      </Badge>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          )}
 
           {/* Recent Check-ins */}
           <Card>

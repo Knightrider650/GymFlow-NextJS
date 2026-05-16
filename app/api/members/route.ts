@@ -18,6 +18,11 @@ export async function GET(req: NextRequest) {
       gymId: user.gymId
     }
 
+    // Report requirement: Trainers view assigned members only
+    if (user.role === 'trainer') {
+      where.assignedTrainerId = user.userId
+    }
+
     if (status) where.status = status
     if (membershipType) where.membershipType = membershipType
     if (searchTerm) {
@@ -45,6 +50,11 @@ export async function POST(req: NextRequest) {
     const user = await getAuthUser(req)
     if (!user) {
       return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 })
+    }
+
+    // Report requirement: Trainer should not manage broad member records
+    if (user.role === 'trainer') {
+      return NextResponse.json({ success: false, error: 'Trainers cannot create member records' }, { status: 403 })
     }
 
     const data = await req.json()

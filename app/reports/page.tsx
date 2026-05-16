@@ -25,8 +25,9 @@ type ReportType =
 
 const COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899']
 
-import { useGymStore } from '@/lib/store'
+import { useAuthStore, useGymStore } from '@/lib/store'
 import { formatCurrency } from '@/utils/format'
+import { UserRole } from '@/lib/permissions'
 
 export default function ReportsPage() {
   const [reportType, setReportType] = useState<ReportType>('member-summary')
@@ -130,16 +131,26 @@ export default function ReportsPage() {
     }
   }
 
+  const actorRole = useAuthStore(s => s.user?.role) as UserRole
+  const isManagerOrAdmin = ['cto', 'ceo', 'admin', 'manager'].includes(actorRole)
+
   const reportOptions = [
-    { value: 'member-summary', label: 'Member Growth & Summary', icon: Users },
-    { value: 'expiring-members', label: 'Membership Retention Alerts', icon: UserCheck },
-    { value: 'revenue', label: 'Financial Revenue Trends', icon: DollarSign },
-    { value: 'attendance', label: 'Traffic & Attendance Patterns', icon: Activity },
-    { value: 'class-utilization', label: 'Class Enrollment Metrics', icon: Calendar },
-    { value: 'equipment-status', label: 'Equipment Maintenance Log', icon: Package },
-    { value: 'leads-conversion', label: 'Lead Conversion Pipeline', icon: Zap },
-    { value: 'staff-performance', label: 'Trainer & Staff Performance', icon: TrendingUp },
-  ]
+    { value: 'member-summary', label: 'Member Growth & Summary', icon: Users, roles: ['cto', 'ceo', 'admin', 'manager', 'staff', 'trainer'] },
+    { value: 'expiring-members', label: 'Membership Retention Alerts', icon: UserCheck, roles: ['cto', 'ceo', 'admin', 'manager', 'staff'] },
+    { value: 'revenue', label: 'Financial Revenue Trends', icon: DollarSign, roles: ['cto', 'ceo', 'admin', 'manager'] },
+    { value: 'attendance', label: 'Traffic & Attendance Patterns', icon: Activity, roles: ['cto', 'ceo', 'admin', 'manager', 'staff', 'trainer'] },
+    { value: 'class-utilization', label: 'Class Enrollment Metrics', icon: Calendar, roles: ['cto', 'ceo', 'admin', 'manager', 'staff', 'trainer'] },
+    { value: 'equipment-status', label: 'Equipment Maintenance Log', icon: Package, roles: ['cto', 'ceo', 'admin', 'manager', 'staff'] },
+    { value: 'leads-conversion', label: 'Lead Conversion Pipeline', icon: Zap, roles: ['cto', 'ceo', 'admin', 'manager'] },
+    { value: 'staff-performance', label: 'Trainer & Staff Performance', icon: TrendingUp, roles: ['cto', 'ceo', 'admin', 'manager'] },
+  ].filter(opt => opt.roles.includes(actorRole))
+
+  // Set initial report type to the first available option for that role
+  useEffect(() => {
+    if (reportOptions.length > 0 && !reportOptions.find(o => o.value === reportType)) {
+      setReportType(reportOptions[0].value as ReportType)
+    }
+  }, [actorRole])
 
   return (
     <ProtectedLayout>

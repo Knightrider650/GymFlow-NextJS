@@ -20,8 +20,9 @@ import { Plus, Edit2, Trash2 } from 'lucide-react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import * as z from 'zod'
-import { useGymStore } from '@/lib/store'
+import { useAuthStore, useGymStore } from '@/lib/store'
 import { formatCurrency } from '@/utils/format'
+import { UserRole } from '@/lib/permissions'
 
 const planSchema = z.object({
   name: z.string().min(2, 'Name must be at least 2 characters'),
@@ -94,6 +95,9 @@ export default function PlansPage() {
     }
   }
 
+  const actorRole = useAuthStore(s => s.user?.role) as UserRole
+  const canManagePlans = ['cto', 'ceo', 'admin', 'manager'].includes(actorRole)
+
   return (
     <ProtectedLayout>
       <div className="p-6 lg:p-8 space-y-8">
@@ -103,53 +107,55 @@ export default function PlansPage() {
             <p className="text-sm text-muted-foreground mt-1">Configure pricing tiers and durations</p>
           </div>
 
-        <Dialog open={isDialogOpen} onOpenChange={onOpenChange}>
-          <DialogTrigger asChild>
-            <Button className="bg-primary hover:bg-primary/90">
-              <Plus className="mr-2 h-4 w-4" /> Add Plan
-            </Button>
-          </DialogTrigger>
-          <DialogContent className="sm:max-w-[425px] bg-slate-900 border-slate-800 text-slate-100">
-            <DialogHeader>
-              <DialogTitle>{editingId ? 'Edit Plan' : 'Add New Plan'}</DialogTitle>
-              <DialogDescription className="text-slate-400">
-                Configure plan cost and active length.
-              </DialogDescription>
-            </DialogHeader>
-            
-            <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="name">Plan Title</Label>
-                <Input id="name" {...register('name')} className="bg-slate-800 border-slate-700" />
-                {errors.name && <p className="text-xs text-red-400">{errors.name.message}</p>}
-              </div>
+        {canManagePlans && (
+          <Dialog open={isDialogOpen} onOpenChange={onOpenChange}>
+            <DialogTrigger asChild>
+              <Button className="bg-primary hover:bg-primary/90">
+                <Plus className="mr-2 h-4 w-4" /> Add Plan
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="sm:max-w-[425px] bg-slate-900 border-slate-800 text-slate-100">
+              <DialogHeader>
+                <DialogTitle>{editingId ? 'Edit Plan' : 'Add New Plan'}</DialogTitle>
+                <DialogDescription className="text-slate-400">
+                  Configure plan cost and active length.
+                </DialogDescription>
+              </DialogHeader>
               
-              <div className="grid grid-cols-2 gap-4">
+              <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
                 <div className="space-y-2">
-                  <Label htmlFor="price">Price</Label>
-                  <Input id="price" type="number" step="0.01" {...register('price')} className="bg-slate-800 border-slate-700" />
-                  {errors.price && <p className="text-xs text-red-400">{errors.price.message}</p>}
+                  <Label htmlFor="name">Plan Title</Label>
+                  <Input id="name" {...register('name')} className="bg-slate-800 border-slate-700" />
+                  {errors.name && <p className="text-xs text-red-400">{errors.name.message}</p>}
                 </div>
+                
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="price">Price</Label>
+                    <Input id="price" type="number" step="0.01" {...register('price')} className="bg-slate-800 border-slate-700" />
+                    {errors.price && <p className="text-xs text-red-400">{errors.price.message}</p>}
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="durationMonths">Duration (Months)</Label>
+                    <Input id="durationMonths" type="number" {...register('durationMonths')} className="bg-slate-800 border-slate-700" />
+                    {errors.durationMonths && <p className="text-xs text-red-400">{errors.durationMonths.message}</p>}
+                  </div>
+                </div>
+
                 <div className="space-y-2">
-                  <Label htmlFor="durationMonths">Duration (Months)</Label>
-                  <Input id="durationMonths" type="number" {...register('durationMonths')} className="bg-slate-800 border-slate-700" />
-                  {errors.durationMonths && <p className="text-xs text-red-400">{errors.durationMonths.message}</p>}
+                  <Label htmlFor="features">Features (comma separated)</Label>
+                  <Input id="features" {...register('features')} className="bg-slate-800 border-slate-700" />
                 </div>
-              </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="features">Features (comma separated)</Label>
-                <Input id="features" {...register('features')} className="bg-slate-800 border-slate-700" />
-              </div>
-
-              <DialogFooter>
-                <Button type="submit" disabled={isSubmitting}>
-                  {isSubmitting ? 'Saving...' : (editingId ? 'Update Plan' : 'Save Plan')}
-                </Button>
-              </DialogFooter>
-            </form>
-          </DialogContent>
-        </Dialog>
+                <DialogFooter>
+                  <Button type="submit" disabled={isSubmitting}>
+                    {isSubmitting ? 'Saving...' : (editingId ? 'Update Plan' : 'Save Plan')}
+                  </Button>
+                </DialogFooter>
+              </form>
+            </DialogContent>
+          </Dialog>
+        )}
       </div>
 
       <Card className="bg-slate-900 border-slate-800">
@@ -162,7 +168,7 @@ export default function PlansPage() {
                   <TableHead className="font-semibold text-slate-300">Duration</TableHead>
                   <TableHead className="font-semibold text-slate-300">Price</TableHead>
                   <TableHead className="font-semibold text-slate-300">Features</TableHead>
-                  <TableHead className="text-right font-semibold text-slate-300">Actions</TableHead>
+                  {canManagePlans && <TableHead className="text-right font-semibold text-slate-300">Actions</TableHead>}
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -193,16 +199,18 @@ export default function PlansPage() {
                       <TableCell className="text-slate-400 text-sm max-w-[200px] truncate">
                         {plan.features || '-'}
                       </TableCell>
-                      <TableCell className="text-right">
-                        <div className="flex justify-end gap-2">
-                          <Button variant="ghost" size="icon" onClick={() => handleEdit(plan)}>
-                            <Edit2 className="h-4 w-4 text-slate-400 hover:text-white" />
-                          </Button>
-                          <Button variant="ghost" size="icon" onClick={() => { if(confirm('Delete plan?')) deletePlan(plan.id) }}>
-                            <Trash2 className="h-4 w-4 text-red-400 hover:text-red-300" />
-                          </Button>
-                        </div>
-                      </TableCell>
+                      {canManagePlans && (
+                        <TableCell className="text-right">
+                          <div className="flex justify-end gap-2">
+                            <Button variant="ghost" size="icon" onClick={() => handleEdit(plan)}>
+                              <Edit2 className="h-4 w-4 text-slate-400 hover:text-white" />
+                            </Button>
+                            <Button variant="ghost" size="icon" onClick={() => { if(confirm('Delete plan?')) deletePlan(plan.id) }}>
+                              <Trash2 className="h-4 w-4 text-red-400 hover:text-red-300" />
+                            </Button>
+                          </div>
+                        </TableCell>
+                      )}
                     </TableRow>
                   ))
                 )}

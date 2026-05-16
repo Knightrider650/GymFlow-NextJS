@@ -215,158 +215,163 @@ export default function MembersPage() {
               accept=".xlsx, .xls, .csv"
               className="hidden"
             />
-            <Button variant="outline" className="gap-2 shadow-sm" onClick={handleImportClick}>
-              <UploadCloud className="h-4 w-4" />
-              Import Excel
-            </Button>
-            <Dialog open={isDialogOpen} onOpenChange={(open) => {
-              setIsDialogOpen(open)
-              if (!open) resetForm()
-            }}>
-              <DialogTrigger asChild>
-                <Button className="gap-2 shadow-lg shadow-primary/20">
-                  <Plus className="h-4 w-4" />
-                  Add New Member
+            {user?.role !== 'trainer' && (
+              <>
+                <Button variant="outline" className="gap-2 shadow-sm" onClick={handleImportClick}>
+                  <UploadCloud className="h-4 w-4" />
+                  Import Excel
                 </Button>
-              </DialogTrigger>
-              <DialogContent className="sm:max-w-[600px]">
-                <DialogHeader>
-                  <DialogTitle>{editingMember ? 'Edit Member' : 'Add New Member'}</DialogTitle>
-                  <DialogDescription>
-                    Fill in the member details below to {editingMember ? 'update' : 'create'} a membership record.
-                  </DialogDescription>
-                </DialogHeader>
-                <form onSubmit={handleSubmit(onFormSubmit)} className="space-y-4 py-4">
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="name">Full Name *</Label>
-                      <Input
-                        id="name"
-                        {...register('name')}
-                        placeholder="John Doe"
-                        className={errors.name ? 'border-red-500' : ''}
-                      />
-                      {errors.name && <p className="text-xs text-red-500">{errors.name.message}</p>}
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="email">Email Address *</Label>
-                      <Input
-                        id="email"
-                        type="email"
-                        {...register('email')}
-                        placeholder="john@example.com"
-                        className={errors.email ? 'border-red-500' : ''}
-                      />
-                      {errors.email && <p className="text-xs text-red-500">{errors.email.message}</p>}
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="phone">Phone *</Label>
-                      <Input
-                        id="phone"
-                        {...register('phone')}
-                        placeholder="+1 (555) 000-0000"
-                        className={errors.phone ? 'border-red-500' : ''}
-                      />
-                      {errors.phone && <p className="text-xs text-red-500">{errors.phone.message}</p>}
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="address">Address</Label>
-                      <Input
-                        id="address"
-                        {...register('address')}
-                        placeholder="123 Main St"
-                      />
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="membershipType">Membership Type *</Label>
-                      <select
-                        id="membershipType"
-                        {...register('membershipType')}
-                        className="w-full h-10 px-3 rounded-md border border-input text-sm bg-background"
-                      >
-                        <option value="">Select a plan</option>
-                        {plans.length > 0 ? (
-                          plans.map((plan: any) => (
-                            <option key={plan.id} value={plan.name}>{plan.name}</option>
-                          ))
-                        ) : (
-                          <>
-                            <option value="Basic">Basic</option>
-                            <option value="Premium">Premium</option>
-                            <option value="Elite">Elite</option>
-                          </>
-                        )}
-                      </select>
-                      {errors.membershipType && <p className="text-xs text-red-500">{errors.membershipType.message}</p>}
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="status">Status *</Label>
-                      <select
-                        id="status"
-                        {...register('status')}
-                        className="w-full h-10 px-3 rounded-md border border-input text-sm bg-background"
-                      >
-                        <option value="active">Active</option>
-                        <option value="pending">Pending</option>
-                        <option value="expired">Expired</option>
-                        <option value="cancelled">Cancelled</option>
-                      </select>
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="joinDate">Join Date *</Label>
-                      <Input
-                        id="joinDate"
-                        type="date"
-                        {...register('joinDate')}
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="expiryDate">Expiry Date *</Label>
-                      <Input
-                        id="expiryDate"
-                        type="date"
-                        {...register('expiryDate')}
-                      />
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="emergencyContact">Emergency Contact</Label>
-                      <Input
-                        id="emergencyContact"
-                        {...register('emergencyContact')}
-                        placeholder="Contact name"
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="emergencyPhone">Emergency Phone</Label>
-                      <Input
-                        id="emergencyPhone"
-                        {...register('emergencyPhone')}
-                        placeholder="Phone number"
-                      />
-                    </div>
-                  </div>
-
-                  <DialogFooter className="mt-6">
-                    <Button type="submit" className="w-full sm:w-auto gap-2" disabled={isSubmitting}>
-                      {isSubmitting && <Plus className="h-4 w-4 animate-spin" />}
-                      {editingMember ? 'Update Member' : 'Add Member'}
+                <Dialog open={isDialogOpen} onOpenChange={(open) => {
+                  setIsDialogOpen(open)
+                  if (!open) resetForm()
+                }}>
+                  <DialogTrigger asChild>
+                    <Button className="gap-2 shadow-lg shadow-primary/20">
+                      <Plus className="h-4 w-4" />
+                      Add New Member
                     </Button>
-                  </DialogFooter>
-                </form>
-              </DialogContent>
-            </Dialog>
+                  </DialogTrigger>
+                  <DialogContent className="sm:max-w-[600px]">
+                    <DialogHeader>
+                      <DialogTitle>{editingMember ? 'Edit Member' : 'Add New Member'}</DialogTitle>
+                      <DialogDescription>
+                        Fill in the member details below to {editingMember ? 'update' : 'create'} a membership record.
+                      </DialogDescription>
+                    </DialogHeader>
+                    <form onSubmit={handleSubmit(onFormSubmit)} className="space-y-4 py-4">
+                      {/* ... form content ... */}
+                      <div className="grid grid-cols-2 gap-4">
+                        <div className="space-y-2">
+                          <Label htmlFor="name">Full Name *</Label>
+                          <Input
+                            id="name"
+                            {...register('name')}
+                            placeholder="John Doe"
+                            className={errors.name ? 'border-red-500' : ''}
+                          />
+                          {errors.name && <p className="text-xs text-red-500">{errors.name.message}</p>}
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="email">Email Address *</Label>
+                          <Input
+                            id="email"
+                            type="email"
+                            {...register('email')}
+                            placeholder="john@example.com"
+                            className={errors.email ? 'border-red-500' : ''}
+                          />
+                          {errors.email && <p className="text-xs text-red-500">{errors.email.message}</p>}
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-4">
+                        <div className="space-y-2">
+                          <Label htmlFor="phone">Phone *</Label>
+                          <Input
+                            id="phone"
+                            {...register('phone')}
+                            placeholder="+1 (555) 000-0000"
+                            className={errors.phone ? 'border-red-500' : ''}
+                          />
+                          {errors.phone && <p className="text-xs text-red-500">{errors.phone.message}</p>}
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="address">Address</Label>
+                          <Input
+                            id="address"
+                            {...register('address')}
+                            placeholder="123 Main St"
+                          />
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-4">
+                        <div className="space-y-2">
+                          <Label htmlFor="membershipType">Membership Type *</Label>
+                          <select
+                            id="membershipType"
+                            {...register('membershipType')}
+                            className="w-full h-10 px-3 rounded-md border border-input text-sm bg-background"
+                          >
+                            <option value="">Select a plan</option>
+                            {plans.length > 0 ? (
+                              plans.map((plan: any) => (
+                                <option key={plan.id} value={plan.name}>{plan.name}</option>
+                              ))
+                            ) : (
+                              <>
+                                <option value="Basic">Basic</option>
+                                <option value="Premium">Premium</option>
+                                <option value="Elite">Elite</option>
+                              </>
+                            )}
+                          </select>
+                          {errors.membershipType && <p className="text-xs text-red-500">{errors.membershipType.message}</p>}
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="status">Status *</Label>
+                          <select
+                            id="status"
+                            {...register('status')}
+                            className="w-full h-10 px-3 rounded-md border border-input text-sm bg-background"
+                          >
+                            <option value="active">Active</option>
+                            <option value="pending">Pending</option>
+                            <option value="expired">Expired</option>
+                            <option value="cancelled">Cancelled</option>
+                          </select>
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-4">
+                        <div className="space-y-2">
+                          <Label htmlFor="joinDate">Join Date *</Label>
+                          <Input
+                            id="joinDate"
+                            type="date"
+                            {...register('joinDate')}
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="expiryDate">Expiry Date *</Label>
+                          <Input
+                            id="expiryDate"
+                            type="date"
+                            {...register('expiryDate')}
+                          />
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-4">
+                        <div className="space-y-2">
+                          <Label htmlFor="emergencyContact">Emergency Contact</Label>
+                          <Input
+                            id="emergencyContact"
+                            {...register('emergencyContact')}
+                            placeholder="Contact name"
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="emergencyPhone">Emergency Phone</Label>
+                          <Input
+                            id="emergencyPhone"
+                            {...register('emergencyPhone')}
+                            placeholder="Phone number"
+                          />
+                        </div>
+                      </div>
+
+                      <DialogFooter className="mt-6">
+                        <Button type="submit" className="w-full sm:w-auto gap-2" disabled={isSubmitting}>
+                          {isSubmitting && <Plus className="h-4 w-4 animate-spin" />}
+                          {editingMember ? 'Update Member' : 'Add Member'}
+                        </Button>
+                      </DialogFooter>
+                    </form>
+                  </DialogContent>
+                </Dialog>
+              </>
+            )}
           </div>
         </div>
 
@@ -443,26 +448,28 @@ export default function MembersPage() {
                           </div>
                         </TableCell>
                         <TableCell className="text-right">
-                          <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
-                              <Button variant="ghost" size="icon" className="opacity-0 group-hover:opacity-100 transition-opacity">
-                                <MoreHorizontal className="h-4 w-4" />
-                              </Button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end" className="w-48">
-                              <DropdownMenuLabel>Member Actions</DropdownMenuLabel>
-                              <DropdownMenuSeparator />
-                              <DropdownMenuItem className="gap-2" onClick={() => handleEdit(member)}>
-                                <Edit className="h-4 w-4 text-blue-500" /> Edit Details
-                              </DropdownMenuItem>
-                              <DropdownMenuItem className="gap-2 text-red-600 focus:text-red-600 focus:bg-red-50" onClick={() => {
-                                setMemberToDelete(member.id)
-                                setIsDeleteDialogOpen(true)
-                              }}>
-                                <Trash2 className="h-4 w-4" /> Terminate Membership
-                              </DropdownMenuItem>
-                            </DropdownMenuContent>
-                          </DropdownMenu>
+                          {user?.role !== 'trainer' && (
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <Button variant="ghost" size="icon" className="opacity-0 group-hover:opacity-100 transition-opacity">
+                                  <MoreHorizontal className="h-4 w-4" />
+                                </Button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="end" className="w-48">
+                                <DropdownMenuLabel>Member Actions</DropdownMenuLabel>
+                                <DropdownMenuSeparator />
+                                <DropdownMenuItem className="gap-2" onClick={() => handleEdit(member)}>
+                                  <Edit className="h-4 w-4 text-blue-500" /> Edit Details
+                                </DropdownMenuItem>
+                                <DropdownMenuItem className="gap-2 text-red-600 focus:text-red-600 focus:bg-red-50" onClick={() => {
+                                  setMemberToDelete(member.id)
+                                  setIsDeleteDialogOpen(true)
+                                }}>
+                                  <Trash2 className="h-4 w-4" /> Terminate Membership
+                                </DropdownMenuItem>
+                              </DropdownMenuContent>
+                            </DropdownMenu>
+                          )}
                         </TableCell>
                       </TableRow>
                     ))

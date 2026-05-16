@@ -12,6 +12,12 @@ export async function GET(req: NextRequest) {
       orderBy: { createdAt: 'desc' }
     })
 
+    // Report requirement: No money/salary visibility for trainers
+    if (user.role === 'trainer') {
+      const sanitizedData = data.map(({ salary, ...rest }) => rest)
+      return NextResponse.json({ success: true, data: sanitizedData })
+    }
+
     return NextResponse.json({ success: true, data })
   } catch (error: any) {
     console.error('Fetch staff error:', error)
@@ -23,6 +29,11 @@ export async function POST(req: NextRequest) {
   try {
     const user = await getAuthUser(req)
     if (!user) return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 })
+
+    // Report requirement: Trainer should not manage staff
+    if (user.role === 'trainer') {
+      return NextResponse.json({ success: false, error: 'Trainers cannot manage staff records' }, { status: 403 })
+    }
 
     const data = await req.json()
     

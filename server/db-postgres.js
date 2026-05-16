@@ -38,6 +38,7 @@ const db = {
         join_date DATE DEFAULT CURRENT_DATE,
         expiry_date DATE,
         emergency_contact JSONB,
+        assigned_trainer_id UUID REFERENCES users(id),
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       );
 
@@ -96,6 +97,7 @@ const db = {
         instructor_name TEXT,
         max_capacity INTEGER,
         current_enrollment INTEGER DEFAULT 0,
+        instructor_id UUID REFERENCES users(id),
         description TEXT
       );
 
@@ -161,8 +163,17 @@ const db = {
   },
 
   // Member Methods
-  async getMembers(ownerId) {
-    const res = await pool.query('SELECT * FROM members WHERE owner_id = $1 ORDER BY name', [ownerId]);
+  async getMembers(ownerId, trainerId = null) {
+    let query = 'SELECT * FROM members WHERE owner_id = $1';
+    const params = [ownerId];
+    
+    if (trainerId) {
+      query += ' AND assigned_trainer_id = $2';
+      params.push(trainerId);
+    }
+    
+    query += ' ORDER BY name';
+    const res = await pool.query(query, params);
     return res.rows;
   },
 
@@ -385,8 +396,16 @@ const db = {
   },
 
   // Classes Methods
-  async getClasses(ownerId) {
-    const res = await pool.query('SELECT * FROM classes WHERE owner_id = $1', [ownerId]);
+  async getClasses(ownerId, instructorId = null) {
+    let query = 'SELECT * FROM classes WHERE owner_id = $1';
+    const params = [ownerId];
+    
+    if (instructorId) {
+      query += ' AND instructor_id = $2';
+      params.push(instructorId);
+    }
+    
+    const res = await pool.query(query, params);
     return res.rows;
   },
 
