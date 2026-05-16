@@ -3,7 +3,7 @@ export interface User {
   id: string
   email: string
   fullname: string
-  role: 'admin' | 'staff' | 'trainer'
+  role: 'cto' | 'ceo' | 'admin' | 'manager' | 'trainer' | 'staff'
   gymId?: string
   createdAt: string
 }

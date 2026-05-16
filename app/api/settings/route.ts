@@ -23,7 +23,7 @@ export async function GET(req: NextRequest) {
 export async function PATCH(req: NextRequest) {
   try {
     const user = await getAuthUser(req)
-    if (!user || user.role !== 'admin') {
+    if (!user || !['admin', 'ceo', 'cto'].includes(user.role)) {
       return NextResponse.json({ success: false, error: 'Only admins can update gym settings' }, { status: 403 })
     }
 

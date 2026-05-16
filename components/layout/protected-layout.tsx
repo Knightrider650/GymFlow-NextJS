@@ -5,6 +5,7 @@ import { usePathname, useRouter } from 'next/navigation'
 import { useAuth } from '@/hooks'
 import { DashboardLayout } from '@/components/layout/sidebar'
 import { useAuthStore } from '@/lib/store'
+import { ROUTE_PERMISSIONS, type UserRole } from '@/lib/permissions'
 
 export function ProtectedLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter()
@@ -20,27 +21,15 @@ export function ProtectedLayout({ children }: { children: React.ReactNode }) {
     }
   }, [isAuthenticated, isLoading, router])
 
-  // Role-based route protection
+  // Role-based route protection using central permissions map
   const user = useAuthStore(state => state.user)
   const pathname = usePathname()
 
-  const routePermissions: Record<string, string[]> = {
-    '/staff': ['admin', 'owner', 'ceo', 'cto'],
-    '/settings': ['admin', 'owner', 'ceo', 'cto'],
-    '/activity-log': ['admin', 'owner', 'ceo', 'cto'],
-    '/billing': ['admin', 'owner', 'manager', 'ceo', 'cto'],
-    '/inventory': ['admin', 'owner', 'manager', 'ceo', 'cto'],
-    '/communications': ['admin', 'owner', 'manager', 'ceo', 'cto'],
-    '/plans': ['admin', 'owner', 'manager', 'ceo', 'cto'],
-    '/team': ['admin', 'owner', 'ceo', 'cto'],
-    '/invites': ['admin', 'owner', 'ceo', 'cto'],
-  }
-
   useEffect(() => {
     if (!isLoading && isAuthenticated && user) {
-      const allowedRoles = routePermissions[pathname]
-      if (allowedRoles && !allowedRoles.includes(user.role)) {
-        router.push('/dashboard') // Redirect unauthorized to dashboard
+      const allowedRoles = ROUTE_PERMISSIONS[pathname]
+      if (allowedRoles && !allowedRoles.includes(user.role as UserRole)) {
+        router.push('/dashboard')
       }
     }
   }, [pathname, user, isLoading, isAuthenticated, router])
