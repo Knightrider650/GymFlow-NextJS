@@ -24,7 +24,8 @@ async function main() {
     console.log('\n--- USERS ---')
     console.table(users)
   } catch (err) {
-    console.error('Database connection failed:', err.message)
+    const errorMessage = err instanceof Error ? err.message : String(err)
+    console.error('Database connection failed:', errorMessage)
     console.log('Note: If this is a local environment without a database, check .env.local or mock-server.js')
   } finally {
     await prisma.$disconnect()
