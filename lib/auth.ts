@@ -10,7 +10,9 @@ export interface AuthUser {
   userId: string
   email: string
   role: string
+  scope?: 'platform' | 'tenant'
   gymId: string
+  tenantId?: string | null
   isGlobal?: boolean
 }
 

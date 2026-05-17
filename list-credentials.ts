@@ -1,9 +1,5 @@
-import { PrismaClient } from '@prisma/client'
-import dotenv from 'dotenv'
-
-dotenv.config()
-
-const prisma = new PrismaClient()
+import 'dotenv/config'
+import prisma from './lib/prisma'
 
 async function main() {
   try {
@@ -28,7 +24,9 @@ async function main() {
     console.error('Database connection failed:', errorMessage)
     console.log('Note: If this is a local environment without a database, check .env.local or mock-server.js')
   } finally {
-    await prisma.$disconnect()
+    if (typeof (prisma as any).$disconnect === 'function') {
+      await (prisma as any).$disconnect()
+    }
   }
 }
 

@@ -114,7 +114,7 @@ export default function PlansPage() {
                 <Plus className="mr-2 h-4 w-4" /> Add Plan
               </Button>
             </DialogTrigger>
-            <DialogContent className="sm:max-w-[425px] bg-slate-900 border-slate-800 text-slate-100">
+            <DialogContent className="sm:max-w-[425px] max-h-[90vh] overflow-y-auto bg-slate-900 border-slate-800 text-slate-100">
               <DialogHeader>
                 <DialogTitle>{editingId ? 'Edit Plan' : 'Add New Plan'}</DialogTitle>
                 <DialogDescription className="text-slate-400">

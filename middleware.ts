@@ -3,6 +3,20 @@ import type { NextRequest } from 'next/server'
 import { getAuthUser } from './lib/auth'
 import { ROUTE_PERMISSIONS, canAccessRoute } from './lib/permissions'
 
+const PLATFORM_ROUTES = ['/super-dashboard', '/team']
+
+function getRouteScope(pathname: string): 'platform' | 'tenant' | null {
+  if (pathname === '/login' || pathname === '/register' || pathname === '/403') {
+    return null
+  }
+
+  if (PLATFORM_ROUTES.some((route) => pathname === route || pathname.startsWith(route + '/'))) {
+    return 'platform'
+  }
+
+  return 'tenant'
+}
+
 // Middleware to enforce route-level RBAC based on ROUTE_PERMISSIONS
 export async function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl
@@ -28,6 +42,12 @@ export async function middleware(req: NextRequest) {
   if (!actor) {
     const loginUrl = new URL('/login', req.url)
     return NextResponse.redirect(loginUrl)
+  }
+
+  const routeScope = getRouteScope(pathname)
+  if (routeScope && actor.scope && actor.scope !== routeScope) {
+    const target = actor.scope === 'platform' ? '/super-dashboard' : '/dashboard'
+    return NextResponse.redirect(new URL(target, req.url))
   }
 
   // Authorize based on role

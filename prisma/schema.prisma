@@ -36,6 +36,7 @@ model Gym {
   activityLogs     ActivityLog[]
   feedback         Feedback[]
   invites          Invite[]
+  branches         Branch[]
 }
 
 model User {
@@ -71,6 +72,7 @@ model Member {
   assignedTrainer   User?    @relation("TrainerMembers", fields: [assignedTrainerId], references: [id])
   gymId            String
   gym              Gym      @relation(fields: [gymId], references: [id])
+  branchId         String?  @map("branch_id")
   createdAt        DateTime @default(now())
   updatedAt        DateTime @updatedAt
 
@@ -86,6 +88,7 @@ model Attendance {
   checkOutTime DateTime?
   notes        String?
   recordedDate String   // YYYY-MM-DD
+  branchId     String?  @map("branch_id")
   createdAt    DateTime @default(now())
 }
 
@@ -114,6 +117,7 @@ model FitnessClass {
   currentEnrollment Int      @default(0)
   gymId             String
   gym               Gym      @relation(fields: [gymId], references: [id])
+  branchId         String?  @map("branch_id")
   createdAt         DateTime @default(now())
   updatedAt         DateTime @updatedAt
 }
@@ -144,6 +148,7 @@ model Staff {
   emergencyContact String?
   gymId            String
   gym              Gym      @relation(fields: [gymId], references: [id])
+  branchId         String?  @map("branch_id")
   createdAt        DateTime @default(now())
   updatedAt        DateTime @updatedAt
 }
@@ -237,4 +242,22 @@ model Invite {
   expiresAt DateTime
   gymId     String
   gym       Gym      @relation(fields: [gymId], references: [id])
+}
+
+model Branch {
+  id          String   @id @default(cuid())
+  gymId       String   @map("owner_id")
+  gym         Gym      @relation(fields: [gymId], references: [id])
+  name        String
+  address     String
+  phone       String
+  email       String
+  openingTime String?  @map("opening_time")
+  closingTime String?  @map("closing_time")
+  capacity    Int?
+  isDefault   Boolean  @default(false) @map("is_default")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  @@map("branches")
 }

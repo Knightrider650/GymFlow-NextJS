@@ -1,4 +1,5 @@
 require('dotenv').config();
+console.log('✓ Dotenv loaded');
 const express = require('express');
 const cors = require('cors');
 const morgan = require('morgan');
@@ -10,7 +11,8 @@ const { v4: uuidv4 } = require('uuid');
 
 // Use PostgreSQL if DATABASE_URL is provided, else fallback to JSON file
 const db = process.env.DATABASE_URL ? require('./db-postgres') : require('./db');
-const { authMiddleware, generateToken, generateRefreshToken, authorizeRoles } = require('./middleware/auth');
+console.log('✓ Database module loaded');
+const { authMiddleware, generateToken, generateRefreshToken, authorizeRoles, authorizePlatform } = require('./middleware/auth');
 
 // Local role helper for this server process
 function isTrainerRole(role) {
@@ -29,6 +31,7 @@ const io = new Server(httpServer, {
 const PORT = process.env.PORT || 5000;
 
 // Standard Middlewares
+console.log('✓ Setting up middlewares...');
 const rateLimit = require('express-rate-limit');
 app.use(helmet({
   contentSecurityPolicy: {
@@ -69,6 +72,22 @@ const broadcast = (event, data) => {
     client.write(message);
   }
 };
+
+function getTenantContextId(user) {
+  if (!user || user.scope === 'platform') {
+    return null;
+  }
+
+  return user.tenantId || user.tenant_id || user.gymId || user.gym_id || null;
+}
+
+function withTenantPayload(payload, tenantId) {
+  return {
+    ...payload,
+    tenant_id: tenantId,
+    tenantId,
+  };
+}
 
 // ============================================================================
 // AUTHENTICATION ROUTES
@@ -135,12 +154,69 @@ app.post('/api/auth/login', loginLimiter, async (req, res) => {
       data: {
         accessToken: token,
         refreshToken,
-        user: { id: user.id, email: user.email, name: user.name, role: user.role, gymId: user.gymId }
+        user: {
+          id: user.id,
+          email: user.email,
+          name: user.name,
+          role: user.role,
+          scope: user.scope || (['cto', 'ceo', 'admin'].includes(user.role) ? 'platform' : 'tenant'),
+          gymId: user.gymId,
+          tenantId: user.tenantId || user.tenant_id || user.gymId || null,
+        }
       }
     });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Authentication failed' });
+  }
+});
+
+app.post('/api/auth/switch-gym', authMiddleware, authorizePlatform, async (req, res) => {
+  try {
+    const { gymId } = req.body;
+    if (!gymId) {
+      return res.status(400).json({ error: 'gymId is required' });
+    }
+
+    const tenant = await db.getTenantById(gymId);
+    if (!tenant) {
+      return res.status(404).json({ error: 'Tenant not found' });
+    }
+
+    const supportUser = {
+      id: req.user.id,
+      email: req.user.email,
+      name: req.user.name,
+      role: req.user.role,
+      scope: 'tenant',
+      tenantId: tenant.id,
+      gymId: tenant.id,
+    };
+
+    const accessToken = generateToken(supportUser);
+    const refreshToken = generateRefreshToken(supportUser);
+
+    await db.logActivity(
+      req.user.id,
+      req.user.name || req.user.email,
+      'create',
+      'support-session',
+      tenant.id,
+      tenant.name,
+      `Opened support session for ${tenant.name}`
+    );
+
+    res.json({
+      success: true,
+      data: {
+        accessToken,
+        refreshToken,
+        tenant,
+      },
+    });
+  } catch (err) {
+    console.error('Switch gym error:', err);
+    res.status(500).json({ error: 'Failed to switch gym' });
   }
 });
 
@@ -162,7 +238,21 @@ app.post('/api/auth/refresh', async (req, res) => {
     if (!user) return res.status(401).json({ error: 'User not found' });
 
     const accessToken = generateToken(user);
-    res.json({ success: true, data: { accessToken, user: { id: user.id, email: user.email, name: user.name, role: user.role } } });
+    res.json({
+      success: true,
+      data: {
+        accessToken,
+        user: {
+          id: user.id,
+          email: user.email,
+          name: user.name,
+          role: user.role,
+          scope: user.scope || (['cto', 'ceo', 'admin'].includes(user.role) ? 'platform' : 'tenant'),
+          gymId: user.gymId,
+          tenantId: user.tenantId || user.tenant_id || user.gymId || null,
+        }
+      }
+    });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Token refresh failed' });
@@ -173,13 +263,67 @@ app.post('/api/auth/logout', authMiddleware, async (req, res) => {
   res.json({ success: true, message: 'Logged out successfully' });
 });
 
+app.get('/api/super-admin/overview', authMiddleware, authorizePlatform, async (req, res) => {
+  try {
+    const overview = await db.getPlatformOverview();
+    res.json({ success: true, data: overview });
+  } catch (err) {
+    console.error('Platform overview error:', err);
+    res.status(500).json({ error: 'Failed to fetch platform overview' });
+  }
+});
+
+app.get('/api/super-admin/gyms', authMiddleware, authorizePlatform, async (req, res) => {
+  try {
+    const gyms = await db.getTenants();
+    res.json({ success: true, data: gyms });
+  } catch (err) {
+    console.error('Platform gyms error:', err);
+    res.status(500).json({ error: 'Failed to fetch gyms' });
+  }
+});
+
+app.get('/api/platform/tenants', authMiddleware, authorizePlatform, async (req, res) => {
+  try {
+    const gyms = await db.getTenants();
+    res.json({ success: true, data: gyms });
+  } catch (err) {
+    console.error('Platform tenants error:', err);
+    res.status(500).json({ error: 'Failed to fetch tenants' });
+  }
+});
+
+app.post('/api/platform/tenants', authMiddleware, authorizePlatform, async (req, res) => {
+  try {
+    const tenant = await db.createTenant(req.body);
+    res.status(201).json({ success: true, data: tenant });
+  } catch (err) {
+    console.error('Create tenant error:', err);
+    res.status(500).json({ error: 'Failed to create tenant' });
+  }
+});
+
+app.put('/api/platform/tenants/:id', authMiddleware, authorizePlatform, async (req, res) => {
+  try {
+    const tenant = await db.updateTenant(req.params.id, req.body);
+    if (!tenant) {
+      return res.status(404).json({ error: 'Tenant not found' });
+    }
+    res.json({ success: true, data: tenant });
+  } catch (err) {
+    console.error('Update tenant error:', err);
+    res.status(500).json({ error: 'Failed to update tenant' });
+  }
+});
+
 // ============================================================================
 // MEMBERS ROUTES 
 // ============================================================================
 
 app.get('/api/members', authMiddleware, async (req, res) => {
+  const tenantId = getTenantContextId(req.user);
   const trainerId = isTrainerRole(req.user.role) ? req.user.id : null;
-  let members = await db.getMembers(req.user.id, trainerId);
+  let members = await db.getMembers(tenantId, trainerId);
   members = members.map(m => ({
     ...m,
     membershipType: m.membership_type || m.membershipType,
@@ -190,7 +334,8 @@ app.get('/api/members', authMiddleware, async (req, res) => {
 });
 
 app.post('/api/members', authMiddleware, authorizeRoles(['admin', 'ceo', 'cto', 'manager', 'staff']), async (req, res) => {
-  const member = await db.addMember({ ...req.body, id: uuidv4() }, req.user.id);
+  const tenantId = getTenantContextId(req.user);
+  const member = await db.addMember(withTenantPayload({ ...req.body, id: uuidv4() }, tenantId), tenantId);
   broadcast('members:update', member);
   res.status(201).json({ success: true, data: member });
 });
@@ -202,9 +347,10 @@ app.post('/api/members/bulk', authMiddleware, authorizeRoles(['admin', 'ceo', 'c
     }
     
     // Assign UUIDs to each imported member
-    const preparedMembers = req.body.members.map(m => ({ ...m, id: uuidv4() }));
+    const tenantId = getTenantContextId(req.user);
+    const preparedMembers = req.body.members.map(m => withTenantPayload({ ...m, id: uuidv4() }, tenantId));
     
-    const inserted = await db.bulkAddMembers(preparedMembers, req.user.id);
+    const inserted = await db.bulkAddMembers(preparedMembers, tenantId);
     
     // Broadcast bulk update so all connected clients fetch fresh state
     broadcast('members:update_bulk', { count: inserted.length });
@@ -216,13 +362,15 @@ app.post('/api/members/bulk', authMiddleware, authorizeRoles(['admin', 'ceo', 'c
 });
 
 app.delete('/api/members/:id', authMiddleware, authorizeRoles(['admin', 'ceo', 'cto']), async (req, res) => {
-  const success = await db.deleteMember(req.params.id, req.user.id);
+  const tenantId = getTenantContextId(req.user);
+  const success = await db.deleteMember(req.params.id, tenantId);
   if (success) broadcast('members:delete', { id: req.params.id });
   res.json({ success });
 });
 
 app.put('/api/members/:id', authMiddleware, async (req, res) => {
-  const member = await db.updateMember(req.params.id, req.body, req.user.id);
+  const tenantId = getTenantContextId(req.user);
+  const member = await db.updateMember(req.params.id, req.body, tenantId);
   if (member) broadcast('members:update', member);
   res.json({ success: !!member, data: member });
 });
@@ -233,19 +381,22 @@ app.put('/api/members/:id', authMiddleware, async (req, res) => {
 // ============================================================================
 
 app.get('/api/attendance', authMiddleware, async (req, res) => {
+  const tenantId = getTenantContextId(req.user);
   const trainerId = req.user.role === 'trainer' ? req.user.id : null;
-  const data = await db.getAttendance(req.query, req.user.id, trainerId);
+  const data = await db.getAttendance(req.query, tenantId, trainerId);
   res.json({ success: true, data });
 });
 
 app.post('/api/attendance/checkin', authMiddleware, async (req, res) => {
-  const record = await db.checkIn(req.body.memberId, req.body.notes, req.user.id);
+  const tenantId = getTenantContextId(req.user);
+  const record = await db.checkIn(req.body.memberId, req.body.notes, tenantId);
   broadcast('attendance:update', record);
   res.status(201).json({ success: true, data: record });
 });
 
 app.post('/api/attendance/:id/checkout', authMiddleware, async (req, res) => {
-  const record = await db.checkOut(req.params.id, req.user.id);
+  const tenantId = getTenantContextId(req.user);
+  const record = await db.checkOut(req.params.id, tenantId);
   if (record) broadcast('attendance:update', record);
   res.json({ success: !!record, data: record });
 });
@@ -255,7 +406,8 @@ app.post('/api/attendance/:id/checkout', authMiddleware, async (req, res) => {
 // ============================================================================
 
 app.get('/api/staff', authMiddleware, async (req, res) => {
-  let data = await db.getStaff(req.user.id);
+  const tenantId = getTenantContextId(req.user);
+  let data = await db.getStaff(tenantId);
   
   // Report requirement: No money/salary visibility for trainers
   if (isTrainerRole(req.user.role)) {
@@ -266,19 +418,22 @@ app.get('/api/staff', authMiddleware, async (req, res) => {
 });
 
 app.post('/api/staff', authMiddleware, authorizeRoles(['admin', 'ceo', 'cto', 'manager']), async (req, res) => {
-  const member = await db.addStaff({ ...req.body, id: uuidv4() }, req.user.id);
+  const tenantId = getTenantContextId(req.user);
+  const member = await db.addStaff(withTenantPayload({ ...req.body, id: uuidv4() }, tenantId), tenantId);
   broadcast('staff:update', member);
   res.status(201).json({ success: true, data: member });
 });
 
 app.put('/api/staff/:id', authMiddleware, authorizeRoles(['admin', 'ceo', 'cto', 'manager']), async (req, res) => {
-  const member = await db.updateStaff(req.params.id, req.body, req.user.id);
+  const tenantId = getTenantContextId(req.user);
+  const member = await db.updateStaff(req.params.id, req.body, tenantId);
   if (member) broadcast('staff:update', member);
   res.json({ success: !!member, data: member });
 });
 
 app.delete('/api/staff/:id', authMiddleware, authorizeRoles(['admin', 'ceo', 'cto']), async (req, res) => {
-  const success = await db.deleteStaff(req.params.id, req.user.id);
+  const tenantId = getTenantContextId(req.user);
+  const success = await db.deleteStaff(req.params.id, tenantId);
   if (success) broadcast('staff:delete', { id: req.params.id });
   res.json({ success });
 });
@@ -288,7 +443,8 @@ app.delete('/api/staff/:id', authMiddleware, authorizeRoles(['admin', 'ceo', 'ct
 // ============================================================================
 
 app.get('/api/inventory', authMiddleware, authorizeRoles(['admin', 'ceo', 'cto', 'manager', 'staff']), async (req, res) => {
-  let data = await db.getInventory(req.user.id);
+  const tenantId = getTenantContextId(req.user);
+  let data = await db.getInventory(tenantId);
   data = data.map(i => ({
     ...i,
     minThreshold: i.min_threshold ?? i.minThreshold,
@@ -299,19 +455,22 @@ app.get('/api/inventory', authMiddleware, authorizeRoles(['admin', 'ceo', 'cto',
 });
 
 app.post('/api/inventory', authMiddleware, async (req, res) => {
-  const item = await db.addInventoryItem({ ...req.body, id: uuidv4() }, req.user.id);
+  const tenantId = getTenantContextId(req.user);
+  const item = await db.addInventoryItem(withTenantPayload({ ...req.body, id: uuidv4() }, tenantId), tenantId);
   broadcast('inventory:update', item);
   res.status(201).json({ success: true, data: item });
 });
 
 app.put('/api/inventory/:id', authMiddleware, async (req, res) => {
-  const item = await db.updateInventoryItem(req.params.id, req.body, req.user.id);
+  const tenantId = getTenantContextId(req.user);
+  const item = await db.updateInventoryItem(req.params.id, req.body, tenantId);
   if (item) broadcast('inventory:update', item);
   res.json({ success: !!item, data: item });
 });
 
 app.delete('/api/inventory/:id', authMiddleware, authorizeRoles(['admin', 'ceo', 'cto']), async (req, res) => {
-  const success = await db.deleteInventoryItem(req.params.id, req.user.id);
+  const tenantId = getTenantContextId(req.user);
+  const success = await db.deleteInventoryItem(req.params.id, tenantId);
   if (success) broadcast('inventory:delete', { id: req.params.id });
   res.json({ success });
 });
@@ -321,30 +480,35 @@ app.delete('/api/inventory/:id', authMiddleware, authorizeRoles(['admin', 'ceo',
 // ============================================================================
 
 app.get('/api/billing', authMiddleware, authorizeRoles(['admin', 'ceo', 'cto', 'manager', 'staff']), async (req, res) => {
-  const data = await db.getInvoices(req.user.id);
+  const tenantId = getTenantContextId(req.user);
+  const data = await db.getInvoices(tenantId);
   res.json({ success: true, data });
 });
 
 app.post('/api/billing', authMiddleware, async (req, res) => {
-  const invoice = await db.addInvoice({ ...req.body, id: uuidv4(), status: 'pending' }, req.user.id);
+  const tenantId = getTenantContextId(req.user);
+  const invoice = await db.addInvoice(withTenantPayload({ ...req.body, id: uuidv4(), status: 'pending' }, tenantId), tenantId);
   broadcast('billing:update', invoice);
   res.status(201).json({ success: true, data: invoice });
 });
 
 app.post('/api/billing/:id/pay', authMiddleware, async (req, res) => {
-  const record = await db.payInvoice(req.params.id, req.body, req.user.id);
+  const tenantId = getTenantContextId(req.user);
+  const record = await db.payInvoice(req.params.id, req.body, tenantId);
   if (record) broadcast('billing:update', record);
   res.json({ success: !!record, data: record });
 });
 
 app.put('/api/billing/:id', authMiddleware, async (req, res) => {
-  const invoice = await db.updateInvoice(req.params.id, req.body, req.user.id);
+  const tenantId = getTenantContextId(req.user);
+  const invoice = await db.updateInvoice(req.params.id, req.body, tenantId);
   if (invoice) broadcast('billing:update', invoice);
   res.json({ success: !!invoice, data: invoice });
 });
 
 app.delete('/api/billing/:id', authMiddleware, authorizeRoles(['admin', 'ceo', 'cto']), async (req, res) => {
-  const success = await db.deleteInvoice(req.params.id, req.user.id);
+  const tenantId = getTenantContextId(req.user);
+  const success = await db.deleteInvoice(req.params.id, tenantId);
   if (success) broadcast('billing:delete', { id: req.params.id });
   res.json({ success });
 });
@@ -354,37 +518,43 @@ app.delete('/api/billing/:id', authMiddleware, authorizeRoles(['admin', 'ceo', '
 // ============================================================================
 
 app.get('/api/classes', authMiddleware, async (req, res) => {
+  const tenantId = getTenantContextId(req.user);
   const instructorId = isTrainerRole(req.user.role) ? req.user.id : null;
-  const data = await db.getClasses(req.user.id, instructorId);
+  const data = await db.getClasses(tenantId, instructorId);
   res.json({ success: true, data });
 });
 
 app.post('/api/classes', authMiddleware, authorizeRoles(['admin', 'ceo', 'cto', 'manager', 'staff']), async (req, res) => {
-  const cls = await db.addClass({ ...req.body, id: uuidv4(), currentEnrollment: 0 }, req.user.id);
+  const tenantId = getTenantContextId(req.user);
+  const cls = await db.addClass(withTenantPayload({ ...req.body, id: uuidv4(), currentEnrollment: 0 }, tenantId), tenantId);
   broadcast('classes:update', cls);
   res.status(201).json({ success: true, data: cls });
 });
 
 app.put('/api/classes/:id', authMiddleware, async (req, res) => {
-  const cls = await db.updateClass(req.params.id, req.body, req.user.id);
+  const tenantId = getTenantContextId(req.user);
+  const cls = await db.updateClass(req.params.id, req.body, tenantId);
   if (cls) broadcast('classes:update', cls);
   res.json({ success: !!cls, data: cls });
 });
 
 app.delete('/api/classes/:id', authMiddleware, authorizeRoles(['admin', 'ceo', 'cto']), async (req, res) => {
-  const success = await db.deleteClass(req.params.id, req.user.id);
+  const tenantId = getTenantContextId(req.user);
+  const success = await db.deleteClass(req.params.id, tenantId);
   if (success) broadcast('classes:delete', { id: req.params.id });
   res.json({ success });
 });
 
 app.get('/api/classes/:id/bookings', authMiddleware, async (req, res) => {
-  const data = await db.getClassBookings(req.params.id, req.user.id);
+  const tenantId = getTenantContextId(req.user);
+  const data = await db.getClassBookings(req.params.id, tenantId);
   res.json({ success: true, data });
 });
 
 app.post('/api/bookings', authMiddleware, async (req, res) => {
   try {
-    const data = await db.bookClass(req.body.memberId, req.body.classId, req.user.id);
+    const tenantId = getTenantContextId(req.user);
+    const data = await db.bookClass(req.body.memberId, req.body.classId, tenantId);
     broadcast('bookings:update', data);
     res.status(201).json({ success: true, data });
   } catch (err) {
@@ -393,7 +563,8 @@ app.post('/api/bookings', authMiddleware, async (req, res) => {
 });
 
 app.delete('/api/bookings/:id', authMiddleware, async (req, res) => {
-  const success = await db.cancelBooking(req.params.id, req.user.id);
+  const tenantId = getTenantContextId(req.user);
+  const success = await db.cancelBooking(req.params.id, tenantId);
   if (success) broadcast('bookings:delete', { id: req.params.id });
   res.json({ success });
 });
@@ -403,24 +574,26 @@ app.delete('/api/bookings/:id', authMiddleware, async (req, res) => {
 // ============================================================================
 
 app.get('/api/settings', authMiddleware, async (req, res) => {
-  const data = await db.getSettings(req.user.id);
+  const tenantId = getTenantContextId(req.user);
+  const classes = await db.getClasses(tenantId);
   res.json({ success: true, data });
 });
 
 app.put('/api/settings', authMiddleware, authorizeRoles(['admin', 'ceo', 'cto', 'manager']), async (req, res) => {
-  const data = await db.updateSettings(req.body, req.user.id);
+  const tenantId = getTenantContextId(req.user);
+  const cls = await db.addClass(withTenantPayload({ ...req.body, id: uuidv4() }, tenantId), tenantId);
   res.json({ success: true, data });
 });
 
 app.get('/api/dashboard-stats', authMiddleware, async (req, res) => {
   try {
+    const tenantId = getTenantContextId(req.user);
     const trainerId = req.user.role === 'trainer' ? req.user.id : null;
-    let data = await db.getDashboardStats(req.user.id, trainerId);
+    let data = await db.getDashboardStats(tenantId, trainerId);
     
     // Report requirement: Trainers should not see revenue/money
     if (isTrainerRole(req.user.role)) {
       delete data.todayRevenue;
-      delete data.monthlyRevenue;
       delete data.revenueTrend;
       delete data.pendingPayments;
     }
@@ -437,12 +610,14 @@ app.get('/api/dashboard-stats', authMiddleware, async (req, res) => {
 // ============================================================================
 
 app.get('/api/notifications', authMiddleware, async (req, res) => {
-  const data = await db.getNotifications(req.user.id);
+  const tenantId = getTenantContextId(req.user);
+  const data = await db.getNotifications(tenantId);
   res.json({ success: true, data });
 });
 
 app.put('/api/notifications/:id', authMiddleware, async (req, res) => {
-  const data = await db.markNotificationRead(req.params.id, req.user.id);
+  const tenantId = getTenantContextId(req.user);
+  const data = await db.markNotificationRead(req.params.id, tenantId);
   res.json({ success: !!data, data });
 });
 
@@ -451,30 +626,35 @@ app.put('/api/notifications/:id', authMiddleware, async (req, res) => {
 // ============================================================================
 
 app.get('/api/leads', authMiddleware, async (req, res) => {
-  const data = await db.getLeads(req.user.id);
+  const tenantId = getTenantContextId(req.user);
+  const data = await db.getLeads(tenantId);
   res.json({ success: true, data });
 });
 
 app.post('/api/leads', authMiddleware, async (req, res) => {
-  const lead = await db.addLead({ ...req.body, id: uuidv4() }, req.user.id);
+  const tenantId = getTenantContextId(req.user);
+  const lead = await db.addLead(withTenantPayload({ ...req.body, id: uuidv4() }, tenantId), tenantId);
   broadcast('leads:update', lead);
   res.status(201).json({ success: true, data: lead });
 });
 
 app.put('/api/leads/:id', authMiddleware, async (req, res) => {
-  const lead = await db.updateLead(req.params.id, req.body, req.user.id);
+  const tenantId = getTenantContextId(req.user);
+  const lead = await db.updateLead(req.params.id, req.body, tenantId);
   if (lead) broadcast('leads:update', lead);
   res.json({ success: !!lead, data: lead });
 });
 
 app.delete('/api/leads/:id', authMiddleware, async (req, res) => {
-  const success = await db.deleteLead(req.params.id, req.user.id);
+  const tenantId = getTenantContextId(req.user);
+  const success = await db.deleteLead(req.params.id, tenantId);
   if (success) broadcast('leads:delete', { id: req.params.id });
   res.json({ success });
 });
 
 app.post('/api/leads/:id/convert', authMiddleware, async (req, res) => {
-  const member = await db.convertLead(req.params.id, { ...req.body, id: uuidv4() }, req.user.id);
+  const tenantId = getTenantContextId(req.user);
+  const member = await db.convertLead(req.params.id, withTenantPayload({ ...req.body, id: uuidv4() }, tenantId), tenantId);
   if (member) {
     broadcast('leads:delete', { id: req.params.id });
     broadcast('members:update', member);
@@ -487,24 +667,28 @@ app.post('/api/leads/:id/convert', authMiddleware, async (req, res) => {
 // ============================================================================
 
 app.get('/api/plans', authMiddleware, async (req, res) => {
-  const data = await db.getPlans(req.user.id);
+  const tenantId = getTenantContextId(req.user);
+  const data = await db.getPlans(tenantId);
   res.json({ success: true, data });
 });
 
 app.post('/api/plans', authMiddleware, async (req, res) => {
-  const plan = await db.addPlan({ ...req.body, id: uuidv4() }, req.user.id);
+  const tenantId = getTenantContextId(req.user);
+  const plan = await db.addPlan(withTenantPayload({ ...req.body, id: uuidv4() }, tenantId), tenantId);
   broadcast('plans:update', plan);
   res.status(201).json({ success: true, data: plan });
 });
 
 app.put('/api/plans/:id', authMiddleware, async (req, res) => {
-  const plan = await db.updatePlan(req.params.id, req.body, req.user.id);
+  const tenantId = getTenantContextId(req.user);
+  const plan = await db.updatePlan(req.params.id, req.body, tenantId);
   if (plan) broadcast('plans:update', plan);
   res.json({ success: !!plan, data: plan });
 });
 
 app.delete('/api/plans/:id', authMiddleware, async (req, res) => {
-  const success = await db.deletePlan(req.params.id, req.user.id);
+  const tenantId = getTenantContextId(req.user);
+  const success = await db.deletePlan(req.params.id, tenantId);
   if (success) broadcast('plans:delete', { id: req.params.id });
   res.json({ success });
 });
@@ -515,8 +699,9 @@ app.delete('/api/plans/:id', authMiddleware, async (req, res) => {
 
 app.get('/api/settings', authMiddleware, async (req, res) => {
   try {
-    const data = await db.getSettings ? await db.getSettings(req.user.id) : { gymName: 'GymFlow' };
-    res.json({ success: true, data });
+    const tenantId = getTenantContextId(req.user);
+    const settings = await db.getSettings ? await db.getSettings(tenantId) : { gymName: 'GymFlow' };
+    res.json({ success: true, data: settings });
   } catch (err) {
     res.status(500).json({ error: 'Failed to fetch settings' });
   }
@@ -524,8 +709,9 @@ app.get('/api/settings', authMiddleware, async (req, res) => {
 
 app.put('/api/settings', authMiddleware, authorizeRoles(['admin', 'ceo', 'cto']), async (req, res) => {
   try {
-    const data = await db.updateSettings ? await db.updateSettings(req.body, req.user.id) : req.body;
-    res.json({ success: true, data });
+    const tenantId = getTenantContextId(req.user);
+    const settings = await db.updateSettings ? await db.updateSettings(req.body, tenantId) : req.body;
+    res.json({ success: true, data: settings });
   } catch (err) {
     res.status(500).json({ error: 'Failed to update settings' });
   }
@@ -533,8 +719,9 @@ app.put('/api/settings', authMiddleware, authorizeRoles(['admin', 'ceo', 'cto'])
 
 app.post('/api/settings', authMiddleware, authorizeRoles(['admin', 'ceo', 'cto']), async (req, res) => {
   try {
-    const data = await db.updateSettings ? await db.updateSettings(req.body, req.user.id) : req.body;
-    res.json({ success: true, data });
+    const tenantId = getTenantContextId(req.user);
+    const settings = await db.updateSettings ? await db.updateSettings(req.body, tenantId) : req.body;
+    res.json({ success: true, data: settings });
   } catch (err) {
     res.status(500).json({ error: 'Failed to update settings' });
   }
@@ -546,7 +733,8 @@ app.post('/api/settings', authMiddleware, authorizeRoles(['admin', 'ceo', 'cto']
 
 app.get('/api/branches', authMiddleware, async (req, res) => {
   try {
-    const data = await db.getBranches(req.user.id);
+    const tenantId = getTenantContextId(req.user);
+    const data = await db.getBranches(req.user.id, tenantId);
     res.json({ success: true, data });
   } catch (err) {
     res.status(500).json({ error: 'Failed to fetch branches' });
@@ -555,7 +743,8 @@ app.get('/api/branches', authMiddleware, async (req, res) => {
 
 app.post('/api/branches', authMiddleware, authorizeRoles(['admin', 'ceo', 'cto']), async (req, res) => {
   try {
-    const branch = await db.addBranch(req.body, req.user.id);
+    const tenantId = getTenantContextId(req.user);
+    const branch = await db.addBranch(withTenantPayload(req.body, tenantId), tenantId);
     res.status(201).json({ success: true, data: branch });
   } catch (err) {
     res.status(500).json({ error: 'Failed to create branch' });
@@ -564,7 +753,8 @@ app.post('/api/branches', authMiddleware, authorizeRoles(['admin', 'ceo', 'cto']
 
 app.put('/api/branches/:id', authMiddleware, authorizeRoles(['admin', 'ceo', 'cto']), async (req, res) => {
   try {
-    const branch = await db.updateBranch(req.params.id, req.body, req.user.id);
+    const tenantId = getTenantContextId(req.user);
+    const branch = await db.updateBranch(req.params.id, req.body, tenantId);
     res.json({ success: true, data: branch });
   } catch (err) {
     res.status(500).json({ error: 'Failed to update branch' });
@@ -573,7 +763,8 @@ app.put('/api/branches/:id', authMiddleware, authorizeRoles(['admin', 'ceo', 'ct
 
 app.delete('/api/branches/:id', authMiddleware, authorizeRoles(['admin', 'ceo', 'cto']), async (req, res) => {
   try {
-    await db.deleteBranch(req.params.id, req.user.id);
+    const tenantId = getTenantContextId(req.user);
+    await db.deleteBranch(req.params.id, tenantId);
     res.json({ success: true });
   } catch (err) {
     res.status(500).json({ error: 'Failed to delete branch' });
@@ -589,38 +780,39 @@ app.delete('/api/branches/:id', authMiddleware, authorizeRoles(['admin', 'ceo', 
 app.get('/api/reports/:type', authMiddleware, authorizeRoles(['admin', 'ceo', 'cto', 'manager', 'staff', 'trainer']), async (req, res) => {
   try {
     const { type } = req.params;
+    const tenantId = getTenantContextId(req.user);
     const trainerId = req.user.role === 'trainer' ? req.user.id : null;
     let data;
     
     switch(type) {
       case 'member-summary':
       case 'expiring-members':
-        data = await db.getMembers(req.user.id, trainerId);
+        data = await db.getMembers(tenantId, trainerId);
         break;
       case 'revenue':
         // Double check permissions for revenue report
         if (req.user.role === 'trainer') return res.status(403).json({ error: 'Access denied' });
-        data = await db.getInvoices(req.user.id);
+        data = await db.getInvoices(tenantId);
         break;
       case 'attendance':
-        data = await db.getAttendance({}, req.user.id, trainerId);
+        data = await db.getAttendance({}, tenantId, trainerId);
         break;
       case 'class-utilization':
-        data = await db.getClasses(req.user.id, trainerId);
+        data = await db.getClasses(tenantId, trainerId);
         break;
       case 'equipment-status':
-        data = await db.getInventory(req.user.id);
+        data = await db.getInventory(tenantId);
         break;
       case 'leads-conversion':
         if (req.user.role === 'trainer') return res.status(403).json({ error: 'Access denied' });
-        data = await db.getLeads(req.user.id);
+        data = await db.getLeads(tenantId);
         break;
       case 'staff-performance':
         if (req.user.role === 'trainer') return res.status(403).json({ error: 'Access denied' });
-        data = await db.getStaff(req.user.id);
+        data = await db.getStaff(tenantId);
         break;
       default:
-        data = await db.getDashboardStats(req.user.id, trainerId);
+        data = await db.getDashboardStats(tenantId, trainerId);
     }
     
     res.json({ success: true, data });
@@ -679,6 +871,7 @@ app.post('/api/feedback', authMiddleware, async (req, res) => {
       return res.status(400).json({ error: 'All fields required' });
     }
 
+    const tenantId = getTenantContextId(req.user);
     const feedback = await db.addFeedback({
       id: uuidv4(),
       category,
@@ -688,8 +881,9 @@ app.post('/api/feedback', authMiddleware, async (req, res) => {
       userName: req.user.name,
       userEmail: req.user.email,
       createdAt: new Date().toISOString(),
-      status: 'new'
-    }, req.user.id);
+      status: 'new',
+      tenant_id: tenantId,
+    }, tenantId);
 
     broadcast('feedback:new', feedback);
     res.status(201).json({ success: true, data: feedback });
@@ -701,7 +895,8 @@ app.post('/api/feedback', authMiddleware, async (req, res) => {
 
 app.get('/api/feedback', authMiddleware, async (req, res) => {
   try {
-    const data = await db.getFeedback(req.user.id);
+    const tenantId = getTenantContextId(req.user);
+    const data = await db.getFeedback(tenantId);
     res.json({ success: true, data });
   } catch (err) {
     console.error('Fetch feedback error:', err);
@@ -750,7 +945,8 @@ app.get('/api/activity-logs', authMiddleware, async (req, res) => {
       limit: req.query.limit ? parseInt(req.query.limit) : 500
     };
 
-    const data = await db.getActivityLogs(filters);
+    const tenantId = getTenantContextId(req.user);
+    const data = await db.getActivityLogs({ ...filters, tenantId });
     res.json({ success: true, data });
   } catch (err) {
     console.error('Fetch activity logs error:', err);
@@ -792,7 +988,7 @@ app.post('/api/team/members', authMiddleware, authorizeRoles(['admin', 'ceo', 'c
       password,
       name,
       role: role || 'staff',
-      gymId: 'gym-001'
+      gymId: getTenantContextId(req.user) || 'gym-001'
     });
 
     await db.logActivity(
@@ -906,6 +1102,7 @@ app.post('/api/campaigns', authMiddleware, authorizeRoles(['admin']), async (req
       return res.status(400).json({ error: 'Title and message are required' });
     }
 
+    const tenantId = getTenantContextId(req.user);
     const campaign = await db.createCampaign({
       id: uuidv4(),
       userId: req.user.id,
@@ -915,8 +1112,9 @@ app.post('/api/campaigns', authMiddleware, authorizeRoles(['admin']), async (req
       message,
       status: 'draft',
       scheduled_date: scheduledDate,
+      tenant_id: tenantId,
       createdAt: new Date().toISOString()
-    }, req.user.id);
+    }, tenantId);
 
     await db.logActivity(
       req.user.id,
@@ -938,7 +1136,8 @@ app.post('/api/campaigns', authMiddleware, authorizeRoles(['admin']), async (req
 
 app.get('/api/campaigns', authMiddleware, authorizeRoles(['admin']), async (req, res) => {
   try {
-    const campaigns = await db.getCampaigns(req.user.id);
+    const tenantId = getTenantContextId(req.user);
+    const campaigns = await db.getCampaigns(tenantId);
     res.json({ success: true, data: campaigns });
   } catch (err) {
     console.error('Fetch campaigns error:', err);
@@ -949,7 +1148,8 @@ app.get('/api/campaigns', authMiddleware, authorizeRoles(['admin']), async (req,
 app.put('/api/campaigns/:id', authMiddleware, authorizeRoles(['admin']), async (req, res) => {
   try {
     const { id } = req.params;
-    const campaign = await db.updateCampaign(id, req.body, req.user.id);
+    const tenantId = getTenantContextId(req.user);
+    const campaign = await db.updateCampaign(id, req.body, tenantId);
     
     if (!campaign) {
       return res.status(404).json({ error: 'Campaign not found' });
@@ -975,7 +1175,8 @@ app.put('/api/campaigns/:id', authMiddleware, authorizeRoles(['admin']), async (
 app.delete('/api/campaigns/:id', authMiddleware, authorizeRoles(['admin']), async (req, res) => {
   try {
     const { id } = req.params;
-    const deleted = await db.deleteCampaign(id, req.user.id);
+    const tenantId = getTenantContextId(req.user);
+    const deleted = await db.deleteCampaign(id, tenantId);
     
     if (!deleted) {
       return res.status(404).json({ error: 'Campaign not found' });
@@ -1000,8 +1201,9 @@ app.delete('/api/campaigns/:id', authMiddleware, authorizeRoles(['admin']), asyn
 
 app.get('/api/reminders', authMiddleware, authorizeRoles(['admin']), async (req, res) => {
   try {
-    const reminders = await db.getReminders(req.user.id);
-    const stats = await db.getReminderStats(req.user.id);
+    const tenantId = getTenantContextId(req.user);
+    const reminders = await db.getReminders(tenantId);
+    const stats = await db.getReminderStats(tenantId);
     res.json({ success: true, data: reminders, stats });
   } catch (err) {
     console.error('Fetch reminders error:', err);
@@ -1012,7 +1214,8 @@ app.get('/api/reminders', authMiddleware, authorizeRoles(['admin']), async (req,
 app.post('/api/campaigns/:id/send', authMiddleware, authorizeRoles(['admin']), async (req, res) => {
   try {
     const { id } = req.params;
-    const campaign = await db.getCampaigns(req.user.id);
+    const tenantId = getTenantContextId(req.user);
+    const campaign = await db.getCampaigns(tenantId);
     const targetCampaign = campaign.find(c => c.id === id);
     
     if (!targetCampaign) {
@@ -1020,7 +1223,7 @@ app.post('/api/campaigns/:id/send', authMiddleware, authorizeRoles(['admin']), a
     }
 
     // Create reminders for all members
-    const members = await db.getMembers();
+    const members = await db.getMembers(tenantId);
     let reminderCount = 0;
     
     for (const member of members) {
@@ -1033,12 +1236,12 @@ app.post('/api/campaigns/:id/send', authMiddleware, authorizeRoles(['admin']), a
         status: 'sent',
         sent_at: new Date().toISOString(),
         createdAt: new Date().toISOString()
-      }, req.user.id);
+      }, tenantId);
       reminderCount++;
     }
 
     // Update campaign status
-    await db.updateCampaign(id, { status: 'sent' }, req.user.id);
+    await db.updateCampaign(id, { status: 'sent' }, tenantId);
 
     await db.logActivity(
       req.user.id,
@@ -1056,6 +1259,7 @@ app.post('/api/campaigns/:id/send', authMiddleware, authorizeRoles(['admin']), a
     console.error('Campaign send error:', err);
     res.status(500).json({ error: 'Failed to send campaign' });
   }
+});
 
 // Invites & Signup
 app.post('/api/invites', authMiddleware, authorizeRoles(['admin']), async (req, res) => {
@@ -1108,92 +1312,69 @@ app.get('/api/invites', authMiddleware, authorizeRoles(['admin']), async (req, r
   }
 });
 
-app.get('/api/invites/:token/verify', async (req, res) => {
-  try {
-    const { token } = req.params;
-    const invite = await db.getInviteByToken(token);
-    
-    if (!invite) {
-      return res.status(404).json({ error: 'Invite not found or expired' });
-    }
-
-    res.json({ success: true, data: { email: invite.email, invitedBy: invite.inviter_name } });
-  } catch (err) {
-    console.error('Verify invite error:', err);
-    res.status(500).json({ error: 'Failed to verify invite' });
-  }
-});
-
 app.post('/api/auth/signup-invite', async (req, res) => {
   try {
-    const { email, password, name, token } = req.body || {}
+    const { token, email, password, name } = req.body;
 
-    if (!email || !password || !name || !token) {
-      return res.status(400).json({ error: 'Email, password, name, and token are required' })
+    if (!token || !email || !password || !name) {
+      return res.status(400).json({ error: 'Missing required fields' });
     }
 
-    // Verify invite token
-    const invite = await db.getInviteByToken(token)
-    if (!invite) return res.status(401).json({ error: 'Invalid or expired invite' })
+    // Verify invite
+    const invite = await db.verifyInvite(token);
+    if (!invite) {
+      return res.status(400).json({ error: 'Invalid or expired invite' });
+    }
 
-    if (invite.email !== email) return res.status(401).json({ error: 'Email does not match invite' })
-
-    // Check if user already exists
-    const existingUser = await db.getUserByEmail(email)
-    if (existingUser) return res.status(409).json({ error: 'User already exists' })
-
-    // Create new user
-    const userId = uuidv4()
-    const newUser = await db.createUser({
-      id: userId,
+    // Create user
+    const user = await db.createUser({
+      id: uuidv4(),
       email,
       password,
       name,
-      role: 'staff',
-      gymId: invite.gym_id || invite.gymId || 'gym-001',
-    })
+      role: 'member',
+      gym_id: process.env.DEFAULT_GYM_ID || 'default',
+    });
 
-    // Accept the invite and log activity
-    await db.acceptInvite(token, userId)
+    const accessToken = generateToken(user);
+    const refreshToken = generateRefreshToken(user);
+
     await db.logActivity(
-      userId,
-      name,
+      user.id,
+      user.name,
       'create',
       'user',
-      userId,
-      email,
-      'Registered via invite'
-    )
+      user.id,
+      user.email,
+      'Signed up via invite'
+    );
 
-    // Generate tokens
-    const accessToken = generateToken(newUser)
-    const refreshToken = generateRefreshToken(newUser)
+    // Mark invite as used
+    await db.updateInvite(invite.id, { status: 'completed' });
 
-    broadcast('user:registered', { email, name })
-
-    return res.json({
+    res.json({
       success: true,
       data: {
-        user: { id: newUser.id, email: newUser.email, name: newUser.name, role: newUser.role },
+        user,
         accessToken,
         refreshToken,
       },
-    })
+    });
   } catch (err) {
-    console.error('Signup via invite error:', err)
-    return res.status(500).json({ error: 'Failed to complete signup' })
+    console.error('Signup via invite error:', err);
+    res.status(500).json({ error: 'Failed to complete signup' });
   }
-})
+});
 
 app.delete('/api/invites/:id', authMiddleware, authorizeRoles(['admin']), async (req, res) => {
   try {
     const { id } = req.params;
     const success = await db.deleteInvite(id);
-    
+
     if (!success) {
       return res.status(404).json({ error: 'Invite not found' });
     }
-  // ============================================================================
+
     await db.logActivity(
       req.user.id,
       req.user.name || req.user.email,
@@ -1203,7 +1384,7 @@ app.delete('/api/invites/:id', authMiddleware, authorizeRoles(['admin']), async 
       '',
       'Deleted invite'
     );
-  // AUTO-EXPIRY JOB
+
     broadcast('invite:deleted', { inviteId: id });
     res.json({ success: true });
   } catch (err) {
@@ -1211,17 +1392,18 @@ app.delete('/api/invites/:id', authMiddleware, authorizeRoles(['admin']), async 
     res.status(500).json({ error: 'Failed to delete invite' });
   }
 });
-  // ============================================================================
-async function startServer() {
-  if (db.init) await db.init();
-  const AUTO_EXPIRY_INTERVAL = 60 * 60 * 1000; // 1 hour
 
+// Start server
+async function startServer() {
+  console.log('🚀 Starting server...');
+  if (db.init) await db.init();
+  console.log('✓ Database initialized');
+
+  const AUTO_EXPIRY_INTERVAL = 60 * 60 * 1000; // 1 hour
   const runAutoExpiryJob = async () => {
     try {
       console.log('🔄 Running auto-expiry job...');
       const today = new Date().toISOString().split('T')[0];
-
-      // Get all members
       const allMembers = await db.getMembers();
 
       if (!allMembers || allMembers.length === 0) {
@@ -1229,15 +1411,12 @@ async function startServer() {
         return;
       }
 
-      // Find expired members
       let expiredCount = 0;
       for (const member of allMembers) {
         if (member.status === 'active' && member.expiry_date && member.expiry_date < today) {
-          // Mark as expired
           await db.updateMember(member.id, { status: 'expired' });
           expiredCount++;
 
-          // Log the expiry activity
           await db.logActivity(
             'system',
             'System',
@@ -1248,7 +1427,6 @@ async function startServer() {
             `Membership expired on ${member.expiry_date}`
           );
 
-          // Broadcast expiry event for real-time UI update
           broadcast('member:expired', {
             memberId: member.id,
             memberName: member.name,
@@ -1269,10 +1447,10 @@ async function startServer() {
   await runAutoExpiryJob();
   setInterval(runAutoExpiryJob, AUTO_EXPIRY_INTERVAL);
 
-  const PORT = process.env.PORT || 3001;
   httpServer.listen(PORT, () => {
-    console.log(`Server running on port ${PORT}`);
+    console.log(`✓ Server running on http://localhost:${PORT}`);
   });
 }
 
 startServer().catch((err) => console.error('Startup error:', err));
+

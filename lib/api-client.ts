@@ -25,6 +25,27 @@ class ApiClient {
     }
   }
 
+  private getAuthContext(): { scope?: string; tenantId?: string } {
+    if (typeof window === 'undefined') {
+      return {}
+    }
+
+    const authStorage = localStorage.getItem('auth-storage')
+    if (!authStorage) {
+      return {}
+    }
+
+    try {
+      const parsed = JSON.parse(authStorage)
+      return {
+        scope: parsed?.state?.user?.scope,
+        tenantId: parsed?.state?.user?.tenantId || parsed?.state?.user?.gymId || null,
+      }
+    } catch {
+      return {}
+    }
+  }
+
   constructor() {
     this.client = axios.create({
       baseURL: API_BASE_URL,
@@ -49,6 +70,14 @@ class ApiClient {
             ...(config.params || {}),
             gymId,
           }
+        }
+
+        const authContext = this.getAuthContext()
+        if (authContext.scope) {
+          config.headers['X-Scope'] = authContext.scope
+        }
+        if (authContext.tenantId) {
+          config.headers['X-Tenant-ID'] = authContext.tenantId
         }
       }
       return config

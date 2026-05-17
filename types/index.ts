@@ -4,7 +4,9 @@ export interface User {
   email: string
   fullname: string
   role: 'cto' | 'ceo' | 'admin' | 'manager' | 'trainer' | 'staff'
+  scope?: 'platform' | 'tenant'
   gymId?: string
+  tenantId?: string
   isGlobal?: boolean
   createdAt: string
 }

@@ -4,6 +4,90 @@ const { v4: uuidv4 } = require('uuid');
 const bcrypt = require('bcrypt');
 
 const DATA_FILE = path.join(__dirname, 'data.json');
+const DEFAULT_TENANT_ID = 'gym-001';
+const PLATFORM_ROLES = new Set(['cto', 'ceo', 'admin']);
+
+const TENANT_COLLECTIONS = [
+  'members',
+  'staff',
+  'inventory',
+  'attendance',
+  'billing',
+  'classes',
+  'notifications',
+  'leads',
+  'plans',
+  'feedback',
+  'activity_logs',
+  'campaigns',
+  'reminders',
+  'invites',
+  'branches',
+];
+
+function getRecordTenantId(record) {
+  return record?.tenant_id || record?.tenantId || record?.owner_id || record?.ownerId || record?.gymId || null;
+}
+
+function normalizeRecordTenant(record, tenantId = DEFAULT_TENANT_ID) {
+  if (!record || typeof record !== 'object') {
+    return record;
+  }
+
+  const resolvedTenantId = getRecordTenantId(record) || tenantId;
+  return {
+    ...record,
+    tenant_id: resolvedTenantId,
+    tenantId: record.tenantId || resolvedTenantId,
+  };
+}
+
+function normalizeDataModel() {
+  if (!Array.isArray(data.tenants)) {
+    data.tenants = [
+      {
+        id: DEFAULT_TENANT_ID,
+        name: 'GymFlow Pro',
+        slug: 'gymflow-pro',
+        status: 'active',
+        plan: 'Pro',
+        membersLimit: 500,
+        branchesLimit: 5,
+        contactEmail: 'admin@gymflow.com',
+        createdAt: new Date().toISOString(),
+        lastActiveAt: new Date().toISOString(),
+      },
+    ];
+  }
+
+  data.users = (data.users || []).map((user) => ({
+    ...user,
+    scope: user.scope || (PLATFORM_ROLES.has(user.role) ? 'platform' : 'tenant'),
+    tenantId: user.tenantId || user.tenant_id || user.gymId || DEFAULT_TENANT_ID,
+    tenant_id: user.tenant_id || user.tenantId || user.gymId || DEFAULT_TENANT_ID,
+  }));
+
+  for (const collectionName of TENANT_COLLECTIONS) {
+    if (Array.isArray(data[collectionName])) {
+      data[collectionName] = data[collectionName].map((record) =>
+        normalizeRecordTenant(record, DEFAULT_TENANT_ID)
+      );
+    }
+  }
+}
+
+function filterByTenant(records = [], tenantId = null) {
+  if (!tenantId) {
+    return records;
+  }
+
+  return records.filter((record) => getRecordTenantId(record) === tenantId);
+}
+
+function attachTenant(record, tenantId) {
+  if (!record) return record;
+  return normalizeRecordTenant(record, tenantId || DEFAULT_TENANT_ID);
+}
 
 /**
  * Initial Seed Data
@@ -21,38 +105,67 @@ const INITIAL_DATA = {
     }
   ],
   members: [
-    { id: 'm-1', name: 'John Doe', email: 'john@example.com', phone: '555-0101', membership_type: 'Premium', status: 'active', join_date: '2023-11-01', expiry_date: '2024-11-01' },
-    { id: 'm-2', name: 'Jane Smith', email: 'jane@example.com', phone: '555-0102', membership_type: 'Basic', status: 'active', join_date: '2023-12-15', expiry_date: '2024-06-15' }
+    { id: 'm-1', name: 'John Doe', email: 'john@example.com', phone: '555-0101', membership_type: 'Premium', status: 'active', join_date: '2023-11-01', expiry_date: '2024-11-01', tenant_id: DEFAULT_TENANT_ID },
+    { id: 'm-2', name: 'Jane Smith', email: 'jane@example.com', phone: '555-0102', membership_type: 'Basic', status: 'active', join_date: '2023-12-15', expiry_date: '2024-06-15', tenant_id: DEFAULT_TENANT_ID }
   ],
   staff: [
-    { id: 's-1', name: 'Mike Tyson', position: 'Head Trainer', salary: 5000, email: 'mike@gym.com', phone: '555-0201' },
-    { id: 's-2', name: 'Sylvester Stallone', position: 'Floor Staff', salary: 3000, email: 'sly@gym.com', phone: '555-0202' }
+    { id: 's-1', name: 'Mike Tyson', position: 'Head Trainer', salary: 5000, email: 'mike@gym.com', phone: '555-0201', tenant_id: DEFAULT_TENANT_ID },
+    { id: 's-2', name: 'Sylvester Stallone', position: 'Floor Staff', salary: 3000, email: 'sly@gym.com', phone: '555-0202', tenant_id: DEFAULT_TENANT_ID }
   ],
   inventory: [
-    { id: 'i-1', name: 'Dumbbell Set', category: 'Equipment', quantity: 15, min_threshold: 5, cost_per_unit: 120, last_updated: new Date().toISOString() },
-    { id: 'i-2', name: 'Yoga Mats', category: 'Fitness Pros', quantity: 4, min_threshold: 10, cost_per_unit: 25, last_updated: new Date().toISOString() }
+    { id: 'i-1', name: 'Dumbbell Set', category: 'Equipment', quantity: 15, min_threshold: 5, cost_per_unit: 120, last_updated: new Date().toISOString(), tenant_id: DEFAULT_TENANT_ID },
+    { id: 'i-2', name: 'Yoga Mats', category: 'Fitness Pros', quantity: 4, min_threshold: 10, cost_per_unit: 25, last_updated: new Date().toISOString(), tenant_id: DEFAULT_TENANT_ID }
   ],
   attendance: [],
   billing: [],
   classes: [
-    { id: 'c-1', name: 'Morning Yoga', instructorName: 'Mike Tyson', maxCapacity: 20, currentEnrollment: 12, description: 'Relaxing yoga session' },
-    { id: 'c-2', name: 'Heavy HIIT', instructorName: 'Sylvester Stallone', maxCapacity: 15, currentEnrollment: 8, description: 'Intense interval training' }
+    { id: 'c-1', name: 'Morning Yoga', instructorName: 'Mike Tyson', maxCapacity: 20, currentEnrollment: 12, description: 'Relaxing yoga session', tenant_id: DEFAULT_TENANT_ID },
+    { id: 'c-2', name: 'Heavy HIIT', instructorName: 'Sylvester Stallone', maxCapacity: 15, currentEnrollment: 8, description: 'Intense interval training', tenant_id: DEFAULT_TENANT_ID }
+  ],
+  branches: [
+    {
+      id: 'b-1',
+      name: 'Main Branch',
+      address: '123 Fitness Avenue',
+      phone: '555-0301',
+      email: 'main@gymflow.com',
+      openingTime: '06:00',
+      closingTime: '22:00',
+      capacity: 200,
+      isDefault: true,
+      tenant_id: DEFAULT_TENANT_ID,
+    },
   ],
   notifications: [
-    { id: 'n-1', title: 'System Configured', message: 'Welcome to GymFlow Pro Edition.', read: false, createdAt: new Date().toISOString() }
+    { id: 'n-1', title: 'System Configured', message: 'Welcome to GymFlow Pro Edition.', read: false, createdAt: new Date().toISOString(), tenant_id: DEFAULT_TENANT_ID }
   ],
   leads: [
-    { id: 'l-1', name: 'John Doe Partner', email: 'johndoe+lead@example.com', phone: '123-456-7890', status: 'New', notes: 'Interested in Premium Trial', created_at: new Date().toISOString() }
+    { id: 'l-1', name: 'John Doe Partner', email: 'johndoe+lead@example.com', phone: '123-456-7890', status: 'New', notes: 'Interested in Premium Trial', created_at: new Date().toISOString(), tenant_id: DEFAULT_TENANT_ID }
   ],
   plans: [
-    { id: 'p-1', name: 'Premium Plan', price: 99.99, durationMonths: 12, features: 'Full Access, Classes, Gym' },
-    { id: 'p-2', name: 'Basic Plan', price: 49.99, durationMonths: 1, features: 'Gym Only' }
+    { id: 'p-1', name: 'Premium Plan', price: 99.99, durationMonths: 12, features: 'Full Access, Classes, Gym', tenant_id: DEFAULT_TENANT_ID },
+    { id: 'p-2', name: 'Basic Plan', price: 49.99, durationMonths: 1, features: 'Gym Only', tenant_id: DEFAULT_TENANT_ID }
   ],
   feedback: [],
   activity_logs: [],
   campaigns: [],
   reminders: [],
   invites: [],
+  tenants: [
+    {
+      id: DEFAULT_TENANT_ID,
+      name: 'GymFlow Pro',
+      slug: 'gymflow-pro',
+      status: 'active',
+      plan: 'Pro',
+      membersLimit: 500,
+      branchesLimit: 5,
+      contactEmail: 'admin@gymflow.com',
+      createdAt: new Date().toISOString(),
+      lastActiveAt: new Date().toISOString(),
+    },
+  ],
+  settings: {
     gymName: 'GymFlow Pro',
     gymLogo: '',
     gymEmail: 'admin@gymflow.com',
@@ -74,6 +187,7 @@ const db = {
     try {
       const fileData = await fs.readFile(DATA_FILE, 'utf8');
       data = JSON.parse(fileData);
+      normalizeDataModel();
       console.log('✓ Local JSON database loaded');
     } catch (err) {
       console.log('ℹ Initializing new JSON database...');
@@ -81,6 +195,7 @@ const db = {
       const salt = await bcrypt.genSalt(10);
       INITIAL_DATA.users[0].password_hash = await bcrypt.hash('password', salt);
       data = { ...INITIAL_DATA };
+      normalizeDataModel();
       await this.save();
     }
   },
@@ -138,7 +253,7 @@ const db = {
 
   // Member Methods
   async getMembers(ownerId, trainerId = null) {
-    let members = data.members.filter(m => m.owner_id === ownerId || !m.owner_id);
+    let members = filterByTenant(data.members, ownerId);
     if (trainerId) {
       members = members.filter(m => m.assigned_trainer_id === trainerId);
     }
@@ -146,21 +261,22 @@ const db = {
   },
 
   async addMember(member, ownerId) {
-    data.members.push(member);
+    data.members.push(attachTenant({ ...member, owner_id: ownerId }, ownerId));
     await this.save();
-    return member;
+    return attachTenant(member, ownerId);
   },
 
   async updateMember(id, patch, ownerId) {
     const index = data.members.findIndex(m => m.id === id);
     if (index === -1) return null;
+    if (ownerId && getRecordTenantId(data.members[index]) !== ownerId) return null;
     data.members[index] = { ...data.members[index], ...patch };
     await this.save();
     return data.members[index];
   },
 
   async bulkAddMembers(membersArray, ownerId) {
-    const newMembers = membersArray.map(m => ({ ...m, owner_id: ownerId }));
+    const newMembers = membersArray.map(m => attachTenant({ ...m, owner_id: ownerId }, ownerId));
     data.members = [...data.members, ...newMembers];
     await this.save();
     return newMembers;
@@ -168,25 +284,26 @@ const db = {
 
   async deleteMember(id, ownerId) {
     const originalLength = data.members.length;
-    data.members = data.members.filter(m => m.id !== id);
+    data.members = data.members.filter(m => m.id !== id || (ownerId && getRecordTenantId(m) !== ownerId));
     await this.save();
     return data.members.length < originalLength;
   },
 
   // Staff Methods
   async getStaff(ownerId) {
-    return data.staff;
+    return filterByTenant(data.staff, ownerId);
   },
 
   async addStaff(member, ownerId) {
-    data.staff.push(member);
+    data.staff.push(attachTenant({ ...member, owner_id: ownerId }, ownerId));
     await this.save();
-    return member;
+    return attachTenant(member, ownerId);
   },
 
   async updateStaff(id, patch, ownerId) {
     const index = data.staff.findIndex(s => s.id === id);
     if (index === -1) return null;
+    if (ownerId && getRecordTenantId(data.staff[index]) !== ownerId) return null;
     data.staff[index] = { ...data.staff[index], ...patch, last_updated: new Date().toISOString() };
     await this.save();
     return data.staff[index];
@@ -194,25 +311,26 @@ const db = {
 
   async deleteStaff(id, ownerId) {
     const originalLength = data.staff.length;
-    data.staff = data.staff.filter(s => s.id !== id);
+    data.staff = data.staff.filter(s => s.id !== id || (ownerId && getRecordTenantId(s) !== ownerId));
     await this.save();
     return data.staff.length < originalLength;
   },
 
   // Inventory Methods
   async getInventory(ownerId) {
-    return data.inventory;
+    return filterByTenant(data.inventory, ownerId);
   },
 
   async addInventoryItem(item, ownerId) {
-    data.inventory.push(item);
+    data.inventory.push(attachTenant({ ...item, owner_id: ownerId }, ownerId));
     await this.save();
-    return item;
+    return attachTenant(item, ownerId);
   },
 
   async updateInventoryItem(id, patch, ownerId) {
     const index = data.inventory.findIndex(i => i.id === id);
     if (index === -1) return null;
+    if (ownerId && getRecordTenantId(data.inventory[index]) !== ownerId) return null;
     data.inventory[index] = { ...data.inventory[index], ...patch };
     await this.save();
     return data.inventory[index];
@@ -220,18 +338,19 @@ const db = {
 
   async deleteInventoryItem(id, ownerId) {
     const originalLength = data.inventory.length;
-    data.inventory = data.inventory.filter(i => i.id !== id);
+    data.inventory = data.inventory.filter(i => i.id !== id || (ownerId && getRecordTenantId(i) !== ownerId));
     await this.save();
     return data.inventory.length < originalLength;
   },
 
   // Attendance Methods
   async getAttendance(filters, ownerId) {
-    return data.attendance;
+    return filterByTenant(data.attendance, ownerId);
   },
 
   async checkIn(memberId, notes, ownerId) {
     const member = data.members.find(m => m.id === memberId);
+    if (ownerId && member && getRecordTenantId(member) !== ownerId) return null;
     const record = {
       id: uuidv4(),
       memberId,
@@ -239,7 +358,8 @@ const db = {
       checkInTime: new Date().toISOString(),
       checkOutTime: null,
       notes,
-      recordedDate: new Date().toISOString().split('T')[0]
+      recordedDate: new Date().toISOString().split('T')[0],
+      tenant_id: ownerId || getRecordTenantId(member),
     };
     data.attendance.unshift(record);
     await this.save();
@@ -249,6 +369,7 @@ const db = {
   async checkOut(id, ownerId) {
     const index = data.attendance.findIndex(a => a.id === id);
     if (index === -1) return null;
+    if (ownerId && getRecordTenantId(data.attendance[index]) !== ownerId) return null;
     data.attendance[index].checkOutTime = new Date().toISOString();
     await this.save();
     return data.attendance[index];
@@ -256,18 +377,19 @@ const db = {
 
   // Invoices & Billing
   async getInvoices(ownerId) {
-    return data.billing;
+    return filterByTenant(data.billing, ownerId);
   },
 
   async addInvoice(invoice, ownerId) {
-    data.billing.push(invoice);
+    data.billing.push(attachTenant({ ...invoice, owner_id: ownerId }, ownerId));
     await this.save();
-    return invoice;
+    return attachTenant(invoice, ownerId);
   },
 
   async payInvoice(id, paymentData, ownerId) {
     const index = data.billing.findIndex(i => i.id === id);
     if (index === -1) return null;
+    if (ownerId && getRecordTenantId(data.billing[index]) !== ownerId) return null;
     data.billing[index].status = 'paid';
     data.billing[index].paymentMethod = paymentData.method;
     data.billing[index].paymentDate = new Date().toISOString();
@@ -278,6 +400,7 @@ const db = {
   async updateInvoice(id, patch, ownerId) {
     const index = data.billing.findIndex(i => i.id === id);
     if (index === -1) return null;
+    if (ownerId && getRecordTenantId(data.billing[index]) !== ownerId) return null;
     data.billing[index] = { ...data.billing[index], ...patch };
     await this.save();
     return data.billing[index];
@@ -285,14 +408,14 @@ const db = {
 
   async deleteInvoice(id, ownerId) {
     const originalLength = data.billing.length;
-    data.billing = data.billing.filter(i => i.id !== id);
+    data.billing = data.billing.filter(i => i.id !== id || (ownerId && getRecordTenantId(i) !== ownerId));
     await this.save();
     return data.billing.length < originalLength;
   },
 
   // Classes Methods
   async getClasses(ownerId, instructorId = null) {
-    let classes = data.classes.filter(c => c.owner_id === ownerId || !c.owner_id);
+    let classes = filterByTenant(data.classes, ownerId);
     if (instructorId) {
       classes = classes.filter(c => c.instructor_id === instructorId);
     }
@@ -300,14 +423,15 @@ const db = {
   },
 
   async addClass(cls, ownerId) {
-    data.classes.push(cls);
+    data.classes.push(attachTenant({ ...cls, owner_id: ownerId }, ownerId));
     await this.save();
-    return cls;
+    return attachTenant(cls, ownerId);
   },
 
   async updateClass(id, patch, ownerId) {
     const index = data.classes.findIndex(c => c.id === id);
     if (index === -1) return null;
+    if (ownerId && getRecordTenantId(data.classes[index]) !== ownerId) return null;
     data.classes[index] = { ...data.classes[index], ...patch };
     await this.save();
     return data.classes[index];
@@ -315,7 +439,7 @@ const db = {
 
   async deleteClass(id, ownerId) {
     const originalLength = data.classes.length;
-    data.classes = data.classes.filter(c => c.id !== id);
+    data.classes = data.classes.filter(c => c.id !== id || (ownerId && getRecordTenantId(c) !== ownerId));
     await this.save();
     return data.classes.length < originalLength;
   },
@@ -346,20 +470,21 @@ const db = {
 
   // Leads (CRM)
   async getLeads(ownerId) {
-    return data.leads || [];
+    return filterByTenant(data.leads || [], ownerId);
   },
 
   async addLead(lead, ownerId) {
     if (!data.leads) data.leads = [];
-    data.leads.push(lead);
+    data.leads.push(attachTenant({ ...lead, owner_id: ownerId }, ownerId));
     await this.save();
-    return lead;
+    return attachTenant(lead, ownerId);
   },
 
   async updateLead(id, patch, ownerId) {
     if (!data.leads) data.leads = [];
     const index = data.leads.findIndex(l => l.id === id);
     if (index === -1) return null;
+    if (ownerId && getRecordTenantId(data.leads[index]) !== ownerId) return null;
     data.leads[index] = { ...data.leads[index], ...patch, last_updated: new Date().toISOString() };
     await this.save();
     return data.leads[index];
@@ -368,7 +493,7 @@ const db = {
   async deleteLead(id, ownerId) {
     if (!data.leads) data.leads = [];
     const originalLength = data.leads.length;
-    data.leads = data.leads.filter(l => l.id !== id);
+    data.leads = data.leads.filter(l => l.id !== id || (ownerId && getRecordTenantId(l) !== ownerId));
     await this.save();
     return data.leads.length < originalLength;
   },
@@ -383,20 +508,21 @@ const db = {
 
   // Membership Plans
   async getPlans(ownerId) {
-    return data.plans || [];
+    return filterByTenant(data.plans || [], ownerId);
   },
 
   async addPlan(plan, ownerId) {
     if (!data.plans) data.plans = [];
-    data.plans.push(plan);
+    data.plans.push(attachTenant({ ...plan, owner_id: ownerId }, ownerId));
     await this.save();
-    return plan;
+    return attachTenant(plan, ownerId);
   },
 
   async updatePlan(id, patch, ownerId) {
     if (!data.plans) data.plans = [];
     const index = data.plans.findIndex(p => p.id === id);
     if (index === -1) return null;
+    if (ownerId && getRecordTenantId(data.plans[index]) !== ownerId) return null;
     data.plans[index] = { ...data.plans[index], ...patch };
     await this.save();
     return data.plans[index];
@@ -405,30 +531,33 @@ const db = {
   async deletePlan(id, ownerId) {
     if (!data.plans) data.plans = [];
     const originalLength = data.plans.length;
-    data.plans = data.plans.filter(p => p.id !== id);
+    data.plans = data.plans.filter(p => p.id !== id || (ownerId && getRecordTenantId(p) !== ownerId));
     await this.save();
     return data.plans.length < originalLength;
   },
 
   // Dashboard Stats
   async getDashboardStats(ownerId) {
+    const members = filterByTenant(data.members, ownerId);
+    const billing = filterByTenant(data.billing, ownerId);
+    const attendance = filterByTenant(data.attendance, ownerId);
     const today = new Date().toISOString().split('T')[0];
     const monthStart = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split('T')[0];
     
-    const activeMembers = data.members.filter(m => m.status === 'active').length;
-    const todayRevenue = data.billing
+    const activeMembers = members.filter(m => m.status === 'active').length;
+    const todayRevenue = billing
       .filter(i => i.status === 'paid' && i.paymentDate && i.paymentDate.startsWith(today))
       .reduce((sum, i) => sum + i.amount, 0);
       
-    const monthlyRevenue = data.billing
+    const monthlyRevenue = billing
       .filter(i => i.status === 'paid' && i.paymentDate && i.paymentDate >= monthStart)
       .reduce((sum, i) => sum + i.amount, 0);
       
-    const todayVisits = data.attendance
+    const todayVisits = attendance
       .filter(a => a.recordedDate === today)
       .length;
       
-    const pendingPayments = data.billing
+    const pendingPayments = billing
       .filter(i => i.status === 'pending' || i.status === 'overdue')
       .length;
 
@@ -444,7 +573,7 @@ const db = {
       const d = new Date(dateStr);
       return {
         name: days[d.getDay()],
-        revenue: data.billing
+        revenue: billing
           .filter(i => i.status === 'paid' && i.paymentDate && i.paymentDate.startsWith(dateStr))
           .reduce((sum, i) => sum + i.amount, 0)
       };
@@ -454,13 +583,13 @@ const db = {
       const d = new Date(dateStr);
       return {
         name: days[d.getDay()],
-        visits: data.attendance.filter(a => a.recordedDate === dateStr).length
+        visits: attendance.filter(a => a.recordedDate === dateStr).length
       };
     });
     
     return {
       activeMembers,
-      totalMembers: data.members.length,
+      totalMembers: members.length,
       todayRevenue,
       monthlyRevenue,
       todayVisits,
@@ -473,6 +602,99 @@ const db = {
 
   getSettings: async (gymId) => {
     return data.settings || { gymName: 'GymFlow' };
+  },
+
+  async getBranches(ownerId) {
+    return filterByTenant(data.branches || [], ownerId);
+  },
+
+  async addBranch(branch, ownerId) {
+    if (!data.branches) data.branches = [];
+    data.branches.push(attachTenant({ ...branch, owner_id: ownerId }, ownerId));
+    await this.save();
+    return attachTenant(branch, ownerId);
+  },
+
+  async updateBranch(id, patch, ownerId) {
+    if (!data.branches) data.branches = [];
+    const index = data.branches.findIndex((branch) => branch.id === id);
+    if (index === -1) return null;
+    if (ownerId && getRecordTenantId(data.branches[index]) !== ownerId) return null;
+    data.branches[index] = { ...data.branches[index], ...patch };
+    await this.save();
+    return data.branches[index];
+  },
+
+  async deleteBranch(id, ownerId) {
+    if (!data.branches) data.branches = [];
+    const originalLength = data.branches.length;
+    data.branches = data.branches.filter((branch) => branch.id !== id || (ownerId && getRecordTenantId(branch) !== ownerId));
+    if (data.branches.length < originalLength) {
+      await this.save();
+      return true;
+    }
+    return false;
+  },
+
+  async getTenants() {
+    return (data.tenants || []).map((tenant) => ({
+      ...tenant,
+      membersCount: filterByTenant(data.members, tenant.id).length,
+      branchesCount: filterByTenant(data.branches || [], tenant.id).length,
+      lastActiveAt: tenant.lastActiveAt || tenant.updatedAt || tenant.createdAt,
+    }));
+  },
+
+  async getTenantById(id) {
+    return (data.tenants || []).find((tenant) => tenant.id === id) || null;
+  },
+
+  async createTenant(tenant) {
+    if (!data.tenants) data.tenants = [];
+    const newTenant = {
+      id: tenant.id || uuidv4(),
+      name: tenant.name,
+      slug: tenant.slug,
+      status: tenant.status || 'active',
+      plan: tenant.plan || 'Basic',
+      contactEmail: tenant.contactEmail || tenant.email || '',
+      membersLimit: tenant.membersLimit || 100,
+      branchesLimit: tenant.branchesLimit || 1,
+      createdAt: new Date().toISOString(),
+      lastActiveAt: new Date().toISOString(),
+      ...tenant,
+    };
+    data.tenants.push(newTenant);
+    await this.save();
+    return newTenant;
+  },
+
+  async updateTenant(id, patch) {
+    const index = (data.tenants || []).findIndex((tenant) => tenant.id === id);
+    if (index === -1) return null;
+    data.tenants[index] = { ...data.tenants[index], ...patch, lastActiveAt: new Date().toISOString() };
+    await this.save();
+    return data.tenants[index];
+  },
+
+  async getPlatformOverview() {
+    const tenants = data.tenants || [];
+    const activeTenants = tenants.filter((tenant) => tenant.status === 'active').length;
+    const suspendedTenants = tenants.filter((tenant) => tenant.status === 'suspended').length;
+    const mrr = tenants.reduce((sum, tenant) => {
+      const planPrice = tenant.planPrice || (tenant.plan === 'Enterprise' ? 299 : tenant.plan === 'Pro' ? 149 : 49);
+      return sum + planPrice;
+    }, 0);
+
+    return {
+      totalGyms: tenants.length,
+      activeGyms: activeTenants,
+      suspendedGyms: suspendedTenants,
+      totalMembers: data.members.length,
+      mrr,
+      churnRate: tenants.length ? Math.max(0, Math.round((suspendedTenants / tenants.length) * 100)) : 0,
+      todaySignUps: data.members.filter((member) => member.createdAt && member.createdAt.startsWith(new Date().toISOString().split('T')[0])).length,
+    };
   },
 
   updateSettings: async (settings, gymId) => {
@@ -490,7 +712,7 @@ const db = {
   },
 
   async getFeedback(ownerId) {
-    return (data.feedback || []).sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+    return filterByTenant(data.feedback || [], ownerId).sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
   },
 
   async updateFeedback(id, updates, ownerId) {
@@ -505,7 +727,7 @@ const db = {
 
   async deleteFeedback(id, ownerId) {
     const originalLength = (data.feedback || []).length;
-    data.feedback = (data.feedback || []).filter(f => f.id !== id);
+    data.feedback = (data.feedback || []).filter(f => f.id !== id || (ownerId && getRecordTenantId(f) !== ownerId));
     if (data.feedback.length < originalLength) {
       await this.save();
       return true;
@@ -533,7 +755,7 @@ const db = {
   },
 
   async getActivityLogs(filters = {}) {
-    const logs = (data.activity_logs || []).sort((a, b) => 
+    const logs = filterByTenant(data.activity_logs || [], filters.tenantId).sort((a, b) => 
       new Date(b.createdAt) - new Date(a.createdAt)
     );
     
@@ -567,18 +789,19 @@ const db = {
   // Campaigns & Reminders
   async createCampaign(campaign, ownerId) {
     data.campaigns = data.campaigns || [];
-    data.campaigns.push(campaign);
+    data.campaigns.push(attachTenant({ ...campaign, owner_id: ownerId }, ownerId));
     await this.save();
-    return campaign;
+    return attachTenant(campaign, ownerId);
   },
 
   async getCampaigns(ownerId) {
-    return (data.campaigns || []).sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+    return filterByTenant(data.campaigns || [], ownerId).sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
   },
 
   async updateCampaign(id, updates, ownerId) {
     const campaign = (data.campaigns || []).find(c => c.id === id);
     if (campaign) {
+      if (ownerId && getRecordTenantId(campaign) !== ownerId) return null;
       Object.assign(campaign, updates);
       await this.save();
       return campaign;
@@ -588,7 +811,7 @@ const db = {
 
   async deleteCampaign(id, ownerId) {
     const originalLength = (data.campaigns || []).length;
-    data.campaigns = (data.campaigns || []).filter(c => c.id !== id);
+    data.campaigns = (data.campaigns || []).filter(c => c.id !== id || (ownerId && getRecordTenantId(c) !== ownerId));
     if (data.campaigns.length < originalLength) {
       await this.save();
       return true;
@@ -598,24 +821,24 @@ const db = {
 
   async createReminder(reminder, ownerId) {
     data.reminders = data.reminders || [];
-    data.reminders.push(reminder);
+    data.reminders.push(attachTenant({ ...reminder, owner_id: ownerId }, ownerId));
     await this.save();
-    return reminder;
+    return attachTenant(reminder, ownerId);
   },
 
   async getReminders(ownerId) {
-    return (data.reminders || []).sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+    return filterByTenant(data.reminders || [], ownerId).sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
   },
 
   async getReminderStats(ownerId) {
-    const reminders = data.reminders || [];
+    const reminders = filterByTenant(data.reminders || [], ownerId);
     return {
       total: reminders.length,
       sent: reminders.filter(r => r.status === 'sent').length,
       pending: reminders.filter(r => r.status === 'pending').length,
       failed: reminders.filter(r => r.status === 'failed').length
     };
-  }
+  },
 
   // Invites & Signup
   async createInvite(invite) {
@@ -628,6 +851,7 @@ const db = {
       status: 'pending',
       created_at: new Date().toISOString(),
       expires_at: invite.expires_at,
+      tenant_id: invite.tenant_id || invite.tenantId || invite.gymId || DEFAULT_TENANT_ID,
       accepted_at: null
     };
     data.invites.push(newInvite);
@@ -637,6 +861,9 @@ const db = {
 
   async getInvites(filters = {}) {
     let invites = data.invites || [];
+    if (filters.tenantId) {
+      invites = invites.filter((invite) => getRecordTenantId(invite) === filters.tenantId);
+    }
     
     if (filters.email) {
       invites = invites.filter(i => i.email === filters.email);

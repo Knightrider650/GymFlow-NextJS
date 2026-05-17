@@ -119,7 +119,7 @@ export default function ClassesPage() {
                   Add New Class
                 </Button>
               </DialogTrigger>
-            <DialogContent className="sm:max-w-[425px] overflow-hidden border-none shadow-2xl">
+            <DialogContent className="sm:max-w-[425px] max-h-[90vh] overflow-y-auto border-none shadow-2xl">
               <DialogHeader className="bg-slate-50 -m-6 mb-0 p-6 border-b border-slate-100">
                 <DialogTitle className="text-xl">Create Fitness Session</DialogTitle>
                 <DialogDescription>

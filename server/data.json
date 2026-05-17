@@ -7,7 +7,10 @@
       "name": "Developer Admin",
       "role": "admin",
       "gymId": "all",
-      "created_at": "2026-04-26T22:32:53.341Z"
+      "created_at": "2026-04-26T22:32:53.341Z",
+      "scope": "platform",
+      "tenantId": "all",
+      "tenant_id": "all"
     },
     {
       "id": "owner-001",
@@ -16,7 +19,10 @@
       "name": "Powerhouse Owner",
       "role": "owner",
       "gymId": "gym-001",
-      "created_at": "2026-04-26T22:32:53.342Z"
+      "created_at": "2026-04-26T22:32:53.342Z",
+      "scope": "tenant",
+      "tenantId": "gym-001",
+      "tenant_id": "gym-001"
     },
     {
       "id": "admin-001",
@@ -25,7 +31,10 @@
       "name": "Gym Administrator",
       "role": "admin",
       "gymId": "gym-001",
-      "created_at": "2026-04-26T22:32:53.342Z"
+      "created_at": "2026-04-26T22:32:53.342Z",
+      "scope": "platform",
+      "tenantId": "gym-001",
+      "tenant_id": "gym-001"
     }
   ],
   "members": [
@@ -37,7 +46,9 @@
       "membership_type": "Premium",
       "status": "expired",
       "join_date": "2023-11-01",
-      "expiry_date": "2024-11-01"
+      "expiry_date": "2024-11-01",
+      "tenant_id": "gym-001",
+      "tenantId": "gym-001"
     },
     {
       "id": "m-2",
@@ -47,7 +58,9 @@
       "membership_type": "Basic",
       "status": "expired",
       "join_date": "2023-12-15",
-      "expiry_date": "2024-06-15"
+      "expiry_date": "2024-06-15",
+      "tenant_id": "gym-001",
+      "tenantId": "gym-001"
     }
   ],
   "staff": [
@@ -57,7 +70,9 @@
       "position": "Head Trainer",
       "salary": 5000,
       "email": "mike@gym.com",
-      "phone": "555-0201"
+      "phone": "555-0201",
+      "tenant_id": "gym-001",
+      "tenantId": "gym-001"
     },
     {
       "id": "s-2",
@@ -65,7 +80,9 @@
       "position": "Floor Staff",
       "salary": 3000,
       "email": "sly@gym.com",
-      "phone": "555-0202"
+      "phone": "555-0202",
+      "tenant_id": "gym-001",
+      "tenantId": "gym-001"
     }
   ],
   "inventory": [
@@ -76,7 +93,9 @@
       "quantity": 15,
       "min_threshold": 5,
       "cost_per_unit": 120,
-      "last_updated": "2026-04-26T22:32:53.342Z"
+      "last_updated": "2026-04-26T22:32:53.342Z",
+      "tenant_id": "gym-001",
+      "tenantId": "gym-001"
     },
     {
       "id": "i-2",
@@ -85,7 +104,9 @@
       "quantity": 4,
       "min_threshold": 10,
       "cost_per_unit": 25,
-      "last_updated": "2026-04-26T22:32:53.342Z"
+      "last_updated": "2026-04-26T22:32:53.342Z",
+      "tenant_id": "gym-001",
+      "tenantId": "gym-001"
     }
   ],
   "attendance": [],
@@ -96,7 +117,9 @@
       "amount": 99.99,
       "status": "paid",
       "paymentMethod": "Card",
-      "paymentDate": "2026-04-24T22:32:53.342Z"
+      "paymentDate": "2026-04-24T22:32:53.342Z",
+      "tenant_id": "gym-001",
+      "tenantId": "gym-001"
     },
     {
       "id": "inv-2",
@@ -104,7 +127,9 @@
       "amount": 49.99,
       "status": "paid",
       "paymentMethod": "Cash",
-      "paymentDate": "2026-04-25T22:32:53.342Z"
+      "paymentDate": "2026-04-25T22:32:53.342Z",
+      "tenant_id": "gym-001",
+      "tenantId": "gym-001"
     },
     {
       "id": "inv-3",
@@ -112,7 +137,9 @@
       "amount": 150,
       "status": "paid",
       "paymentMethod": "UPI",
-      "paymentDate": "2026-04-26T22:32:53.342Z"
+      "paymentDate": "2026-04-26T22:32:53.342Z",
+      "tenant_id": "gym-001",
+      "tenantId": "gym-001"
     }
   ],
   "classes": [
@@ -122,7 +149,9 @@
       "instructorName": "Mike Tyson",
       "maxCapacity": 20,
       "currentEnrollment": 12,
-      "description": "Relaxing yoga session"
+      "description": "Relaxing yoga session",
+      "tenant_id": "gym-001",
+      "tenantId": "gym-001"
     },
     {
       "id": "c-2",
@@ -130,7 +159,9 @@
       "instructorName": "Sylvester Stallone",
       "maxCapacity": 15,
       "currentEnrollment": 8,
-      "description": "Intense interval training"
+      "description": "Intense interval training",
+      "tenant_id": "gym-001",
+      "tenantId": "gym-001"
     }
   ],
   "notifications": [
@@ -139,7 +170,9 @@
       "title": "System Configured",
       "message": "Welcome to GymFlow Pro Edition.",
       "read": false,
-      "createdAt": "2026-04-26T22:32:53.342Z"
+      "createdAt": "2026-04-26T22:32:53.342Z",
+      "tenant_id": "gym-001",
+      "tenantId": "gym-001"
     }
   ],
   "leads": [
@@ -150,7 +183,9 @@
       "phone": "123-456-7890",
       "status": "New",
       "notes": "Interested in Premium Trial",
-      "created_at": "2026-04-26T22:32:53.342Z"
+      "created_at": "2026-04-26T22:32:53.342Z",
+      "tenant_id": "gym-001",
+      "tenantId": "gym-001"
     }
   ],
   "plans": [
@@ -159,14 +194,18 @@
       "name": "Premium Plan",
       "price": 99.99,
       "durationMonths": 12,
-      "features": "Full Access, Classes, Gym"
+      "features": "Full Access, Classes, Gym",
+      "tenant_id": "gym-001",
+      "tenantId": "gym-001"
     },
     {
       "id": "p-2",
       "name": "Basic Plan",
       "price": 49.99,
       "durationMonths": 1,
-      "features": "Gym Only"
+      "features": "Gym Only",
+      "tenant_id": "gym-001",
+      "tenantId": "gym-001"
     }
   ],
   "settings": {
@@ -179,5 +218,32 @@
   },
   "activity": [],
   "campaigns": [],
-  "messageLogs": []
+  "messageLogs": [],
+  "tenants": [
+    {
+      "id": "gym-001",
+      "name": "GymFlow Pro",
+      "slug": "gymflow-pro",
+      "status": "active",
+      "plan": "Pro",
+      "membersLimit": 500,
+      "branchesLimit": 5,
+      "contactEmail": "admin@gymflow.com",
+      "createdAt": "2026-05-17T09:13:56.039Z",
+      "lastActiveAt": "2026-05-17T09:13:56.039Z"
+    }
+  ],
+  "activity_logs": [
+    {
+      "id": "3f2a2983-9974-40ca-afc6-09d499e9e404",
+      "userId": "admin-001",
+      "userName": "Gym Administrator",
+      "action": "create",
+      "entityType": "support-session",
+      "entityId": "gym-001",
+      "entityName": "GymFlow Pro",
+      "details": "Opened support session for GymFlow Pro",
+      "createdAt": "2026-05-17T09:14:45.766Z"
+    }
+  ]
 }
