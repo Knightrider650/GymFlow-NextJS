@@ -190,6 +190,7 @@ export default function StaffPage() {
                           <SelectValue placeholder="Select a branch" />
                         </SelectTrigger>
                         <SelectContent>
+                          <SelectItem value="none">None / No Branch</SelectItem>
                           {branches.map(b => (
                             <SelectItem key={b.id} value={b.id}>{b.name}</SelectItem>
                           ))}

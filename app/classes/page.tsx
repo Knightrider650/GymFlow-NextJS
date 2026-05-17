@@ -147,7 +147,7 @@ export default function ClassesPage() {
                       onChange={(e) => setFormData({ ...formData, instructorName: e.target.value })}
                       className="w-full h-10 px-3 rounded-md border border-input bg-background text-sm focus:ring-2 focus:ring-primary/20 outline-none"
                     >
-                      <option value="">Select Instructor</option>
+                      <option value="">None / Unassigned</option>
                       {staff.map(s => <option key={s.id} value={s.name}>{s.name}</option>)}
                     </select>
                   </div>
@@ -196,6 +196,7 @@ export default function ClassesPage() {
                       <SelectValue placeholder="Select a branch" />
                     </SelectTrigger>
                     <SelectContent>
+                      <SelectItem value="none">None / No Branch</SelectItem>
                       {branches.map(b => (
                         <SelectItem key={b.id} value={b.id}>{b.name}</SelectItem>
                       ))}

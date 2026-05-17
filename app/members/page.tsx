@@ -320,6 +320,7 @@ export default function MembersPage() {
                             {...register('membershipType')}
                             className="w-full h-10 px-3 rounded-md border border-input text-sm bg-background"
                           >
+                            <option value="None">None</option>
                             <option value="">Select a plan</option>
                             {plans.length > 0 ? (
                               plans.map((plan: any) => (
@@ -376,9 +377,9 @@ export default function MembersPage() {
                           {...register('branchId')}
                           className="w-full h-10 px-3 rounded-md border border-input text-sm bg-background"
                         >
-                          <option value="">Select a branch</option>
+                          <option value="none">None / No Branch</option>
                           {branches.map(b => (
-                            <SelectItem key={b.id} value={b.id}>{b.name}</SelectItem>
+                            <option key={b.id} value={b.id}>{b.name}</option>
                           ))}
                         </select>
                       </div>
