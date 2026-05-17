@@ -172,6 +172,15 @@ export const useAuthStore = create<AuthState>()(
         checkAuth: async () => {
           set({ isLoading: true })
           try {
+            const hasAccessToken = typeof window !== 'undefined' && !!localStorage.getItem('accessToken')
+            const hasRefreshToken = typeof window !== 'undefined' && !!localStorage.getItem('refreshToken')
+            const hasCookieToken = typeof document !== 'undefined' && document.cookie.includes('token=')
+
+            if (!hasAccessToken && !hasRefreshToken && !hasCookieToken) {
+              set({ user: null, isAuthenticated: false })
+              return
+            }
+
             const response = await apiClient.get('/api/auth/me')
             if (response.success && response.data) {
               set({ user: response.data, isAuthenticated: true })

@@ -27,8 +27,9 @@ import {
   FileText,
   Globe,
 } from 'lucide-react'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { NAV_VISIBILITY, type UserRole } from '@/lib/permissions'
+import { useAuthStore } from '@/lib/store'
 
 interface NavItem {
   href: string
@@ -213,12 +214,55 @@ export function Sidebar() {
 }
 
 export function DashboardLayout({ children }: { children: React.ReactNode }) {
+  const router = useRouter()
+  const user = useAuthStore(state => state.user)
+  const [isSupportMode, setIsSupportMode] = useState(() => {
+    if (typeof window !== 'undefined') {
+      const mode = localStorage.getItem('gymflow_support_session')
+      return mode === 'true' && !!user?.isGlobal
+    }
+    return false
+  })
+
+  // Watch storage events or router updates to toggle banner reactively
+  useEffect(() => {
+    const checkSupport = () => {
+      const mode = localStorage.getItem('gymflow_support_session')
+      setIsSupportMode(mode === 'true' && !!user?.isGlobal)
+    }
+    checkSupport()
+    window.addEventListener('storage', checkSupport)
+    return () => window.removeEventListener('storage', checkSupport)
+  }, [user])
+
+  const handleExitSupport = async () => {
+    localStorage.removeItem('gymflow_support_session')
+    setIsSupportMode(false)
+    router.push('/super-dashboard')
+  }
+
   return (
-    <div className="flex h-screen bg-background bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-slate-900 via-background to-background">
-      <Sidebar />
-      <main className="flex-1 flex flex-col overflow-hidden">
-        <div className="flex-1 overflow-auto">{children}</div>
-      </main>
+    <div className="flex h-screen bg-background bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-slate-900 via-background to-background flex-col">
+      {isSupportMode && (
+        <div className="bg-gradient-to-r from-amber-500 via-yellow-600 to-amber-500 text-slate-950 font-bold px-4 py-2.5 text-center text-xs flex items-center justify-center gap-4 shadow-xl select-none shrink-0 z-50 animate-in slide-in-from-top duration-300">
+          <div className="flex items-center gap-2">
+            <span className="text-sm">⚠️</span>
+            <span>SUPPORT SESSION ACTIVE: Viewing Gym Portal as Platform Administrator. Actions are fully audited.</span>
+          </div>
+          <button 
+            onClick={handleExitSupport}
+            className="bg-slate-950 hover:bg-slate-900 text-amber-400 font-extrabold px-3 py-1 rounded text-[10px] uppercase tracking-wider transition-all duration-200 border border-amber-400/20 active:scale-95 hover:scale-105"
+          >
+            Exit Impersonation
+          </button>
+        </div>
+      )}
+      <div className="flex flex-1 overflow-hidden">
+        <Sidebar />
+        <main className="flex-1 flex flex-col overflow-hidden">
+          <div className="flex-1 overflow-auto">{children}</div>
+        </main>
+      </div>
     </div>
   )
 }
