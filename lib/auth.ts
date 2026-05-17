@@ -17,9 +17,13 @@ export interface AuthUser {
 export async function getAuthUser(req: NextRequest): Promise<AuthUser | null> {
   try {
     const authHeader = req.headers.get('Authorization')
-    const token = authHeader?.startsWith('Bearer ') 
+    let token = authHeader?.startsWith('Bearer ') 
       ? authHeader.substring(7) 
       : null
+
+    if (!token) {
+      token = req.cookies.get('token')?.value || null;
+    }
 
     if (!token) return null
 

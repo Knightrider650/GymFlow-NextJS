@@ -140,6 +140,7 @@ export const useAuthStore = create<AuthState>()(
             if (response.success && response.data) {
               const { user, accessToken, refreshToken } = response.data
               localStorage.setItem('accessToken', accessToken)
+              document.cookie = `token=${accessToken}; path=/; max-age=86400; SameSite=Lax`
               if (refreshToken) {
                 localStorage.setItem('refreshToken', refreshToken)
               }
@@ -161,6 +162,7 @@ export const useAuthStore = create<AuthState>()(
             console.error('Logout error:', error)
           } finally {
             localStorage.clear()
+            document.cookie = 'token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT'
             set({ user: null, isAuthenticated: false })
           }
         },
@@ -175,10 +177,12 @@ export const useAuthStore = create<AuthState>()(
               set({ user: response.data, isAuthenticated: true })
             } else {
               localStorage.clear()
+              document.cookie = 'token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT'
               set({ user: null, isAuthenticated: false })
             }
           } catch (error) {
             localStorage.clear()
+            document.cookie = 'token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT'
             set({ user: null, isAuthenticated: false })
           } finally {
             set({ isLoading: false })
@@ -191,6 +195,7 @@ export const useAuthStore = create<AuthState>()(
             if (response.success && response.data) {
               const { accessToken, refreshToken } = response.data
               localStorage.setItem('accessToken', accessToken)
+              document.cookie = `token=${accessToken}; path=/; max-age=86400; SameSite=Lax`
               if (refreshToken) {
                 localStorage.setItem('refreshToken', refreshToken)
               }
