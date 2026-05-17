@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server'
 import jwt from 'jsonwebtoken'
 import prisma from '@/lib/prisma'
 
-const JWT_SECRET = process.env.NEXT_PUBLIC_JWT_SECRET || 'fallback_secret'
+const JWT_SECRET = process.env.JWT_SECRET || process.env.NEXT_PUBLIC_JWT_SECRET || 'fallback_secret'
 
 export async function POST(request: Request) {
   try {

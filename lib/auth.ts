@@ -3,7 +3,7 @@ import { cookies } from 'next/headers'
 import { NextRequest } from 'next/server'
 
 const JWT_SECRET = new TextEncoder().encode(
-  process.env.NEXT_PUBLIC_JWT_SECRET || 'fallback_secret'
+  process.env.JWT_SECRET || process.env.NEXT_PUBLIC_JWT_SECRET || 'fallback_secret'
 )
 
 export interface AuthUser {
@@ -30,7 +30,25 @@ export async function getAuthUser(req: NextRequest): Promise<AuthUser | null> {
     if (!token) return null
 
     const { payload } = await jwtVerify(token, JWT_SECRET)
-    return payload as unknown as AuthUser
+    const rawPayload = payload as any
+
+    // Normalize properties for Next.js and standalone Express JWT schema compatibility
+    const userId = rawPayload.userId || rawPayload.id || ''
+    const email = rawPayload.email || ''
+    const role = rawPayload.role || ''
+    const gymId = rawPayload.gymId || rawPayload.tenantId || rawPayload.gym_id || ''
+    const scope = rawPayload.scope || (['cto', 'ceo', 'admin'].includes(role) ? 'platform' : 'tenant')
+    const isGlobal = rawPayload.isGlobal !== undefined ? rawPayload.isGlobal : ['cto', 'ceo', 'admin'].includes(role)
+
+    return {
+      userId,
+      email,
+      role,
+      scope,
+      gymId,
+      tenantId: gymId,
+      isGlobal
+    }
   } catch (error) {
     return null
   }

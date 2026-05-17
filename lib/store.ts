@@ -589,7 +589,7 @@ export const useGymStore = create<GymState>()((set, get) => ({
 
   updateSettings: async (settings: Partial<AppSettings>) => {
     try {
-      const response = await apiClient.put('/api/settings', settings)
+      const response = await apiClient.patch('/api/settings', settings)
       if (response.success && response.data) {
         set({ settings: response.data })
       }
