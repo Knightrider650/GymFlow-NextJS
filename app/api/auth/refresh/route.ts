@@ -4,6 +4,27 @@ import prisma from '@/lib/prisma'
 
 const JWT_SECRET = process.env.JWT_SECRET || process.env.NEXT_PUBLIC_JWT_SECRET || 'fallback_secret'
 
+function isDatabaseUnavailable(error: any): boolean {
+  const message = String(error?.message || '')
+  return error?.code === 'ECONNREFUSED' || /ECONNREFUSED|Can't reach database server|database server/i.test(message)
+}
+
+async function tryBackendRefresh(refreshToken: string) {
+  const backendUrl = process.env.API_FALLBACK_URL || process.env.NEXT_PUBLIC_API_URL
+  if (!backendUrl || !/^https?:\/\//.test(backendUrl)) {
+    return null
+  }
+
+  const response = await fetch(`${backendUrl}/api/auth/refresh`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ refreshToken }),
+  })
+
+  const payload = await response.json()
+  return NextResponse.json(payload, { status: response.status })
+}
+
 export async function POST(request: Request) {
   try {
     const { refreshToken } = await request.json()
@@ -26,10 +47,19 @@ export async function POST(request: Request) {
       )
     }
 
-    const user = await prisma.user.findUnique({
-      where: { id: decoded.userId },
-      include: { gym: true }
-    })
+    let user: any
+    try {
+      user = await prisma.user.findUnique({
+        where: { id: decoded.userId },
+        include: { gym: true }
+      })
+    } catch (dbError: any) {
+      if (isDatabaseUnavailable(dbError)) {
+        const fallback = await tryBackendRefresh(refreshToken)
+        if (fallback) return fallback
+      }
+      throw dbError
+    }
 
     if (!user) {
       return NextResponse.json(
@@ -68,6 +98,12 @@ export async function POST(request: Request) {
     })
   } catch (error: any) {
     console.error('Refresh token error:', error)
+    if (isDatabaseUnavailable(error)) {
+      return NextResponse.json(
+        { success: false, error: 'Database unavailable. Start PostgreSQL or configure API_FALLBACK_URL/NEXT_PUBLIC_API_URL.' },
+        { status: 503 }
+      )
+    }
     return NextResponse.json(
       { success: false, error: 'Internal server error' },
       { status: 500 }

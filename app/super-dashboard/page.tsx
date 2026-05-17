@@ -92,115 +92,66 @@ interface JobQueueItem {
 
 export default function SuperDashboard() {
   const [activeTab, setActiveTab] = useState<'overview' | 'tenants' | 'plans' | 'flags' | 'logs'>('overview')
+  const [loading, setLoading] = useState(true)
   const [stats, setStats] = useState<SuperStats>({
-    totalGyms: 14,
-    totalMembers: 1842,
-    activeMembers: 1520,
-    totalRevenue: 34500,
-    suspendedGyms: 2,
-    churnRate: 1.8,
-    todaySignups: 4,
-    mrr: 24800
+    totalGyms: 5,
+    totalMembers: 730,
+    activeMembers: 625,
+    totalRevenue: 26300,
+    suspendedGyms: 1,
+    churnRate: 1.5,
+    todaySignups: 1,
+    mrr: 950
   })
 
-  // Simulated live tenants
-  const [tenants, setTenants] = useState<GymOverview[]>([
-    {
-      id: 'gymflow-hq',
-      name: 'GymFlow Premium HQ',
-      subdomain: 'hq.gymflow.app',
-      status: 'active',
-      plan: 'Enterprise',
-      email: 'contact@gymflow.com',
-      phone: '+1 (555) 019-2834',
-      address: '100 Broadway Suite A, New York, NY',
-      activeMembers: 320,
-      totalMembers: 400,
-      totalRevenue: 12400,
-      staffCount: 8,
-      branchesCount: 3,
-      createdAt: '2026-01-10T08:00:00Z',
-      maxMembersLimit: 2000,
-      maxBranchesLimit: 10,
-      enabledModules: ['POS', 'Inventory', 'Advanced Analytics', 'SMS Campaigns']
-    },
-    {
-      id: 'elite-athletics',
-      name: 'Elite Athletics Center',
-      subdomain: 'elite.gymflow.app',
-      status: 'active',
-      plan: 'Pro',
-      email: 'admin@eliteathletics.com',
-      phone: '+1 (555) 012-3849',
-      address: '456 West 23rd St, Austin, TX',
-      activeMembers: 210,
-      totalMembers: 220,
-      totalRevenue: 6200,
-      staffCount: 4,
-      branchesCount: 2,
-      createdAt: '2026-02-15T09:30:00Z',
-      maxMembersLimit: 500,
-      maxBranchesLimit: 3,
-      enabledModules: ['POS', 'Inventory']
-    },
-    {
-      id: 'prime-fitness',
-      name: 'Prime Fitness Club',
-      subdomain: 'prime.gymflow.app',
-      status: 'active',
-      plan: 'Basic',
-      email: 'hello@primefitness.com',
-      phone: '+1 (555) 045-9821',
-      address: '789 Oak Ave, Chicago, IL',
-      activeMembers: 95,
-      totalMembers: 110,
-      totalRevenue: 2800,
-      staffCount: 2,
-      branchesCount: 1,
-      createdAt: '2026-03-01T10:15:00Z',
-      maxMembersLimit: 150,
-      maxBranchesLimit: 1,
-      enabledModules: ['POS']
-    },
-    {
-      id: 'metro-iron-gym',
-      name: 'Metro Iron Gym',
-      subdomain: 'metroiron.gymflow.app',
-      status: 'suspended',
-      plan: 'Pro',
-      email: 'billing@metroiron.com',
-      phone: '+1 (555) 088-7711',
-      address: '102 Industrial Pkwy, Cleveland, OH',
-      activeMembers: 140,
-      totalMembers: 180,
-      totalRevenue: 4900,
-      staffCount: 5,
-      branchesCount: 2,
-      createdAt: '2026-01-20T11:00:00Z',
-      maxMembersLimit: 500,
-      maxBranchesLimit: 3,
-      enabledModules: ['POS', 'Inventory']
-    },
-    {
-      id: 'apex-crossfit',
-      name: 'Apex CrossFit Box',
-      subdomain: 'apex.gymflow.app',
-      status: 'pending',
-      plan: 'Basic',
-      email: 'setup@apexcrossfit.com',
-      phone: '+1 (555) 033-4455',
-      address: '22 Valley Rd, Boulder, CO',
-      activeMembers: 0,
-      totalMembers: 0,
-      totalRevenue: 0,
-      staffCount: 1,
-      branchesCount: 1,
-      createdAt: '2026-05-16T14:20:00Z',
-      maxMembersLimit: 150,
-      maxBranchesLimit: 1,
-      enabledModules: []
+  // Dynamic live tenants loaded from our API
+  const [tenants, setTenants] = useState<GymOverview[]>([])
+
+  const fetchGyms = async () => {
+    try {
+      setLoading(true)
+      const response = await fetch('/api/super-admin/gyms')
+      if (response.ok) {
+        const result = await response.json()
+        if (result.success && Array.isArray(result.data)) {
+          setTenants(result.data)
+          
+          const list = result.data
+          const totalGyms = list.length
+          const totalMembers = list.reduce((sum: number, t: any) => sum + (t.totalMembers || 0), 0)
+          const activeMembers = list.reduce((sum: number, t: any) => sum + (t.activeMembers || 0), 0)
+          const totalRevenue = list.reduce((sum: number, t: any) => sum + (t.totalRevenue || 0), 0)
+          const suspendedGyms = list.filter((t: any) => t.status === 'suspended').length
+          const mrr = list.filter((t: any) => t.status === 'active').reduce((sum: number, t: any) => {
+            const planRate = t.plan === 'Enterprise' ? 299 : t.plan === 'Pro' ? 149 : 49
+            return sum + planRate
+          }, 0)
+
+          setStats({
+            totalGyms,
+            totalMembers,
+            activeMembers,
+            totalRevenue,
+            suspendedGyms,
+            churnRate: 1.2,
+            todaySignups: list.filter((t: any) => {
+              const days = (Date.now() - new Date(t.createdAt).getTime()) / (1000 * 3600 * 24)
+              return days <= 1
+            }).length,
+            mrr
+          })
+        }
+      }
+    } catch (err) {
+      console.error('Failed to fetch gyms:', err)
+    } finally {
+      setLoading(false)
     }
-  ])
+  }
+
+  useEffect(() => {
+    fetchGyms()
+  }, [])
 
   // Simulated Alert Queue
   const [alerts, setAlerts] = useState([
@@ -258,40 +209,51 @@ export default function SuperDashboard() {
     }
   }
 
-  const handleCreateTenantSubmit = (e: React.FormEvent) => {
+  const handleCreateTenantSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    const newId = newTenantData.name.toLowerCase().replace(/\s+/g, '-')
-    const created: GymOverview = {
-      id: newId,
-      name: newTenantData.name,
-      subdomain: newTenantData.subdomain || `${newId}.gymflow.app`,
-      status: 'active',
-      plan: newTenantData.plan,
-      email: newTenantData.email,
-      phone: newTenantData.phone,
-      address: newTenantData.address,
-      activeMembers: 0,
-      totalMembers: 0,
-      totalRevenue: 0,
-      staffCount: 1,
-      branchesCount: 1,
-      createdAt: new Date().toISOString(),
-      maxMembersLimit: newTenantData.plan === 'Enterprise' ? 2000 : newTenantData.plan === 'Pro' ? 500 : 150,
-      maxBranchesLimit: newTenantData.plan === 'Enterprise' ? 10 : newTenantData.plan === 'Pro' ? 3 : 1,
-      enabledModules: newTenantData.plan === 'Enterprise' ? ['POS', 'Inventory', 'Advanced Analytics'] : newTenantData.plan === 'Pro' ? ['POS'] : []
+    try {
+      const response = await fetch('/api/super-admin/gyms', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(newTenantData)
+      })
+      if (response.ok) {
+        const result = await response.json()
+        if (result.success) {
+          await fetchGyms()
+          setIsNewTenantOpen(false)
+          setNewTenantData({ name: '', subdomain: '', plan: 'Basic', email: '', phone: '', address: '' })
+        }
+      } else {
+        alert('Failed to provision tenant')
+      }
+    } catch (err) {
+      console.error('Error provisioning tenant:', err)
     }
-    setTenants([created, ...tenants])
-    setStats(prev => ({
-      ...prev,
-      totalGyms: prev.totalGyms + 1
-    }))
-    setIsNewTenantOpen(false)
-    setNewTenantData({ name: '', subdomain: '', plan: 'Basic', email: '', phone: '', address: '' })
   }
 
-  const handleSaveTenantLimits = (updated: GymOverview) => {
-    setTenants(tenants.map(t => t.id === updated.id ? updated : t))
-    setSelectedTenant(updated)
+  const handleSaveTenantLimits = async (updated: GymOverview) => {
+    try {
+      const response = await fetch(`/api/super-admin/gyms/${updated.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          status: updated.status,
+          plan: updated.plan,
+          maxMembersLimit: updated.maxMembersLimit,
+          maxBranchesLimit: updated.maxBranchesLimit,
+          enabledModules: updated.enabledModules
+        })
+      })
+      if (response.ok) {
+        await fetchGyms()
+        setSelectedTenant(updated)
+      } else {
+        alert('Failed to update tenant overrides')
+      }
+    } catch (err) {
+      console.error('Error updating tenant overrides:', err)
+    }
   }
 
   const handleRetryJob = (jobId: string) => {
