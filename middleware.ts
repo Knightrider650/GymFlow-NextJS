@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
-import { getAuthUser } from './lib/auth'
+import { getAuthUser } from './lib/auth-edge'
 import { ROUTE_PERMISSIONS, canAccessRoute } from './lib/permissions'
 
 const PLATFORM_ROUTES = ['/super-dashboard', '/team']
