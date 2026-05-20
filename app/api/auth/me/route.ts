@@ -72,10 +72,23 @@ export async function GET(req: NextRequest) {
 
     const { password, ...userWithoutPassword } = userData
 
+    let currentGym = userData.gym
+    if (user.gymId && user.gymId !== userData.gymId) {
+      try {
+        const activeGym = await prisma.gym.findUnique({ where: { id: user.gymId } })
+        if (activeGym) {
+          currentGym = activeGym
+        }
+      } catch (e) {
+        console.warn('Failed to fetch contextual gym during /me:', e)
+      }
+    }
+
     return NextResponse.json({
       success: true,
       data: {
         ...userWithoutPassword,
+        gym: currentGym,
         gymId: user.gymId, // Use gymId from JWT (contextual)
         isGlobal: user.isGlobal // Include isGlobal from JWT
       }

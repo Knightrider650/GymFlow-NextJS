@@ -63,21 +63,24 @@ class ApiClient {
           config.headers.Authorization = `Bearer ${token}`
         }
 
-        const gymId = this.getGymId()
-        if (gymId) {
-          config.headers['X-Gym-ID'] = gymId
-          config.params = {
-            ...(config.params || {}),
-            gymId,
+        const isAuthRoute = config.url?.startsWith('/api/auth/') || config.url?.startsWith('api/auth/')
+        if (!isAuthRoute) {
+          const gymId = this.getGymId()
+          if (gymId) {
+            config.headers['X-Gym-ID'] = gymId
+            config.params = {
+              ...(config.params || {}),
+              gymId,
+            }
           }
-        }
 
-        const authContext = this.getAuthContext()
-        if (authContext.scope) {
-          config.headers['X-Scope'] = authContext.scope
-        }
-        if (authContext.tenantId) {
-          config.headers['X-Tenant-ID'] = authContext.tenantId
+          const authContext = this.getAuthContext()
+          if (authContext.scope) {
+            config.headers['X-Scope'] = authContext.scope
+          }
+          if (authContext.tenantId) {
+            config.headers['X-Tenant-ID'] = authContext.tenantId
+          }
         }
       }
       return config
