@@ -733,7 +733,7 @@ export const useGymStore = create<GymState>()((set, get) => ({
   fetchActivityLogs: async (filters?: any) => {
     set({ activityLogsLoading: true })
     try {
-      const response = await apiClient.get('/api/activity-logs', { params: filters || {} })
+      const response = await apiClient.get('/api/activity-log', { params: filters || {} })
       if (response.success) {
         set({ activityLogs: response.data || [] })
         return response.data || []
@@ -748,7 +748,7 @@ export const useGymStore = create<GymState>()((set, get) => ({
   },
   logActivity: async (action: string, entityType: string, entityId?: string, entityName?: string, details?: string) => {
     try {
-      const response = await apiClient.post('/api/activity-logs', {
+      const response = await apiClient.post('/api/activity-log', {
         action,
         entityType,
         entityId,
