@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import prisma from '@/lib/prisma'
-import { getAuthUser } from '@/lib/auth'
+import { getAuthUser, getGymIdContext, getRequiredGymId } from '@/lib/auth'
 import { isTrainer } from '@/lib/permissions'
 
 export async function GET(req: NextRequest) {
@@ -10,8 +10,9 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 })
     }
 
+    const gymId = getGymIdContext(user, req)
     const plans = await prisma.plan.findMany({
-      where: { gymId: user.gymId },
+      where: gymId ? { gymId } : {},
       orderBy: { price: 'asc' }
     })
 
@@ -30,11 +31,13 @@ export async function POST(req: NextRequest) {
     }
 
     const data = await req.json()
+    const gymId = await getRequiredGymId(user, req, data)
+    const { gymId: dummy, ...rest } = data
     
     const newPlan = await prisma.plan.create({
       data: {
-        ...data,
-        gymId: user.gymId
+        ...rest,
+        gymId: gymId
       }
     })
 

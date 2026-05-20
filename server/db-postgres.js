@@ -242,38 +242,41 @@ const db = {
   },
 
   async addMember(member, ownerId) {
+    const branchId = member.branchId || member.branch_id || null;
     const res = await pool.query(
-      'INSERT INTO members (id, owner_id, name, email, phone, membership_type, status, join_date, expiry_date) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING *',
-      [member.id, ownerId, member.name, member.email, member.phone, member.membershipType || member.membership_type, member.status, member.joinDate || member.join_date, member.expiryDate || member.expiry_date]
+      'INSERT INTO members (id, owner_id, name, email, phone, membership_type, status, join_date, expiry_date, branch_id) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING *',
+      [member.id, ownerId, member.name, member.email, member.phone, member.membershipType || member.membership_type, member.status, member.joinDate || member.join_date, member.expiryDate || member.expiry_date, branchId]
     );
     return res.rows[0];
   },
-
+ 
   async bulkAddMembers(membersArray, ownerId) {
     // Basic iterative strategy for PostgreSQL bulk insert compatibility
     const inserted = [];
     for (const member of membersArray) {
+      const branchId = member.branchId || member.branch_id || null;
       const res = await pool.query(
-        'INSERT INTO members (id, owner_id, name, email, phone, membership_type, status, join_date, expiry_date) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING *',
-        [member.id, ownerId, member.name, member.email, member.phone, member.membershipType || member.membership_type, member.status, member.joinDate || member.join_date, member.expiryDate || member.expiry_date]
+        'INSERT INTO members (id, owner_id, name, email, phone, membership_type, status, join_date, expiry_date, branch_id) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING *',
+        [member.id, ownerId, member.name, member.email, member.phone, member.membershipType || member.membership_type, member.status, member.joinDate || member.join_date, member.expiryDate || member.expiry_date, branchId]
       );
       inserted.push(res.rows[0]);
     }
     return inserted;
   },
-
+ 
   async updateMember(id, patch, ownerId) {
     const fields = [];
     const values = [];
     let idx = 1;
-
+ 
     const propMap = {
       name: 'name', email: 'email', phone: 'phone', address: 'address',
       membershipType: 'membership_type', membership_type: 'membership_type',
       status: 'status', joinDate: 'join_date', join_date: 'join_date',
-      expiryDate: 'expiry_date', expiry_date: 'expiry_date'
+      expiryDate: 'expiry_date', expiry_date: 'expiry_date',
+      branchId: 'branch_id', branch_id: 'branch_id'
     };
-
+ 
     for (const [key, value] of Object.entries(patch)) {
       if (propMap[key] !== undefined) {
         fields.push(`${propMap[key]} = $${idx}`);
@@ -285,7 +288,7 @@ const db = {
         idx++;
       }
     }
-
+ 
     if (fields.length === 0) return null;
     values.push(id);
     values.push(ownerId);
@@ -306,9 +309,10 @@ const db = {
   },
   
   async addStaff(member, ownerId) {
+    const branchId = member.branchId || member.branch_id || null;
     const res = await pool.query(
-      'INSERT INTO staff (id, owner_id, name, email, phone, position, salary, status) VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING *',
-      [member.id, ownerId, member.name, member.email, member.phone, member.position, member.salary, member.status || 'active']
+      'INSERT INTO staff (id, owner_id, name, email, phone, position, salary, status, branch_id) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING *',
+      [member.id, ownerId, member.name, member.email, member.phone, member.position, member.salary, member.status || 'active', branchId]
     );
     return res.rows[0];
   },
@@ -317,11 +321,14 @@ const db = {
     const fields = [];
     const values = [];
     let idx = 1;
-    const allowed = ['name', 'email', 'phone', 'position', 'salary', 'status'];
+    const propMap = {
+      name: 'name', email: 'email', phone: 'phone', position: 'position',
+      salary: 'salary', status: 'status', branchId: 'branch_id', branch_id: 'branch_id'
+    };
 
     for (const [key, value] of Object.entries(patch)) {
-      if (allowed.includes(key)) {
-        fields.push(`${key} = $${idx}`);
+      if (propMap[key] !== undefined) {
+        fields.push(`${propMap[key]} = $${idx}`);
         values.push(value);
         idx++;
       }
@@ -556,9 +563,10 @@ const db = {
   },
 
   async addClass(cls, ownerId) {
+    const branchId = cls.branchId || cls.branch_id || null;
     const res = await pool.query(
-      'INSERT INTO classes (id, owner_id, name, instructor_name, max_capacity, description) VALUES ($1, $2, $3, $4, $5, $6) RETURNING *',
-      [cls.id, ownerId, cls.name, cls.instructorName, cls.maxCapacity, cls.description]
+      'INSERT INTO classes (id, owner_id, name, instructor_name, max_capacity, description, branch_id) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *',
+      [cls.id, ownerId, cls.name, cls.instructorName, cls.maxCapacity, cls.description, branchId]
     );
     return res.rows[0];
   },
@@ -567,7 +575,14 @@ const db = {
     const fields = [];
     const values = [];
     let idx = 1;
-    const allowed = { name: 'name', instructorName: 'instructor_name', maxCapacity: 'max_capacity', description: 'description' };
+    const allowed = { 
+      name: 'name', 
+      instructorName: 'instructor_name', 
+      maxCapacity: 'max_capacity', 
+      description: 'description',
+      branchId: 'branch_id',
+      branch_id: 'branch_id'
+    };
 
     for (const [key, value] of Object.entries(patch)) {
       if (allowed[key]) {
@@ -579,7 +594,8 @@ const db = {
     if (fields.length === 0) return null;
     values.push(id);
     values.push(ownerId);
-    const res = await pool.query(`UPDATE classes SET ${fields.join(', ')} WHERE id = $${idx} AND owner_id = $${idx + 1} RETURNING *`, values);
+    const query = `UPDATE classes SET ${fields.join(', ')} WHERE id = $${idx} AND owner_id = $${idx + 1} RETURNING *`;
+    const res = await pool.query(query, values);
     return res.rows[0];
   },
 

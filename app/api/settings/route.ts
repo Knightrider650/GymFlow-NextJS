@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import prisma from '@/lib/prisma'
-import { getAuthUser } from '@/lib/auth'
+import { getAuthUser, getGymIdContext, getRequiredGymId } from '@/lib/auth'
 
 export async function GET(req: NextRequest) {
   try {
@@ -9,8 +9,14 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 })
     }
 
+    const gymId = getGymIdContext(user, req)
+    if (!gymId) {
+      const firstGym = await prisma.gym.findFirst()
+      return NextResponse.json({ success: true, data: firstGym })
+    }
+
     const settings = await prisma.gym.findUnique({
-      where: { id: user.gymId }
+      where: { id: gymId }
     })
 
     return NextResponse.json({ success: true, data: settings })
@@ -23,15 +29,17 @@ export async function GET(req: NextRequest) {
 export async function PATCH(req: NextRequest) {
   try {
     const user = await getAuthUser(req)
-    if (!user || !['admin', 'ceo', 'cto'].includes(user.role)) {
-      return NextResponse.json({ success: false, error: 'Only admins can update gym settings' }, { status: 403 })
+    if (!user || !['admin', 'ceo', 'cto', 'owner', 'manager'].includes(user.role)) {
+      return NextResponse.json({ success: false, error: 'Insufficient permissions to update gym settings' }, { status: 403 })
     }
 
     const data = await req.json()
+    const gymId = await getRequiredGymId(user, req, data)
+    const { id: dummy, gymId: dummy2, ...rest } = data
     
     const updatedSettings = await prisma.gym.update({
-      where: { id: user.gymId },
-      data
+      where: { id: gymId },
+      data: rest
     })
 
     return NextResponse.json({ success: true, data: updatedSettings })

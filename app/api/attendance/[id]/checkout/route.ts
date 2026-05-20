@@ -1,31 +1,35 @@
 import { NextRequest, NextResponse } from 'next/server'
 import prisma from '@/lib/prisma'
-import { getAuthUser } from '@/lib/auth'
-
+import { getAuthUser, getGymIdContext } from '@/lib/auth'
+ 
 export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const user = await getAuthUser(req)
     if (!user) return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 })
-
+ 
     const { id } = await params
+    const gymId = getGymIdContext(user, req)
     
     const record = await prisma.attendance.findFirst({
-      where: { id, member: { gymId: user.gymId } },
+      where: { 
+        id,
+        ...(gymId ? { member: { gymId } } : {})
+      },
       include: {
         member: {
-          select: { name: true, membershipType: true, status: true }
+          select: { name: true, membershipType: true, status: true, gymId: true }
         }
       }
     })
-
+ 
     if (!record) {
       return NextResponse.json({ success: false, error: 'Attendance record not found' }, { status: 404 })
     }
-
+ 
     if (record.checkOutTime) {
       return NextResponse.json({ success: false, error: 'Member is already checked out' }, { status: 400 })
     }
-
+ 
     const updatedRecord = await prisma.attendance.update({
       where: { id },
       data: { checkOutTime: new Date() },
@@ -35,7 +39,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
         }
       }
     })
-
+ 
     await prisma.activityLog.create({
       data: {
         action: 'Check Out',
@@ -44,7 +48,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
         entityId: updatedRecord.id,
         userName: user.email,
         userId: user.userId,
-        gymId: user.gymId
+        gymId: record.member.gymId
       }
     })
 

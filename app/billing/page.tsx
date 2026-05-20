@@ -331,21 +331,20 @@ export default function BillingPage() {
                 <Table>
                   <TableHeader>
                     <TableRow className="bg-muted/50 hover:bg-muted/50">
-                    <TableRow className="bg-muted/50 hover:bg-muted/50">
                       <TableHead className="w-[150px]">Invoice Ref</TableHead>
                       <TableHead>Member</TableHead>
                       <TableHead>Subtotal</TableHead>
                       <TableHead>Tax</TableHead>
                       <TableHead>Total</TableHead>
                       <TableHead>Status</TableHead>
+                      <TableHead>Due Date</TableHead>
                       <TableHead className="text-right">Action</TableHead>
-                    </TableRow>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                   {filteredInvoices.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={6} className="h-24 text-center text-muted-foreground">
+                      <TableCell colSpan={8} className="h-24 text-center text-muted-foreground">
                         No invoices found matching your criteria.
                       </TableCell>
                     </TableRow>

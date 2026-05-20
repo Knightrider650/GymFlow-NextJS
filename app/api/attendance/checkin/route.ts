@@ -1,28 +1,33 @@
 import { NextRequest, NextResponse } from 'next/server'
 import prisma from '@/lib/prisma'
-import { getAuthUser } from '@/lib/auth'
-
+import { getAuthUser, getGymIdContext } from '@/lib/auth'
+ 
 export async function POST(req: NextRequest) {
   try {
     const user = await getAuthUser(req)
     if (!user) return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 })
-
+ 
     const { memberId, notes } = await req.json()
     
     if (!memberId) {
       return NextResponse.json({ success: false, error: 'Member ID is required' }, { status: 400 })
     }
-
+ 
+    const gymId = getGymIdContext(user, req)
+ 
     const member = await prisma.member.findFirst({
-      where: { id: memberId, gymId: user.gymId }
+      where: { 
+        id: memberId,
+        ...(gymId ? { gymId } : {})
+      }
     })
-
+ 
     if (!member) {
       return NextResponse.json({ success: false, error: 'Member not found' }, { status: 404 })
     }
-
+ 
     const today = new Date().toISOString().split('T')[0]
-
+ 
     // Check if already checked in today without checking out
     const activeCheckin = await prisma.attendance.findFirst({
       where: {
@@ -31,16 +36,17 @@ export async function POST(req: NextRequest) {
         checkOutTime: null
       }
     })
-
+ 
     if (activeCheckin) {
       return NextResponse.json({ success: false, error: 'Member is already checked in' }, { status: 400 })
     }
-
+ 
     const record = await prisma.attendance.create({
       data: {
         memberId,
         notes: notes || '',
-        recordedDate: today
+        recordedDate: today,
+        branchId: member.branchId
       },
       include: {
         member: {
@@ -48,7 +54,7 @@ export async function POST(req: NextRequest) {
         }
       }
     })
-
+ 
     await prisma.activityLog.create({
       data: {
         action: 'Check In',
@@ -57,7 +63,7 @@ export async function POST(req: NextRequest) {
         entityId: record.id,
         userName: user.email,
         userId: user.userId,
-        gymId: user.gymId
+        gymId: member.gymId
       }
     })
 

@@ -10,26 +10,32 @@ export async function PUT(
     const user = await getAuthUser(req)
     if (!user) return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 })
 
-    // Only allow admin, ceo, cto to update branches
-    if (!['admin', 'ceo', 'cto'].includes(user.role)) {
+    // Only allow admin, ceo, cto, owner, manager to update branches
+    if (!['admin', 'ceo', 'cto', 'owner', 'manager'].includes(user.role)) {
       return NextResponse.json({ success: false, error: 'Forbidden' }, { status: 403 })
     }
 
     const { id } = await params
     const data = await req.json()
 
-    // Validate that branch belongs to the user's gym
-    const existingBranch = await prisma.branch.findFirst({
-      where: { id, gymId: user.gymId }
+    // Validate that branch exists and matches user's gym scope
+    const existingBranch = await prisma.branch.findUnique({
+      where: { id }
     })
     if (!existingBranch) {
       return NextResponse.json({ success: false, error: 'Branch not found' }, { status: 404 })
     }
 
+    if (user.gymId !== 'all' && !user.isGlobal && existingBranch.gymId !== user.gymId) {
+      return NextResponse.json({ success: false, error: 'Forbidden' }, { status: 403 })
+    }
+
+    const branchGymId = existingBranch.gymId
+
     // If setting to default, unset other defaults
     if (data.isDefault) {
       await prisma.branch.updateMany({
-        where: { gymId: user.gymId, isDefault: true, NOT: { id } },
+        where: { gymId: branchGymId, isDefault: true, NOT: { id } },
         data: { isDefault: false }
       })
     }
@@ -56,7 +62,7 @@ export async function PUT(
         entityId: updatedBranch.id,
         userName: user.email,
         userId: user.userId,
-        gymId: user.gymId
+        gymId: branchGymId
       }
     })
 
@@ -75,19 +81,25 @@ export async function DELETE(
     const user = await getAuthUser(req)
     if (!user) return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 })
 
-    // Only allow admin, ceo, cto to delete branches
-    if (!['admin', 'ceo', 'cto'].includes(user.role)) {
+    // Only allow admin, ceo, cto, owner, manager to delete branches
+    if (!['admin', 'ceo', 'cto', 'owner', 'manager'].includes(user.role)) {
       return NextResponse.json({ success: false, error: 'Forbidden' }, { status: 403 })
     }
 
     const { id } = await params
 
-    const existingBranch = await prisma.branch.findFirst({
-      where: { id, gymId: user.gymId }
+    const existingBranch = await prisma.branch.findUnique({
+      where: { id }
     })
     if (!existingBranch) {
       return NextResponse.json({ success: false, error: 'Branch not found' }, { status: 404 })
     }
+
+    if (user.gymId !== 'all' && !user.isGlobal && existingBranch.gymId !== user.gymId) {
+      return NextResponse.json({ success: false, error: 'Forbidden' }, { status: 403 })
+    }
+
+    const branchGymId = existingBranch.gymId
 
     await prisma.branch.delete({
       where: { id }
@@ -101,7 +113,7 @@ export async function DELETE(
         entityId: id,
         userName: user.email,
         userId: user.userId,
-        gymId: user.gymId
+        gymId: branchGymId
       }
     })
 

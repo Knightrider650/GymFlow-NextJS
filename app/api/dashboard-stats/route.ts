@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import prisma from '@/lib/prisma'
-import { getAuthUser } from '@/lib/auth'
+import { getAuthUser, getGymIdContext } from '@/lib/auth'
 import { isTrainer as checkIsTrainer } from '@/lib/permissions'
 import { startOfDay, endOfDay, startOfMonth, subDays, format } from 'date-fns'
 
@@ -11,7 +11,7 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 })
     }
 
-    const gymId = user.gymId
+    const gymId = getGymIdContext(user, req)
     const now = new Date()
     const todayStart = startOfDay(now)
     const todayEnd = endOfDay(now)
@@ -22,13 +22,13 @@ export async function GET(req: NextRequest) {
 
     // Role-based filters
     const isTrainer = checkIsTrainer(user.role)
-    const memberFilter: any = { gymId }
+    const memberFilter: any = gymId ? { gymId } : {}
     if (isTrainer) {
       memberFilter.assignedTrainerId = user.userId
     }
 
     const attendanceFilter: any = { member: memberFilter }
-    const invoiceFilter: any = { gymId }
+    const invoiceFilter: any = gymId ? { gymId } : {}
     if (isTrainer) {
       invoiceFilter.member = { assignedTrainerId: user.userId }
     }
@@ -55,14 +55,14 @@ export async function GET(req: NextRequest) {
         prisma.payment.aggregate({
           where: {
             paymentDate: { gte: todayStart, lte: todayEnd },
-            invoice: { gymId }
+            invoice: gymId ? { gymId } : {}
           },
           _sum: { amount: true }
         }),
         prisma.payment.aggregate({
           where: {
             paymentDate: { gte: monthStart },
-            invoice: { gymId }
+            invoice: gymId ? { gymId } : {}
           },
           _sum: { amount: true }
         })
@@ -86,7 +86,7 @@ export async function GET(req: NextRequest) {
         const sum = await prisma.payment.aggregate({
           where: {
             paymentDate: { gte: startOfDay(day.date), lte: endOfDay(day.date) },
-            invoice: { gymId }
+            invoice: gymId ? { gymId } : {}
           },
           _sum: { amount: true }
         })

@@ -1,14 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server'
 import prisma from '@/lib/prisma'
-import { getAuthUser } from '@/lib/auth'
+import { getAuthUser, getGymIdContext, getRequiredGymId } from '@/lib/auth'
 
 export async function GET(req: NextRequest) {
   try {
     const user = await getAuthUser(req)
     if (!user) return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 })
 
+    const gymId = getGymIdContext(user, req)
     const invoices = await prisma.invoice.findMany({
-      where: { gymId: user.gymId },
+      where: gymId ? { gymId } : {},
       include: {
         member: {
           select: {
@@ -21,7 +22,12 @@ export async function GET(req: NextRequest) {
       orderBy: { createdAt: 'desc' }
     })
 
-    return NextResponse.json({ success: true, data: invoices })
+    const mappedInvoices = invoices.map(inv => ({
+      ...inv,
+      memberName: inv.member?.name || 'Unknown'
+    }))
+
+    return NextResponse.json({ success: true, data: mappedInvoices })
   } catch (error: any) {
     console.error('Fetch invoices error:', error)
     return NextResponse.json({ success: false, error: 'Failed to fetch invoices' }, { status: 500 })
@@ -40,11 +46,13 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ success: false, error: 'Missing required fields' }, { status: 400 })
     }
 
+    const gymId = await getRequiredGymId(user, req, data)
+
     // Perform inside transaction to auto-increment nextInvoiceNumber safely
     const newInvoice = await prisma.$transaction(async (tx) => {
       // 1. Get gym settings
       const gym = await tx.gym.findUnique({
-        where: { id: user.gymId }
+        where: { id: gymId }
       })
       if (!gym) {
         throw new Error('Gym not found')
@@ -56,7 +64,7 @@ export async function POST(req: NextRequest) {
 
       // 2. Increment nextInvoiceNumber
       await tx.gym.update({
-        where: { id: user.gymId },
+        where: { id: gymId },
         data: {
           nextInvoiceNumber: {
             increment: 1
@@ -73,7 +81,7 @@ export async function POST(req: NextRequest) {
           description: description || 'Gym Membership',
           dueDate: new Date(dueDate),
           memberId,
-          gymId: user.gymId
+          gymId: gymId
         },
         include: {
           member: {
@@ -94,7 +102,7 @@ export async function POST(req: NextRequest) {
           entityId: invoice.id,
           userName: user.email,
           userId: user.userId,
-          gymId: user.gymId
+          gymId: gymId
         }
       })
 

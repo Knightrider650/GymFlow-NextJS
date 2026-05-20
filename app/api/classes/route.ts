@@ -1,13 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server'
 import prisma from '@/lib/prisma'
-import { getAuthUser } from '@/lib/auth'
+import { getAuthUser, getGymIdContext, getRequiredGymId } from '@/lib/auth'
 
 export async function GET(req: NextRequest) {
   try {
     const user = await getAuthUser(req)
     if (!user) return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 })
 
-    const where: any = { gymId: user.gymId }
+    const gymId = getGymIdContext(user, req)
+    const where: any = gymId ? { gymId } : {}
     if (user.role === 'trainer') {
       where.instructorId = user.userId
     }
@@ -29,12 +30,14 @@ export async function POST(req: NextRequest) {
     const user = await getAuthUser(req)
     if (!user) return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 })
 
-    // Only allow admin, ceo, cto to add classes
-    if (!['admin', 'ceo', 'cto'].includes(user.role)) {
+    // Only allow admin, ceo, cto, owner, manager to add classes
+    if (!['admin', 'ceo', 'cto', 'owner', 'manager'].includes(user.role)) {
       return NextResponse.json({ success: false, error: 'Forbidden' }, { status: 403 })
     }
 
     const data = await req.json()
+    const gymId = await getRequiredGymId(user, req, data)
+    const targetBranchId = (data.branchId === 'none' || data.branchId === '') ? null : (data.branchId || null)
 
     const newClass = await prisma.fitnessClass.create({
       data: {
@@ -46,8 +49,8 @@ export async function POST(req: NextRequest) {
         time: data.time || '10:00 AM',
         days: data.days || 'Mon, Wed, Fri',
         description: data.description || '',
-        branchId: data.branchId || null,
-        gymId: user.gymId
+        branchId: targetBranchId,
+        gymId: gymId
       }
     })
 
@@ -59,7 +62,7 @@ export async function POST(req: NextRequest) {
         entityId: newClass.id,
         userName: user.email,
         userId: user.userId,
-        gymId: user.gymId
+        gymId: gymId
       }
     })
 

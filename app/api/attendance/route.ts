@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import prisma from '@/lib/prisma'
-import { getAuthUser } from '@/lib/auth'
+import { getAuthUser, getGymIdContext } from '@/lib/auth'
 import { isTrainer } from '@/lib/permissions'
 
 export async function GET(req: NextRequest) {
@@ -12,8 +12,9 @@ export async function GET(req: NextRequest) {
     const date = searchParams.get('date')
     const memberId = searchParams.get('memberId')
 
+    const gymId = getGymIdContext(user, req)
     const where: any = {
-      member: { gymId: user.gymId }
+      member: gymId ? { gymId } : {}
     }
 
     // Role-based isolation for trainers

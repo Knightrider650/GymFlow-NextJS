@@ -1,14 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server'
 import prisma from '@/lib/prisma'
-import { getAuthUser } from '@/lib/auth'
+import { getAuthUser, getGymIdContext, getRequiredGymId } from '@/lib/auth'
 
 export async function GET(req: NextRequest) {
   try {
     const user = await getAuthUser(req)
     if (!user) return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 })
 
+    const gymId = getGymIdContext(user, req)
     const leads = await prisma.lead.findMany({
-      where: { gymId: user.gymId },
+      where: gymId ? { gymId } : {},
       orderBy: { createdAt: 'desc' }
     })
 
@@ -25,6 +26,7 @@ export async function POST(req: NextRequest) {
     if (!user) return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 })
 
     const data = await req.json()
+    const gymId = await getRequiredGymId(user, req, data)
 
     const newLead = await prisma.lead.create({
       data: {
@@ -33,7 +35,7 @@ export async function POST(req: NextRequest) {
         phone: data.phone || '',
         status: data.status || 'New',
         notes: data.notes || '',
-        gymId: user.gymId
+        gymId: gymId
       }
     })
 
@@ -45,7 +47,7 @@ export async function POST(req: NextRequest) {
         entityId: newLead.id,
         userName: user.email,
         userId: user.userId,
-        gymId: user.gymId
+        gymId: gymId
       }
     })
 

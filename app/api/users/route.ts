@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import prisma from '@/lib/prisma'
-import { getAuthUser } from '@/lib/auth'
+import { getAuthUser, getGymIdContext, getRequiredGymId } from '@/lib/auth'
 import { ELEVATED_ROLES, canManageRole, getCreatableRoles, type UserRole } from '@/lib/permissions'
 import bcrypt from 'bcryptjs'
 
@@ -12,8 +12,9 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ success: false, error: 'Forbidden' }, { status: 403 })
     }
 
+    const gymId = getGymIdContext(actor, req)
     const users = await prisma.user.findMany({
-      where: { gymId: actor.gymId },
+      where: gymId ? { gymId } : {},
       select: {
         id: true,
         email: true,
@@ -40,7 +41,8 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ success: false, error: 'Forbidden' }, { status: 403 })
     }
 
-    const { fullname, email, password, role } = await req.json()
+    const body = await req.json()
+    const { fullname, email, password, role } = body
 
     // Validate required fields
     if (!fullname || !email || !password || !role) {
@@ -69,6 +71,7 @@ export async function POST(req: NextRequest) {
 
     // Hash password
     const hashedPassword = await bcrypt.hash(password, 12)
+    const gymId = await getRequiredGymId(actor, req, body)
 
     const newUser = await prisma.user.create({
       data: {
@@ -76,7 +79,7 @@ export async function POST(req: NextRequest) {
         fullname,
         password: hashedPassword,
         role,
-        gymId: actor.gymId,
+        gymId,
       },
       select: {
         id: true,
@@ -97,7 +100,7 @@ export async function POST(req: NextRequest) {
         entityId: newUser.id,
         userName: actor.email,
         userId: actor.userId,
-        gymId: actor.gymId,
+        gymId,
       },
     })
 

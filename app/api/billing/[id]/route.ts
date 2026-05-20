@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import prisma from '@/lib/prisma'
-import { getAuthUser } from '@/lib/auth'
-
+import { getAuthUser, getGymIdContext } from '@/lib/auth'
+ 
 export async function PUT(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -9,17 +9,22 @@ export async function PUT(
   try {
     const user = await getAuthUser(req)
     if (!user) return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 })
-
+ 
     const { id } = await params
     const data = await req.json()
-
+ 
+    const gymId = getGymIdContext(user, req)
+ 
     const existingInvoice = await prisma.invoice.findFirst({
-      where: { id, gymId: user.gymId }
+      where: { 
+        id,
+        ...(gymId ? { gymId } : {})
+      }
     })
     if (!existingInvoice) {
       return NextResponse.json({ success: false, error: 'Invoice not found' }, { status: 404 })
     }
-
+ 
     const updatedInvoice = await prisma.invoice.update({
       where: { id },
       data: {
@@ -29,7 +34,7 @@ export async function PUT(
         dueDate: data.dueDate ? new Date(data.dueDate) : undefined
       }
     })
-
+ 
     await prisma.activityLog.create({
       data: {
         action: 'Update Invoice',
@@ -38,17 +43,17 @@ export async function PUT(
         entityId: updatedInvoice.id,
         userName: user.email,
         userId: user.userId,
-        gymId: user.gymId
+        gymId: updatedInvoice.gymId
       }
     })
-
+ 
     return NextResponse.json({ success: true, data: updatedInvoice })
   } catch (error: any) {
     console.error('Update invoice error:', error)
     return NextResponse.json({ success: false, error: 'Failed to update invoice' }, { status: 500 })
   }
 }
-
+ 
 export async function DELETE(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -56,11 +61,15 @@ export async function DELETE(
   try {
     const user = await getAuthUser(req)
     if (!user) return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 })
-
+ 
     const { id } = await params
-
+    const gymId = getGymIdContext(user, req)
+ 
     const existingInvoice = await prisma.invoice.findFirst({
-      where: { id, gymId: user.gymId }
+      where: { 
+        id,
+        ...(gymId ? { gymId } : {})
+      }
     })
     if (!existingInvoice) {
       return NextResponse.json({ success: false, error: 'Invoice not found' }, { status: 404 })
@@ -83,7 +92,7 @@ export async function DELETE(
         entityId: id,
         userName: user.email,
         userId: user.userId,
-        gymId: user.gymId
+        gymId: existingInvoice.gymId
       }
     })
 

@@ -3,7 +3,7 @@
  * Defines what each role can see and do across the system.
  */
 
-export type UserRole = 'cto' | 'ceo' | 'admin' | 'manager' | 'trainer' | 'staff'
+export type UserRole = 'cto' | 'ceo' | 'admin' | 'owner' | 'manager' | 'trainer' | 'staff'
 
 // ─── Role Hierarchy ────────────────────────────────────────────────────────────
 // Higher number = higher authority. Cannot manage someone at same or higher level.
@@ -11,6 +11,7 @@ export const ROLE_HIERARCHY: Record<UserRole, number> = {
   cto: 100,
   ceo: 95,
   admin: 90,
+  owner: 80,
   manager: 70,
   staff: 50,
   trainer: 30,
@@ -75,6 +76,21 @@ export const ROLE_DEFINITIONS: RoleDefinition[] = [
       'Review system audit logs',
       'Access tenant support visibility',
       'Maintain platform stability',
+    ],
+  },
+  {
+    role: 'owner',
+    title: 'Gym Owner',
+    description: 'Tenant Layer — Full ownership of a single gym tenant, including financial settings and billing.',
+    color: 'text-indigo-400',
+    bgColor: 'bg-indigo-500/10',
+    borderColor: 'border-indigo-500/30',
+    icon: '🏢',
+    capabilities: [
+      'Full administrative access to gym operations',
+      'Manage billing, invoices, and payment gateway rules',
+      'Manage branches/locations and staff permissions',
+      'View detailed financial reports and audit logs',
     ],
   },
   {
@@ -149,7 +165,7 @@ export function canAccessRoute(actorRole: UserRole, route: string): boolean {
 }
 
 /** Elevated roles — can access Team Management */
-export const ELEVATED_ROLES: UserRole[] = ['cto', 'ceo', 'admin', 'manager']
+export const ELEVATED_ROLES: UserRole[] = ['cto', 'ceo', 'admin', 'owner', 'manager']
 
 /** Administrative roles — top-level authority */
 export const ADMIN_ROLES: UserRole[] = ['cto', 'ceo', 'admin']
@@ -157,24 +173,24 @@ export const ADMIN_ROLES: UserRole[] = ['cto', 'ceo', 'admin']
 // ─── Route Permission Map ──────────────────────────────────────────────────────
 export const ROUTE_PERMISSIONS: Record<string, UserRole[]> = {
   '/super-dashboard': ['cto', 'ceo', 'admin'],
-  '/dashboard': ['cto', 'ceo', 'admin', 'manager', 'staff', 'trainer'],
-  '/members': ['cto', 'ceo', 'admin', 'manager', 'staff', 'trainer'],
-  '/attendance': ['cto', 'ceo', 'admin', 'manager', 'staff', 'trainer'],
-  '/calendar': ['cto', 'ceo', 'admin', 'manager', 'staff', 'trainer'],
-  '/notifications': ['cto', 'ceo', 'admin', 'manager', 'staff', 'trainer'],
-  '/classes': ['cto', 'ceo', 'admin', 'manager', 'staff', 'trainer'],
-  '/leads': ['cto', 'ceo', 'admin', 'manager', 'staff'],
-  '/billing': ['cto', 'ceo', 'admin', 'manager', 'staff'],
-  '/plans': ['cto', 'ceo', 'admin', 'manager', 'staff'],
-  '/inventory': ['cto', 'ceo', 'admin', 'manager', 'staff', 'trainer'],
-  '/communications': ['cto', 'ceo', 'admin', 'manager', 'staff'],
-  '/reports': ['cto', 'ceo', 'admin', 'manager', 'staff', 'trainer'],
-  '/staff': ['cto', 'ceo', 'admin', 'manager'],
-  '/settings': ['cto', 'ceo', 'admin', 'manager'],
-  '/activity-log': ['cto', 'ceo', 'admin', 'manager'],
-  '/team': ['cto', 'ceo', 'admin', 'manager'],
-  '/invites': ['cto', 'ceo', 'admin', 'manager'],
-  '/feedback': ['cto', 'ceo', 'admin', 'manager', 'staff'],
+  '/dashboard': ['cto', 'ceo', 'admin', 'owner', 'manager', 'staff', 'trainer'],
+  '/members': ['cto', 'ceo', 'admin', 'owner', 'manager', 'staff', 'trainer'],
+  '/attendance': ['cto', 'ceo', 'admin', 'owner', 'manager', 'staff', 'trainer'],
+  '/calendar': ['cto', 'ceo', 'admin', 'owner', 'manager', 'staff', 'trainer'],
+  '/notifications': ['cto', 'ceo', 'admin', 'owner', 'manager', 'staff', 'trainer'],
+  '/classes': ['cto', 'ceo', 'admin', 'owner', 'manager', 'staff', 'trainer'],
+  '/leads': ['cto', 'ceo', 'admin', 'owner', 'manager', 'staff'],
+  '/billing': ['cto', 'ceo', 'admin', 'owner', 'manager', 'staff'],
+  '/plans': ['cto', 'ceo', 'admin', 'owner', 'manager', 'staff'],
+  '/inventory': ['cto', 'ceo', 'admin', 'owner', 'manager', 'staff', 'trainer'],
+  '/communications': ['cto', 'ceo', 'admin', 'owner', 'manager', 'staff'],
+  '/reports': ['cto', 'ceo', 'admin', 'owner', 'manager', 'staff', 'trainer'],
+  '/staff': ['cto', 'ceo', 'admin', 'owner', 'manager'],
+  '/settings': ['cto', 'ceo', 'admin', 'owner', 'manager'],
+  '/activity-log': ['cto', 'ceo', 'admin', 'owner', 'manager'],
+  '/team': ['cto', 'ceo', 'admin', 'owner', 'manager'],
+  '/invites': ['cto', 'ceo', 'admin', 'owner', 'manager'],
+  '/feedback': ['cto', 'ceo', 'admin', 'owner', 'manager', 'staff'],
 }
 
 /** Nav items and which roles can see them */

@@ -47,14 +47,41 @@ const authMiddleware = (req, res, next) => {
 
 /**
  * Role-Based Access Control Middleware
+ * Supports role inheritance (e.g. owner can perform manager/staff actions)
  * @param {string[]} roles - Array of allowed roles
  */
 const authorizeRoles = (roles) => {
   return (req, res, next) => {
-    if (!req.user || !roles.includes(req.user.role)) {
+    if (!req.user) {
       return res.status(403).json({ error: 'Forbidden: Insufficient permissions' });
     }
-    next();
+
+    // Direct match
+    if (roles.includes(req.user.role)) {
+      return next();
+    }
+
+    // Owner role mappings: gym owners inherit manager/staff/trainer actions,
+    // and gym-level admin/ceo/cto actions, but not platform-only admin routes.
+    if (req.user.role === 'owner') {
+      const isTenantRoute = roles.some(r => ['manager', 'staff', 'trainer'].includes(r));
+      const isGymAdminRoute = roles.includes('ceo') || roles.includes('cto');
+      const isPlatformOnlyRoute = roles.includes('admin') && roles.length === 1;
+
+      if (isTenantRoute || (isGymAdminRoute && !isPlatformOnlyRoute)) {
+        return next();
+      }
+    }
+
+    // Manager role mappings: gym managers inherit staff/trainer actions
+    if (req.user.role === 'manager') {
+      const isStaffOrTrainerRoute = roles.some(r => ['staff', 'trainer'].includes(r));
+      if (isStaffOrTrainerRoute) {
+        return next();
+      }
+    }
+
+    return res.status(403).json({ error: 'Forbidden: Insufficient permissions' });
   };
 };
 

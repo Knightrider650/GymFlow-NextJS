@@ -42,9 +42,9 @@ export default function ActivityLogPage() {
   }, [])
 
   const filteredActivities = activities.filter(activity => 
-    activity.action.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    activity.userName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    activity.details.toLowerCase().includes(searchTerm.toLowerCase())
+    (activity.action || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+    (activity.userName || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+    (activity.details || '').toLowerCase().includes(searchTerm.toLowerCase())
   )
 
   const getActionColor = (action: string) => {

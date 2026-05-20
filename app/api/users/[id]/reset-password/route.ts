@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import prisma from '@/lib/prisma'
-import { getAuthUser } from '@/lib/auth'
+import { getAuthUser, getGymIdContext } from '@/lib/auth'
 import { ELEVATED_ROLES, canManageRole, type UserRole } from '@/lib/permissions'
 import bcrypt from 'bcryptjs'
 
@@ -22,7 +22,13 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       )
     }
 
-    const targetUser = await prisma.user.findFirst({ where: { id, gymId: actor.gymId } })
+    const gymId = getGymIdContext(actor, req)
+    const targetUser = await prisma.user.findFirst({
+      where: {
+        id,
+        ...(gymId ? { gymId } : {})
+      }
+    })
     if (!targetUser) {
       return NextResponse.json({ success: false, error: 'User not found' }, { status: 404 })
     }
@@ -42,7 +48,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
         entityId: id,
         userName: actor.email,
         userId: actor.userId,
-        gymId: actor.gymId,
+        gymId: targetUser.gymId,
       },
     })
 

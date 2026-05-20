@@ -73,12 +73,28 @@ const broadcast = (event, data) => {
   }
 };
 
-function getTenantContextId(user) {
-  if (!user || user.scope === 'platform') {
+function getTenantContextId(req) {
+  if (!req) return null;
+
+  // Support passing user object directly just in case
+  const user = req.user || req;
+
+  if (req.headers) {
+    const headerGymId = req.headers['x-gym-id'] || req.headers['x-tenant-id'];
+    if (headerGymId && headerGymId !== 'all') return headerGymId;
+
+    const queryGymId = req.query && (req.query.gymId || req.query.tenantId);
+    if (queryGymId && queryGymId !== 'all') return queryGymId;
+
+    const bodyGymId = req.body && (req.body.gymId || req.body.tenantId);
+    if (bodyGymId && bodyGymId !== 'all') return bodyGymId;
+  }
+
+  if (user && user.scope === 'platform') {
     return null;
   }
 
-  return user.tenantId || user.tenant_id || user.gymId || user.gym_id || null;
+  return user ? (user.tenantId || user.tenant_id || user.gymId || user.gym_id || null) : null;
 }
 
 function withTenantPayload(payload, tenantId) {
@@ -321,7 +337,7 @@ app.put('/api/platform/tenants/:id', authMiddleware, authorizePlatform, async (r
 // ============================================================================
 
 app.get('/api/members', authMiddleware, async (req, res) => {
-  const tenantId = getTenantContextId(req.user);
+  const tenantId = getTenantContextId(req);
   const trainerId = isTrainerRole(req.user.role) ? req.user.id : null;
   let members = await db.getMembers(tenantId, trainerId);
   members = members.map(m => ({
@@ -334,7 +350,7 @@ app.get('/api/members', authMiddleware, async (req, res) => {
 });
 
 app.post('/api/members', authMiddleware, authorizeRoles(['admin', 'ceo', 'cto', 'manager', 'staff']), async (req, res) => {
-  const tenantId = getTenantContextId(req.user);
+  const tenantId = getTenantContextId(req);
   const member = await db.addMember(withTenantPayload({ ...req.body, id: uuidv4() }, tenantId), tenantId);
   broadcast('members:update', member);
   res.status(201).json({ success: true, data: member });
@@ -347,7 +363,7 @@ app.post('/api/members/bulk', authMiddleware, authorizeRoles(['admin', 'ceo', 'c
     }
     
     // Assign UUIDs to each imported member
-    const tenantId = getTenantContextId(req.user);
+    const tenantId = getTenantContextId(req);
     const preparedMembers = req.body.members.map(m => withTenantPayload({ ...m, id: uuidv4() }, tenantId));
     
     const inserted = await db.bulkAddMembers(preparedMembers, tenantId);
@@ -362,14 +378,14 @@ app.post('/api/members/bulk', authMiddleware, authorizeRoles(['admin', 'ceo', 'c
 });
 
 app.delete('/api/members/:id', authMiddleware, authorizeRoles(['admin', 'ceo', 'cto']), async (req, res) => {
-  const tenantId = getTenantContextId(req.user);
+  const tenantId = getTenantContextId(req);
   const success = await db.deleteMember(req.params.id, tenantId);
   if (success) broadcast('members:delete', { id: req.params.id });
   res.json({ success });
 });
 
 app.put('/api/members/:id', authMiddleware, async (req, res) => {
-  const tenantId = getTenantContextId(req.user);
+  const tenantId = getTenantContextId(req);
   const member = await db.updateMember(req.params.id, req.body, tenantId);
   if (member) broadcast('members:update', member);
   res.json({ success: !!member, data: member });
@@ -381,21 +397,21 @@ app.put('/api/members/:id', authMiddleware, async (req, res) => {
 // ============================================================================
 
 app.get('/api/attendance', authMiddleware, async (req, res) => {
-  const tenantId = getTenantContextId(req.user);
+  const tenantId = getTenantContextId(req);
   const trainerId = req.user.role === 'trainer' ? req.user.id : null;
   const data = await db.getAttendance(req.query, tenantId, trainerId);
   res.json({ success: true, data });
 });
 
 app.post('/api/attendance/checkin', authMiddleware, async (req, res) => {
-  const tenantId = getTenantContextId(req.user);
+  const tenantId = getTenantContextId(req);
   const record = await db.checkIn(req.body.memberId, req.body.notes, tenantId);
   broadcast('attendance:update', record);
   res.status(201).json({ success: true, data: record });
 });
 
 app.post('/api/attendance/:id/checkout', authMiddleware, async (req, res) => {
-  const tenantId = getTenantContextId(req.user);
+  const tenantId = getTenantContextId(req);
   const record = await db.checkOut(req.params.id, tenantId);
   if (record) broadcast('attendance:update', record);
   res.json({ success: !!record, data: record });
@@ -406,7 +422,7 @@ app.post('/api/attendance/:id/checkout', authMiddleware, async (req, res) => {
 // ============================================================================
 
 app.get('/api/staff', authMiddleware, async (req, res) => {
-  const tenantId = getTenantContextId(req.user);
+  const tenantId = getTenantContextId(req);
   let data = await db.getStaff(tenantId);
   
   // Report requirement: No money/salary visibility for trainers
@@ -418,21 +434,21 @@ app.get('/api/staff', authMiddleware, async (req, res) => {
 });
 
 app.post('/api/staff', authMiddleware, authorizeRoles(['admin', 'ceo', 'cto', 'manager']), async (req, res) => {
-  const tenantId = getTenantContextId(req.user);
+  const tenantId = getTenantContextId(req);
   const member = await db.addStaff(withTenantPayload({ ...req.body, id: uuidv4() }, tenantId), tenantId);
   broadcast('staff:update', member);
   res.status(201).json({ success: true, data: member });
 });
 
 app.put('/api/staff/:id', authMiddleware, authorizeRoles(['admin', 'ceo', 'cto', 'manager']), async (req, res) => {
-  const tenantId = getTenantContextId(req.user);
+  const tenantId = getTenantContextId(req);
   const member = await db.updateStaff(req.params.id, req.body, tenantId);
   if (member) broadcast('staff:update', member);
   res.json({ success: !!member, data: member });
 });
 
 app.delete('/api/staff/:id', authMiddleware, authorizeRoles(['admin', 'ceo', 'cto']), async (req, res) => {
-  const tenantId = getTenantContextId(req.user);
+  const tenantId = getTenantContextId(req);
   const success = await db.deleteStaff(req.params.id, tenantId);
   if (success) broadcast('staff:delete', { id: req.params.id });
   res.json({ success });
@@ -443,7 +459,7 @@ app.delete('/api/staff/:id', authMiddleware, authorizeRoles(['admin', 'ceo', 'ct
 // ============================================================================
 
 app.get('/api/inventory', authMiddleware, authorizeRoles(['admin', 'ceo', 'cto', 'manager', 'staff']), async (req, res) => {
-  const tenantId = getTenantContextId(req.user);
+  const tenantId = getTenantContextId(req);
   let data = await db.getInventory(tenantId);
   data = data.map(i => ({
     ...i,
@@ -455,21 +471,21 @@ app.get('/api/inventory', authMiddleware, authorizeRoles(['admin', 'ceo', 'cto',
 });
 
 app.post('/api/inventory', authMiddleware, async (req, res) => {
-  const tenantId = getTenantContextId(req.user);
+  const tenantId = getTenantContextId(req);
   const item = await db.addInventoryItem(withTenantPayload({ ...req.body, id: uuidv4() }, tenantId), tenantId);
   broadcast('inventory:update', item);
   res.status(201).json({ success: true, data: item });
 });
 
 app.put('/api/inventory/:id', authMiddleware, async (req, res) => {
-  const tenantId = getTenantContextId(req.user);
+  const tenantId = getTenantContextId(req);
   const item = await db.updateInventoryItem(req.params.id, req.body, tenantId);
   if (item) broadcast('inventory:update', item);
   res.json({ success: !!item, data: item });
 });
 
 app.delete('/api/inventory/:id', authMiddleware, authorizeRoles(['admin', 'ceo', 'cto']), async (req, res) => {
-  const tenantId = getTenantContextId(req.user);
+  const tenantId = getTenantContextId(req);
   const success = await db.deleteInventoryItem(req.params.id, tenantId);
   if (success) broadcast('inventory:delete', { id: req.params.id });
   res.json({ success });
@@ -480,34 +496,34 @@ app.delete('/api/inventory/:id', authMiddleware, authorizeRoles(['admin', 'ceo',
 // ============================================================================
 
 app.get('/api/billing', authMiddleware, authorizeRoles(['admin', 'ceo', 'cto', 'manager', 'staff']), async (req, res) => {
-  const tenantId = getTenantContextId(req.user);
+  const tenantId = getTenantContextId(req);
   const data = await db.getInvoices(tenantId);
   res.json({ success: true, data });
 });
 
 app.post('/api/billing', authMiddleware, async (req, res) => {
-  const tenantId = getTenantContextId(req.user);
+  const tenantId = getTenantContextId(req);
   const invoice = await db.addInvoice(withTenantPayload({ ...req.body, id: uuidv4(), status: 'pending' }, tenantId), tenantId);
   broadcast('billing:update', invoice);
   res.status(201).json({ success: true, data: invoice });
 });
 
 app.post('/api/billing/:id/pay', authMiddleware, async (req, res) => {
-  const tenantId = getTenantContextId(req.user);
+  const tenantId = getTenantContextId(req);
   const record = await db.payInvoice(req.params.id, req.body, tenantId);
   if (record) broadcast('billing:update', record);
   res.json({ success: !!record, data: record });
 });
 
 app.put('/api/billing/:id', authMiddleware, async (req, res) => {
-  const tenantId = getTenantContextId(req.user);
+  const tenantId = getTenantContextId(req);
   const invoice = await db.updateInvoice(req.params.id, req.body, tenantId);
   if (invoice) broadcast('billing:update', invoice);
   res.json({ success: !!invoice, data: invoice });
 });
 
 app.delete('/api/billing/:id', authMiddleware, authorizeRoles(['admin', 'ceo', 'cto']), async (req, res) => {
-  const tenantId = getTenantContextId(req.user);
+  const tenantId = getTenantContextId(req);
   const success = await db.deleteInvoice(req.params.id, tenantId);
   if (success) broadcast('billing:delete', { id: req.params.id });
   res.json({ success });
@@ -518,42 +534,42 @@ app.delete('/api/billing/:id', authMiddleware, authorizeRoles(['admin', 'ceo', '
 // ============================================================================
 
 app.get('/api/classes', authMiddleware, async (req, res) => {
-  const tenantId = getTenantContextId(req.user);
+  const tenantId = getTenantContextId(req);
   const instructorId = isTrainerRole(req.user.role) ? req.user.id : null;
   const data = await db.getClasses(tenantId, instructorId);
   res.json({ success: true, data });
 });
 
 app.post('/api/classes', authMiddleware, authorizeRoles(['admin', 'ceo', 'cto', 'manager', 'staff']), async (req, res) => {
-  const tenantId = getTenantContextId(req.user);
+  const tenantId = getTenantContextId(req);
   const cls = await db.addClass(withTenantPayload({ ...req.body, id: uuidv4(), currentEnrollment: 0 }, tenantId), tenantId);
   broadcast('classes:update', cls);
   res.status(201).json({ success: true, data: cls });
 });
 
 app.put('/api/classes/:id', authMiddleware, async (req, res) => {
-  const tenantId = getTenantContextId(req.user);
+  const tenantId = getTenantContextId(req);
   const cls = await db.updateClass(req.params.id, req.body, tenantId);
   if (cls) broadcast('classes:update', cls);
   res.json({ success: !!cls, data: cls });
 });
 
 app.delete('/api/classes/:id', authMiddleware, authorizeRoles(['admin', 'ceo', 'cto']), async (req, res) => {
-  const tenantId = getTenantContextId(req.user);
+  const tenantId = getTenantContextId(req);
   const success = await db.deleteClass(req.params.id, tenantId);
   if (success) broadcast('classes:delete', { id: req.params.id });
   res.json({ success });
 });
 
 app.get('/api/classes/:id/bookings', authMiddleware, async (req, res) => {
-  const tenantId = getTenantContextId(req.user);
+  const tenantId = getTenantContextId(req);
   const data = await db.getClassBookings(req.params.id, tenantId);
   res.json({ success: true, data });
 });
 
 app.post('/api/bookings', authMiddleware, async (req, res) => {
   try {
-    const tenantId = getTenantContextId(req.user);
+    const tenantId = getTenantContextId(req);
     const data = await db.bookClass(req.body.memberId, req.body.classId, tenantId);
     broadcast('bookings:update', data);
     res.status(201).json({ success: true, data });
@@ -563,7 +579,7 @@ app.post('/api/bookings', authMiddleware, async (req, res) => {
 });
 
 app.delete('/api/bookings/:id', authMiddleware, async (req, res) => {
-  const tenantId = getTenantContextId(req.user);
+  const tenantId = getTenantContextId(req);
   const success = await db.cancelBooking(req.params.id, tenantId);
   if (success) broadcast('bookings:delete', { id: req.params.id });
   res.json({ success });
@@ -574,20 +590,20 @@ app.delete('/api/bookings/:id', authMiddleware, async (req, res) => {
 // ============================================================================
 
 app.get('/api/settings', authMiddleware, async (req, res) => {
-  const tenantId = getTenantContextId(req.user);
+  const tenantId = getTenantContextId(req);
   const classes = await db.getClasses(tenantId);
   res.json({ success: true, data });
 });
 
 app.put('/api/settings', authMiddleware, authorizeRoles(['admin', 'ceo', 'cto', 'manager']), async (req, res) => {
-  const tenantId = getTenantContextId(req.user);
+  const tenantId = getTenantContextId(req);
   const cls = await db.addClass(withTenantPayload({ ...req.body, id: uuidv4() }, tenantId), tenantId);
   res.json({ success: true, data });
 });
 
 app.get('/api/dashboard-stats', authMiddleware, async (req, res) => {
   try {
-    const tenantId = getTenantContextId(req.user);
+    const tenantId = getTenantContextId(req);
     const trainerId = req.user.role === 'trainer' ? req.user.id : null;
     let data = await db.getDashboardStats(tenantId, trainerId);
     
@@ -610,13 +626,13 @@ app.get('/api/dashboard-stats', authMiddleware, async (req, res) => {
 // ============================================================================
 
 app.get('/api/notifications', authMiddleware, async (req, res) => {
-  const tenantId = getTenantContextId(req.user);
+  const tenantId = getTenantContextId(req);
   const data = await db.getNotifications(tenantId);
   res.json({ success: true, data });
 });
 
 app.put('/api/notifications/:id', authMiddleware, async (req, res) => {
-  const tenantId = getTenantContextId(req.user);
+  const tenantId = getTenantContextId(req);
   const data = await db.markNotificationRead(req.params.id, tenantId);
   res.json({ success: !!data, data });
 });
@@ -626,34 +642,34 @@ app.put('/api/notifications/:id', authMiddleware, async (req, res) => {
 // ============================================================================
 
 app.get('/api/leads', authMiddleware, async (req, res) => {
-  const tenantId = getTenantContextId(req.user);
+  const tenantId = getTenantContextId(req);
   const data = await db.getLeads(tenantId);
   res.json({ success: true, data });
 });
 
 app.post('/api/leads', authMiddleware, async (req, res) => {
-  const tenantId = getTenantContextId(req.user);
+  const tenantId = getTenantContextId(req);
   const lead = await db.addLead(withTenantPayload({ ...req.body, id: uuidv4() }, tenantId), tenantId);
   broadcast('leads:update', lead);
   res.status(201).json({ success: true, data: lead });
 });
 
 app.put('/api/leads/:id', authMiddleware, async (req, res) => {
-  const tenantId = getTenantContextId(req.user);
+  const tenantId = getTenantContextId(req);
   const lead = await db.updateLead(req.params.id, req.body, tenantId);
   if (lead) broadcast('leads:update', lead);
   res.json({ success: !!lead, data: lead });
 });
 
 app.delete('/api/leads/:id', authMiddleware, async (req, res) => {
-  const tenantId = getTenantContextId(req.user);
+  const tenantId = getTenantContextId(req);
   const success = await db.deleteLead(req.params.id, tenantId);
   if (success) broadcast('leads:delete', { id: req.params.id });
   res.json({ success });
 });
 
 app.post('/api/leads/:id/convert', authMiddleware, async (req, res) => {
-  const tenantId = getTenantContextId(req.user);
+  const tenantId = getTenantContextId(req);
   const member = await db.convertLead(req.params.id, withTenantPayload({ ...req.body, id: uuidv4() }, tenantId), tenantId);
   if (member) {
     broadcast('leads:delete', { id: req.params.id });
@@ -667,27 +683,27 @@ app.post('/api/leads/:id/convert', authMiddleware, async (req, res) => {
 // ============================================================================
 
 app.get('/api/plans', authMiddleware, async (req, res) => {
-  const tenantId = getTenantContextId(req.user);
+  const tenantId = getTenantContextId(req);
   const data = await db.getPlans(tenantId);
   res.json({ success: true, data });
 });
 
 app.post('/api/plans', authMiddleware, async (req, res) => {
-  const tenantId = getTenantContextId(req.user);
+  const tenantId = getTenantContextId(req);
   const plan = await db.addPlan(withTenantPayload({ ...req.body, id: uuidv4() }, tenantId), tenantId);
   broadcast('plans:update', plan);
   res.status(201).json({ success: true, data: plan });
 });
 
 app.put('/api/plans/:id', authMiddleware, async (req, res) => {
-  const tenantId = getTenantContextId(req.user);
+  const tenantId = getTenantContextId(req);
   const plan = await db.updatePlan(req.params.id, req.body, tenantId);
   if (plan) broadcast('plans:update', plan);
   res.json({ success: !!plan, data: plan });
 });
 
 app.delete('/api/plans/:id', authMiddleware, async (req, res) => {
-  const tenantId = getTenantContextId(req.user);
+  const tenantId = getTenantContextId(req);
   const success = await db.deletePlan(req.params.id, tenantId);
   if (success) broadcast('plans:delete', { id: req.params.id });
   res.json({ success });
@@ -699,7 +715,7 @@ app.delete('/api/plans/:id', authMiddleware, async (req, res) => {
 
 app.get('/api/settings', authMiddleware, async (req, res) => {
   try {
-    const tenantId = getTenantContextId(req.user);
+    const tenantId = getTenantContextId(req);
     const settings = await db.getSettings ? await db.getSettings(tenantId) : { gymName: 'GymFlow' };
     res.json({ success: true, data: settings });
   } catch (err) {
@@ -709,7 +725,7 @@ app.get('/api/settings', authMiddleware, async (req, res) => {
 
 app.put('/api/settings', authMiddleware, authorizeRoles(['admin', 'ceo', 'cto']), async (req, res) => {
   try {
-    const tenantId = getTenantContextId(req.user);
+    const tenantId = getTenantContextId(req);
     const settings = await db.updateSettings ? await db.updateSettings(req.body, tenantId) : req.body;
     res.json({ success: true, data: settings });
   } catch (err) {
@@ -719,7 +735,7 @@ app.put('/api/settings', authMiddleware, authorizeRoles(['admin', 'ceo', 'cto'])
 
 app.post('/api/settings', authMiddleware, authorizeRoles(['admin', 'ceo', 'cto']), async (req, res) => {
   try {
-    const tenantId = getTenantContextId(req.user);
+    const tenantId = getTenantContextId(req);
     const settings = await db.updateSettings ? await db.updateSettings(req.body, tenantId) : req.body;
     res.json({ success: true, data: settings });
   } catch (err) {
@@ -733,7 +749,7 @@ app.post('/api/settings', authMiddleware, authorizeRoles(['admin', 'ceo', 'cto']
 
 app.get('/api/branches', authMiddleware, async (req, res) => {
   try {
-    const tenantId = getTenantContextId(req.user);
+    const tenantId = getTenantContextId(req);
     const data = await db.getBranches(req.user.id, tenantId);
     res.json({ success: true, data });
   } catch (err) {
@@ -743,7 +759,7 @@ app.get('/api/branches', authMiddleware, async (req, res) => {
 
 app.post('/api/branches', authMiddleware, authorizeRoles(['admin', 'ceo', 'cto']), async (req, res) => {
   try {
-    const tenantId = getTenantContextId(req.user);
+    const tenantId = getTenantContextId(req);
     const branch = await db.addBranch(withTenantPayload(req.body, tenantId), tenantId);
     res.status(201).json({ success: true, data: branch });
   } catch (err) {
@@ -753,7 +769,7 @@ app.post('/api/branches', authMiddleware, authorizeRoles(['admin', 'ceo', 'cto']
 
 app.put('/api/branches/:id', authMiddleware, authorizeRoles(['admin', 'ceo', 'cto']), async (req, res) => {
   try {
-    const tenantId = getTenantContextId(req.user);
+    const tenantId = getTenantContextId(req);
     const branch = await db.updateBranch(req.params.id, req.body, tenantId);
     res.json({ success: true, data: branch });
   } catch (err) {
@@ -763,7 +779,7 @@ app.put('/api/branches/:id', authMiddleware, authorizeRoles(['admin', 'ceo', 'ct
 
 app.delete('/api/branches/:id', authMiddleware, authorizeRoles(['admin', 'ceo', 'cto']), async (req, res) => {
   try {
-    const tenantId = getTenantContextId(req.user);
+    const tenantId = getTenantContextId(req);
     await db.deleteBranch(req.params.id, tenantId);
     res.json({ success: true });
   } catch (err) {
@@ -780,7 +796,7 @@ app.delete('/api/branches/:id', authMiddleware, authorizeRoles(['admin', 'ceo', 
 app.get('/api/reports/:type', authMiddleware, authorizeRoles(['admin', 'ceo', 'cto', 'manager', 'staff', 'trainer']), async (req, res) => {
   try {
     const { type } = req.params;
-    const tenantId = getTenantContextId(req.user);
+    const tenantId = getTenantContextId(req);
     const trainerId = req.user.role === 'trainer' ? req.user.id : null;
     let data;
     
@@ -871,7 +887,7 @@ app.post('/api/feedback', authMiddleware, async (req, res) => {
       return res.status(400).json({ error: 'All fields required' });
     }
 
-    const tenantId = getTenantContextId(req.user);
+    const tenantId = getTenantContextId(req);
     const feedback = await db.addFeedback({
       id: uuidv4(),
       category,
@@ -895,7 +911,7 @@ app.post('/api/feedback', authMiddleware, async (req, res) => {
 
 app.get('/api/feedback', authMiddleware, async (req, res) => {
   try {
-    const tenantId = getTenantContextId(req.user);
+    const tenantId = getTenantContextId(req);
     const data = await db.getFeedback(tenantId);
     res.json({ success: true, data });
   } catch (err) {
@@ -945,7 +961,7 @@ app.get('/api/activity-logs', authMiddleware, async (req, res) => {
       limit: req.query.limit ? parseInt(req.query.limit) : 500
     };
 
-    const tenantId = getTenantContextId(req.user);
+    const tenantId = getTenantContextId(req);
     const data = await db.getActivityLogs({ ...filters, tenantId });
     res.json({ success: true, data });
   } catch (err) {
@@ -988,7 +1004,7 @@ app.post('/api/team/members', authMiddleware, authorizeRoles(['admin', 'ceo', 'c
       password,
       name,
       role: role || 'staff',
-      gymId: getTenantContextId(req.user) || 'gym-001'
+      gymId: getTenantContextId(req) || 'gym-001'
     });
 
     await db.logActivity(
@@ -1102,7 +1118,7 @@ app.post('/api/campaigns', authMiddleware, authorizeRoles(['admin']), async (req
       return res.status(400).json({ error: 'Title and message are required' });
     }
 
-    const tenantId = getTenantContextId(req.user);
+    const tenantId = getTenantContextId(req);
     const campaign = await db.createCampaign({
       id: uuidv4(),
       userId: req.user.id,
@@ -1136,7 +1152,7 @@ app.post('/api/campaigns', authMiddleware, authorizeRoles(['admin']), async (req
 
 app.get('/api/campaigns', authMiddleware, authorizeRoles(['admin']), async (req, res) => {
   try {
-    const tenantId = getTenantContextId(req.user);
+    const tenantId = getTenantContextId(req);
     const campaigns = await db.getCampaigns(tenantId);
     res.json({ success: true, data: campaigns });
   } catch (err) {
@@ -1148,7 +1164,7 @@ app.get('/api/campaigns', authMiddleware, authorizeRoles(['admin']), async (req,
 app.put('/api/campaigns/:id', authMiddleware, authorizeRoles(['admin']), async (req, res) => {
   try {
     const { id } = req.params;
-    const tenantId = getTenantContextId(req.user);
+    const tenantId = getTenantContextId(req);
     const campaign = await db.updateCampaign(id, req.body, tenantId);
     
     if (!campaign) {
@@ -1175,7 +1191,7 @@ app.put('/api/campaigns/:id', authMiddleware, authorizeRoles(['admin']), async (
 app.delete('/api/campaigns/:id', authMiddleware, authorizeRoles(['admin']), async (req, res) => {
   try {
     const { id } = req.params;
-    const tenantId = getTenantContextId(req.user);
+    const tenantId = getTenantContextId(req);
     const deleted = await db.deleteCampaign(id, tenantId);
     
     if (!deleted) {
@@ -1201,7 +1217,7 @@ app.delete('/api/campaigns/:id', authMiddleware, authorizeRoles(['admin']), asyn
 
 app.get('/api/reminders', authMiddleware, authorizeRoles(['admin']), async (req, res) => {
   try {
-    const tenantId = getTenantContextId(req.user);
+    const tenantId = getTenantContextId(req);
     const reminders = await db.getReminders(tenantId);
     const stats = await db.getReminderStats(tenantId);
     res.json({ success: true, data: reminders, stats });
@@ -1214,7 +1230,7 @@ app.get('/api/reminders', authMiddleware, authorizeRoles(['admin']), async (req,
 app.post('/api/campaigns/:id/send', authMiddleware, authorizeRoles(['admin']), async (req, res) => {
   try {
     const { id } = req.params;
-    const tenantId = getTenantContextId(req.user);
+    const tenantId = getTenantContextId(req);
     const campaign = await db.getCampaigns(tenantId);
     const targetCampaign = campaign.find(c => c.id === id);
     

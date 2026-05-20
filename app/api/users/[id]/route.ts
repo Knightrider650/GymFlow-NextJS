@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import prisma from '@/lib/prisma'
-import { getAuthUser } from '@/lib/auth'
+import { getAuthUser, getGymIdContext } from '@/lib/auth'
 import { ELEVATED_ROLES, canManageRole, type UserRole } from '@/lib/permissions'
 import bcrypt from 'bcryptjs'
 
@@ -14,9 +14,15 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
 
     const { id } = await params
     const { role, fullname } = await req.json()
+    const gymId = getGymIdContext(actor, req)
 
     // Fetch the target user
-    const targetUser = await prisma.user.findFirst({ where: { id, gymId: actor.gymId } })
+    const targetUser = await prisma.user.findFirst({
+      where: {
+        id,
+        ...(gymId ? { gymId } : {})
+      }
+    })
     if (!targetUser) {
       return NextResponse.json({ success: false, error: 'User not found' }, { status: 404 })
     }
@@ -53,7 +59,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
         entityId: id,
         userName: actor.email,
         userId: actor.userId,
-        gymId: actor.gymId,
+        gymId: targetUser.gymId,
       },
     })
 
@@ -73,8 +79,14 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
     }
 
     const { id } = await params
+    const gymId = getGymIdContext(actor, req)
 
-    const targetUser = await prisma.user.findFirst({ where: { id, gymId: actor.gymId } })
+    const targetUser = await prisma.user.findFirst({
+      where: {
+        id,
+        ...(gymId ? { gymId } : {})
+      }
+    })
     if (!targetUser) {
       return NextResponse.json({ success: false, error: 'User not found' }, { status: 404 })
     }
@@ -97,7 +109,7 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
         entityId: id,
         userName: actor.email,
         userId: actor.userId,
-        gymId: actor.gymId,
+        gymId: targetUser.gymId,
       },
     })
 

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import prisma from '@/lib/prisma'
-import { getAuthUser } from '@/lib/auth'
-
+import { getAuthUser, getGymIdContext } from '@/lib/auth'
+ 
 export async function POST(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -9,13 +9,18 @@ export async function POST(
   try {
     const user = await getAuthUser(req)
     if (!user) return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 })
-
+ 
     const { id } = await params
     const body = await req.json()
-
+ 
+    const gymId = getGymIdContext(user, req)
+ 
     // 1. Get invoice
     const invoice = await prisma.invoice.findFirst({
-      where: { id, gymId: user.gymId }
+      where: { 
+        id,
+        ...(gymId ? { gymId } : {})
+      }
     })
     if (!invoice) {
       return NextResponse.json({ success: false, error: 'Invoice not found' }, { status: 404 })

@@ -37,6 +37,8 @@ model Gym {
   feedback         Feedback[]
   invites          Invite[]
   branches         Branch[]
+  campaigns        Campaign[]
+  reminders        Reminder[]
 }
 
 model User {
@@ -260,4 +262,32 @@ model Branch {
   updatedAt   DateTime @updatedAt @map("updated_at")
 
   @@map("branches")
+}
+
+model Campaign {
+  id            String   @id @default(cuid())
+  title         String
+  subject       String
+  content       String
+  targetSegment String
+  status        String   @default("draft") // draft, sent
+  sentAt        DateTime @default(now())
+  gymId         String
+  gym           Gym      @relation(fields: [gymId], references: [id])
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}
+
+model Reminder {
+  id         String   @id @default(cuid())
+  channel    String   // Email, SMS, etc.
+  memberName String
+  type       String   // e.g. Payment, Expiry, Welcome
+  content    String
+  status     String   @default("pending") // sent, pending, failed
+  sentAt     DateTime @default(now())
+  gymId      String
+  gym        Gym      @relation(fields: [gymId], references: [id])
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
 }

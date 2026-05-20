@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import prisma from '@/lib/prisma'
-import { getAuthUser } from '@/lib/auth'
+import { getAuthUser, getGymIdContext, getRequiredGymId } from '@/lib/auth'
 import { isTrainer } from '@/lib/permissions'
 
 export async function GET(req: NextRequest) {
@@ -8,8 +8,9 @@ export async function GET(req: NextRequest) {
     const user = await getAuthUser(req)
     if (!user) return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 })
 
+    const gymId = getGymIdContext(user, req)
     const data = await prisma.staff.findMany({
-      where: { gymId: user.gymId },
+      where: gymId ? { gymId } : {},
       orderBy: { createdAt: 'desc' }
     })
 
@@ -37,13 +38,17 @@ export async function POST(req: NextRequest) {
     }
 
     const data = await req.json()
+    const gymId = await getRequiredGymId(user, req, data)
+    const { gymId: dummy, ...rest } = data
+    const targetBranchId = (data.branchId === 'none' || data.branchId === '') ? null : (data.branchId || null)
     
     const newStaff = await prisma.staff.create({
       data: {
-        ...data,
+        ...rest,
         salary: parseFloat(data.salary?.toString() || '0'),
         joinDate: new Date(data.joinDate || Date.now()),
-        gymId: user.gymId
+        branchId: targetBranchId,
+        gymId: gymId
       }
     })
 
@@ -55,7 +60,7 @@ export async function POST(req: NextRequest) {
         entityId: newStaff.id,
         userName: user.email,
         userId: user.userId,
-        gymId: user.gymId
+        gymId: gymId
       }
     })
 

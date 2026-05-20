@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import prisma from '@/lib/prisma'
-import { getAuthUser } from '@/lib/auth'
+import { getAuthUser, getGymIdContext, getRequiredGymId } from '@/lib/auth'
 import { isTrainer } from '@/lib/permissions'
 
 export async function GET(req: NextRequest) {
@@ -15,9 +15,8 @@ export async function GET(req: NextRequest) {
     const membershipType = searchParams.get('membershipType')
     const searchTerm = searchParams.get('searchTerm')
 
-    const where: any = {
-      gymId: user.gymId
-    }
+    const gymId = getGymIdContext(user, req)
+    const where: any = gymId ? { gymId } : {}
 
     // Report requirement: Trainers view assigned members only
     if (isTrainer(user.role)) {
@@ -59,11 +58,16 @@ export async function POST(req: NextRequest) {
     }
 
     const data = await req.json()
+    const gymId = await getRequiredGymId(user, req, data)
+    const targetBranchId = (data.branchId === 'none' || data.branchId === '') ? null : (data.branchId || null)
     
+    const { gymId: dummy, branchId: dummy2, ...rest } = data
+
     const newMember = await prisma.member.create({
       data: {
-        ...data,
-        gymId: user.gymId,
+        ...rest,
+        gymId: gymId,
+        branchId: targetBranchId,
         joinDate: new Date(data.joinDate || Date.now()),
         expiryDate: new Date(data.expiryDate || Date.now() + 30 * 24 * 60 * 60 * 1000)
       }
@@ -78,7 +82,7 @@ export async function POST(req: NextRequest) {
         entityId: newMember.id,
         userName: user.email,
         userId: user.userId,
-        gymId: user.gymId
+        gymId: gymId
       }
     })
 

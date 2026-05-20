@@ -1,14 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server'
 import prisma from '@/lib/prisma'
-import { getAuthUser } from '@/lib/auth'
+import { getAuthUser, getGymIdContext, getRequiredGymId } from '@/lib/auth'
 
 export async function GET(req: NextRequest) {
   try {
     const user = await getAuthUser(req)
     if (!user) return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 })
 
+    const gymId = getGymIdContext(user, req)
     const branches = await prisma.branch.findMany({
-      where: { gymId: user.gymId },
+      where: gymId ? { gymId } : {},
       orderBy: { createdAt: 'asc' }
     })
 
@@ -24,17 +25,18 @@ export async function POST(req: NextRequest) {
     const user = await getAuthUser(req)
     if (!user) return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 })
 
-    // Only allow admin, ceo, cto to add branches
-    if (!['admin', 'ceo', 'cto'].includes(user.role)) {
+    // Only allow admin, ceo, cto, owner, manager to add branches
+    if (!['admin', 'ceo', 'cto', 'owner', 'manager'].includes(user.role)) {
       return NextResponse.json({ success: false, error: 'Forbidden' }, { status: 403 })
     }
 
     const data = await req.json()
+    const gymId = await getRequiredGymId(user, req, data)
 
     // If this is set to default, we must unset other defaults for this gym
     if (data.isDefault) {
       await prisma.branch.updateMany({
-        where: { gymId: user.gymId, isDefault: true },
+        where: { gymId: gymId, isDefault: true },
         data: { isDefault: false }
       })
     }
@@ -49,7 +51,7 @@ export async function POST(req: NextRequest) {
         closingTime: data.closingTime || '22:00',
         capacity: parseInt(data.capacity?.toString() || '50'),
         isDefault: !!data.isDefault,
-        gymId: user.gymId
+        gymId: gymId
       }
     })
 
@@ -61,7 +63,7 @@ export async function POST(req: NextRequest) {
         entityId: newBranch.id,
         userName: user.email,
         userId: user.userId,
-        gymId: user.gymId
+        gymId: gymId
       }
     })
 
