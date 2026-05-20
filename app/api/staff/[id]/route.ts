@@ -1,19 +1,28 @@
 import { NextRequest, NextResponse } from 'next/server'
 import prisma from '@/lib/prisma'
-import { getAuthUser } from '@/lib/auth'
+import { getAuthUser, getGymIdContext, getRequiredGymId } from '@/lib/auth'
+import { ELEVATED_ROLES } from '@/lib/permissions'
 
 export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const user = await getAuthUser(req)
     if (!user) return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 })
 
+    // Enforce role authorization
+    if (!ELEVATED_ROLES.includes(user.role as any)) {
+      return NextResponse.json({ success: false, error: 'Forbidden' }, { status: 403 })
+    }
+
     const data = await req.json()
     const { id } = await params
+    const gymId = await getRequiredGymId(user, req, data)
     
     const existing = await prisma.staff.findFirst({
-      where: { id, gymId: user.gymId }
+      where: { id, gymId }
     })
     if (!existing) return NextResponse.json({ success: false, error: 'Staff member not found' }, { status: 404 })
+
+    const targetBranchId = (data.branchId === 'none' || data.branchId === '') ? null : (data.branchId || null)
 
     const updatedStaff = await prisma.staff.update({
       where: { id },
@@ -24,7 +33,8 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
         position: data.position,
         salary: data.salary !== undefined ? parseFloat(data.salary.toString()) : undefined,
         status: data.status,
-        emergencyContact: data.emergencyContact
+        emergencyContact: data.emergencyContact,
+        branchId: targetBranchId
       }
     })
 
@@ -36,7 +46,7 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
         entityId: updatedStaff.id,
         userName: user.email,
         userId: user.userId,
-        gymId: user.gymId
+        gymId: gymId
       }
     })
 
@@ -50,12 +60,18 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
 export async function DELETE(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const user = await getAuthUser(req)
-    if (!user || user.role !== 'admin') return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 })
+    if (!user) return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 })
+
+    // Enforce role authorization
+    if (!ELEVATED_ROLES.includes(user.role as any)) {
+      return NextResponse.json({ success: false, error: 'Forbidden' }, { status: 403 })
+    }
 
     const { id } = await params
+    const gymId = getGymIdContext(user, req)
     
     const existing = await prisma.staff.findFirst({
-      where: { id, gymId: user.gymId }
+      where: gymId ? { id, gymId } : { id }
     })
     if (!existing) return NextResponse.json({ success: false, error: 'Staff member not found' }, { status: 404 })
 
@@ -71,7 +87,7 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
         entityId: id,
         userName: user.email,
         userId: user.userId,
-        gymId: user.gymId
+        gymId: existing.gymId
       }
     })
 

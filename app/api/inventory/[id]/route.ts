@@ -1,18 +1,25 @@
 import { NextRequest, NextResponse } from 'next/server'
 import prisma from '@/lib/prisma'
-import { getAuthUser } from '@/lib/auth'
+import { getAuthUser, getGymIdContext, getRequiredGymId } from '@/lib/auth'
+
+const AUTHORIZED_ROLES = ['cto', 'ceo', 'admin', 'owner', 'manager', 'staff']
 
 export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const user = await getAuthUser(req)
     if (!user) return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 })
 
+    if (!AUTHORIZED_ROLES.includes(user.role)) {
+      return NextResponse.json({ success: false, error: 'Forbidden' }, { status: 403 })
+    }
+
     const data = await req.json()
     const { id } = await params
+    const gymId = await getRequiredGymId(user, req, data)
     
     // Ensure the item exists and belongs to the user's gym
     const existing = await prisma.inventoryItem.findFirst({
-      where: { id, gymId: user.gymId }
+      where: { id, gymId }
     })
     if (!existing) return NextResponse.json({ success: false, error: 'Item not found' }, { status: 404 })
 
@@ -36,7 +43,7 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
         entityId: updatedItem.id,
         userName: user.email,
         userId: user.userId,
-        gymId: user.gymId
+        gymId: gymId
       }
     })
 
@@ -50,12 +57,17 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
 export async function DELETE(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const user = await getAuthUser(req)
-    if (!user || user.role !== 'admin') return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 })
+    if (!user) return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 })
+
+    if (!AUTHORIZED_ROLES.includes(user.role)) {
+      return NextResponse.json({ success: false, error: 'Forbidden' }, { status: 403 })
+    }
 
     const { id } = await params
+    const gymId = getGymIdContext(user, req)
     
     const existing = await prisma.inventoryItem.findFirst({
-      where: { id, gymId: user.gymId }
+      where: gymId ? { id, gymId } : { id }
     })
     if (!existing) return NextResponse.json({ success: false, error: 'Item not found' }, { status: 404 })
 
@@ -71,7 +83,7 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
         entityId: id,
         userName: user.email,
         userId: user.userId,
-        gymId: user.gymId
+        gymId: existing.gymId
       }
     })
 
