@@ -82,21 +82,23 @@ export default function MembersPage() {
     return matchesSearch && matchesBranch
   })
 
+  const defaultMemberValues: MemberFormValues = {
+    name: '',
+    email: '',
+    phone: '',
+    address: '',
+    membershipType: '',
+    status: 'active',
+    joinDate: new Date().toISOString().split('T')[0],
+    expiryDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+    branchId: '',
+    emergencyContact: '',
+    emergencyPhone: '',
+  }
+
   const form = useForm<MemberFormValues>({
     resolver: zodResolver(memberSchema),
-    defaultValues: {
-      name: '',
-      email: '',
-      phone: '',
-      address: '',
-      membershipType: '',
-      status: 'active',
-      joinDate: new Date().toISOString().split('T')[0],
-      expiryDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-      branchId: '',
-      emergencyContact: '',
-      emergencyPhone: '',
-    },
+    defaultValues: defaultMemberValues,
   })
 
   const {
@@ -193,7 +195,7 @@ export default function MembersPage() {
       const worksheet = workbook.Sheets[sheetName]
       const jsonData = xlsx.utils.sheet_to_json(worksheet)
 
-      const formattedMembers = jsonData.map((item: any) => ({
+      const formattedMembers: Array<Omit<Member, 'id' | 'createdAt' | 'updatedAt'>> = jsonData.map((item: any) => ({
         name: item.Name || item.name || '',
         email: item.Email || item.email || '',
         phone: String(item.Phone || item.phone || ''),

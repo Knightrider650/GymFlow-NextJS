@@ -1129,7 +1129,7 @@ export default function SuperDashboard() {
                     Secure Support Impersonation Mode
                   </div>
                   <p className="text-xs text-slate-400 leading-normal">
-                    Enter safe mode to log into this tenant's Gym Portal. All staff views and check-ins will display as read-only.
+                    Enter safe mode to log into this tenant&apos;s Gym Portal. All staff views and check-ins will display as read-only.
                   </p>
                   <Button 
                     className="w-full gap-2 font-bold bg-violet-600 hover:bg-violet-500 text-slate-50"

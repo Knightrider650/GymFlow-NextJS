@@ -220,7 +220,7 @@ export default function CommunicationsPage() {
                      </CardHeader>
                      <CardContent>
                        <div className="p-3 rounded-lg bg-black/20 text-xs text-muted-foreground italic mb-4">
-                         "{campaign.content.substring(0, 100)}..."
+                         &quot;{campaign.content.substring(0, 100)}...&quot;
                        </div>
                        <div className="flex items-center justify-between text-[10px] text-muted-foreground uppercase tracking-widest font-bold">
                          <span>Sent by {campaign.createdBy}</span>

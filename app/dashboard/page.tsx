@@ -21,6 +21,44 @@ import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, R
 
 import { useAuthStore, useGymStore } from '@/lib/store'
 
+const StatCard = ({
+  title,
+  value,
+  icon: Icon,
+  description,
+  trend,
+  gradient,
+}: {
+  title: string
+  value: string | number
+  icon: any
+  description?: string
+  trend?: number
+  gradient?: string
+}) => (
+  <Card className={`overflow-hidden border-none shadow-lg relative ${gradient || 'bg-card text-card-foreground'}`}>
+    <div className="absolute inset-0 bg-gradient-to-br from-white/10 to-transparent pointer-events-none" />
+    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 relative">
+      <CardTitle className="text-sm font-medium">{title}</CardTitle>
+      <div className="p-2 rounded-full bg-white/10">
+        <Icon className="h-4 w-4" />
+      </div>
+    </CardHeader>
+    <CardContent className="relative">
+      <div className="text-2xl font-bold">{value}</div>
+      {description && (
+        <p className="text-xs opacity-80 mt-1">{description}</p>
+      )}
+      {trend !== undefined && (
+        <div className="flex items-center gap-1 mt-2">
+          <TrendingUp className="h-3 w-3" />
+          <span className="text-xs font-semibold">{trend}% vs last month</span>
+        </div>
+      )}
+    </CardContent>
+  </Card>
+)
+
 export default function DashboardPage() {
   const { user } = useAuthStore()
   const { 
@@ -62,44 +100,6 @@ export default function DashboardPage() {
       </ProtectedLayout>
     )
   }
-
-  const StatCard = ({
-    title,
-    value,
-    icon: Icon,
-    description,
-    trend,
-    gradient,
-  }: {
-    title: string
-    value: string | number
-    icon: any
-    description?: string
-    trend?: number
-    gradient?: string
-  }) => (
-    <Card className={`overflow-hidden border-none shadow-lg relative ${gradient || 'bg-card text-card-foreground'}`}>
-      <div className="absolute inset-0 bg-gradient-to-br from-white/10 to-transparent pointer-events-none" />
-      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 relative">
-        <CardTitle className="text-sm font-medium">{title}</CardTitle>
-        <div className="p-2 rounded-full bg-white/10">
-          <Icon className="h-4 w-4" />
-        </div>
-      </CardHeader>
-      <CardContent className="relative">
-        <div className="text-2xl font-bold">{value}</div>
-        {description && (
-          <p className="text-xs opacity-80 mt-1">{description}</p>
-        )}
-        {trend !== undefined && (
-          <div className="flex items-center gap-1 mt-2">
-            <TrendingUp className="h-3 w-3" />
-            <span className="text-xs font-semibold">{trend}% vs last month</span>
-          </div>
-        )}
-      </CardContent>
-    </Card>
-  )
 
 
   return (

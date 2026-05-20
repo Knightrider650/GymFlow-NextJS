@@ -84,7 +84,7 @@ export default function InventoryPage() {
               <DialogHeader>
                 <DialogTitle>Add Inventory Item</DialogTitle>
                 <DialogDescription>
-                  Add a new item to your gym's inventory tracking.
+                  Add a new item to your gym&apos;s inventory tracking.
                 </DialogDescription>
               </DialogHeader>
               <form onSubmit={handleAddItem} className="space-y-4 py-4">

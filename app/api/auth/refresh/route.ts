@@ -36,6 +36,16 @@ export async function POST(request: Request) {
       )
     }
 
+    const backendUrl = process.env.API_FALLBACK_URL || process.env.NEXT_PUBLIC_API_URL
+    if (backendUrl && /^https?:\/\//.test(backendUrl)) {
+      try {
+        const backendResponse = await tryBackendRefresh(refreshToken)
+        if (backendResponse) return backendResponse
+      } catch {
+        // Fall back to the local Prisma-backed auth path when the backend is unreachable.
+      }
+    }
+
     // Verify refresh token
     let decoded: any
     try {

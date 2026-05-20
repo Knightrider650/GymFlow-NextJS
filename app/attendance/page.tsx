@@ -149,12 +149,12 @@ export default function AttendancePage() {
         {/* Today's Attendence Summary */}
         <Card>
           <CardHeader>
-            <CardTitle>Today's Summary</CardTitle>
+            <CardTitle>Today&apos;s Summary</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="grid grid-cols-3 gap-4">
               <div>
-                <p className="text-sm text-muted-foreground">Today's Check-ins</p>
+                <p className="text-sm text-muted-foreground">Today&apos;s Check-ins</p>
                 <p className="text-2xl font-bold">{todayAttendance.length}</p>
               </div>
               <div>

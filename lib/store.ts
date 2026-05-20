@@ -562,10 +562,10 @@ export const useGymStore = create<GymState>()((set, get) => ({
     try {
       const response = await apiClient.get<Notification[]>('/api/notifications')
       if (response.success && response.data) {
-        const notifications = Array.isArray(response.data) 
-          ? response.data 
+        const notifications: Notification[] = Array.isArray(response.data)
+          ? response.data
           : (response.data as any).data || []
-        const unreadCount = notifications.filter((n: Notification) => !n.read).length
+        const unreadCount = notifications.filter((notification: Notification) => !notification.read).length
         set({ notifications, unreadCount })
       }
     } catch (error: any) {

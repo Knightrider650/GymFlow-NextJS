@@ -5,16 +5,47 @@ import { getAuthUser } from '@/lib/auth'
 
 const JWT_SECRET = process.env.JWT_SECRET || process.env.NEXT_PUBLIC_JWT_SECRET || 'fallback_secret'
 
+async function tryBackendSwitchGym(req: Request, gymId: string) {
+  const backendUrl = process.env.API_FALLBACK_URL || process.env.NEXT_PUBLIC_API_URL
+  if (!backendUrl || !/^https?:\/\//.test(backendUrl)) {
+    return null
+  }
+
+  const authHeader = req.headers.get('Authorization') || req.headers.get('authorization')
+
+  const response = await fetch(`${backendUrl}/api/auth/switch-gym`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      ...(authHeader ? { Authorization: authHeader } : {}),
+    },
+    body: JSON.stringify({ gymId }),
+  })
+
+  const payload = await response.json()
+  return NextResponse.json(payload, { status: response.status })
+}
+
 export async function POST(req: NextRequest) {
   try {
+    const { gymId } = await req.json()
+
+    const backendUrl = process.env.API_FALLBACK_URL || process.env.NEXT_PUBLIC_API_URL
+    if (backendUrl && /^https?:\/\//.test(backendUrl)) {
+      try {
+        const backendResponse = await tryBackendSwitchGym(req, gymId)
+        if (backendResponse) return backendResponse
+      } catch {
+        // Fall back to the local Prisma-backed auth path when the backend is unreachable.
+      }
+    }
+
     const user = await getAuthUser(req)
     
     // Only users with isGlobal flag (cto, ceo, admin) can switch gyms
     if (!user || !user.isGlobal) {
       return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 })
     }
-
-    const { gymId } = await req.json()
 
     if (!gymId) {
       return NextResponse.json({ success: false, error: 'Gym ID is required' }, { status: 400 })

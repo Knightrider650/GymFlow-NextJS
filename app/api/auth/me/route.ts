@@ -28,6 +28,16 @@ async function tryBackendMe(req: NextRequest) {
 
 export async function GET(req: NextRequest) {
   try {
+    const backendUrl = process.env.API_FALLBACK_URL || process.env.NEXT_PUBLIC_API_URL
+    if (backendUrl && /^https?:\/\//.test(backendUrl)) {
+      try {
+        const backendResponse = await tryBackendMe(req)
+        if (backendResponse) return backendResponse
+      } catch {
+        // Fall back to the local Prisma-backed auth path when the backend is unreachable.
+      }
+    }
+
     const user = await getAuthUser(req)
     
     if (!user) {

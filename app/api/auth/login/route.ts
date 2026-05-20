@@ -38,6 +38,16 @@ export async function POST(request: Request) {
       )
     }
 
+    const backendUrl = process.env.API_FALLBACK_URL || process.env.NEXT_PUBLIC_API_URL
+    if (backendUrl && /^https?:\/\//.test(backendUrl)) {
+      try {
+        const backendResponse = await tryBackendLogin(email, password)
+        if (backendResponse) return backendResponse
+      } catch {
+        // Fall back to the local Prisma-backed auth path when the backend is unreachable.
+      }
+    }
+
     let user: any
     try {
       user = await prisma.user.findUnique({
