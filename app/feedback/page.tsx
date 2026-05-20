@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { ProtectedLayout } from '@/components/layout/protected-layout'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -10,6 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Send, CheckCircle2, MessageSquare } from 'lucide-react'
 import { apiClient } from '@/lib/api-client'
 import { useActivityLogs } from '@/hooks'
+import { useAuthStore } from '@/lib/store'
 
 export default function FeedbackPage() {
   const [isSubmitting, setIsSubmitting] = useState(false)
@@ -21,6 +22,31 @@ export default function FeedbackPage() {
     details: ''
   })
   
+  const user = useAuthStore((state: any) => state.user)
+  const isElevated = user?.role && ['cto', 'ceo', 'admin', 'owner', 'manager'].includes(user.role)
+  const [feedbackList, setFeedbackList] = useState<any[]>([])
+  const [loadingFeedback, setLoadingFeedback] = useState(false)
+
+  const fetchFeedback = async () => {
+    setLoadingFeedback(true)
+    try {
+      const response = await apiClient.get('/api/feedback')
+      if (response.success) {
+        setFeedbackList(response.data || [])
+      }
+    } catch (err) {
+      console.error('Failed to fetch feedback list:', err)
+    } finally {
+      setLoadingFeedback(false)
+    }
+  }
+
+  useEffect(() => {
+    if (isElevated) {
+      fetchFeedback()
+    }
+  }, [isElevated])
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setIsSubmitting(true)
@@ -30,6 +56,9 @@ export default function FeedbackPage() {
       if (response.success) {
         await logActivity('Feedback Submitted', 'Feedback', response.data.id, formData.title)
         setIsSubmitted(true)
+        if (isElevated) {
+          fetchFeedback()
+        }
       }
     } catch (err) {
       console.error('Failed to submit feedback:', err)
@@ -40,7 +69,7 @@ export default function FeedbackPage() {
 
   return (
     <ProtectedLayout>
-      <div className="p-6 lg:p-8 space-y-8">
+      <div className="p-6 lg:p-8 space-y-8 bg-slate-50/30 min-h-screen">
         <div>
           <h1 className="text-3xl font-bold tracking-tight bg-gradient-to-r from-primary to-blue-600 bg-clip-text text-transparent flex items-center gap-3">
             <MessageSquare className="h-8 w-8 text-primary" />
@@ -137,8 +166,70 @@ export default function FeedbackPage() {
             </Card>
           )}
         </div>
+
+        {isElevated && (
+          <div className="w-full max-w-4xl mx-auto pt-8">
+            <Card className="border-none bg-card/40 backdrop-blur-md shadow-2xl overflow-hidden">
+              <CardHeader className="bg-primary/5 border-b border-white/5">
+                <CardTitle>Submitted Feedback Logs</CardTitle>
+                <CardDescription>
+                  View and audit feedback entries submitted by team members and managers.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="p-0">
+                <div className="overflow-x-auto">
+                  <table className="w-full border-collapse text-sm">
+                    <thead>
+                      <tr className="border-b border-white/5 bg-muted/30 text-left font-semibold text-muted-foreground">
+                        <th className="p-4">Category</th>
+                        <th className="p-4">Title</th>
+                        <th className="p-4">Details</th>
+                        <th className="p-4 text-right">Date</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {loadingFeedback ? (
+                        <tr>
+                          <td colSpan={4} className="p-8 text-center text-muted-foreground">
+                            Loading feedback logs...
+                          </td>
+                        </tr>
+                      ) : feedbackList.length === 0 ? (
+                        <tr>
+                          <td colSpan={4} className="p-8 text-center text-muted-foreground">
+                            No feedback submissions found.
+                          </td>
+                        </tr>
+                      ) : (
+                        feedbackList.map((item) => (
+                          <tr key={item.id} className="border-b border-white/5 hover:bg-muted/10 transition-colors">
+                            <td className="p-4">
+                              <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider ${
+                                item.category === 'bug' ? 'bg-red-500/10 text-red-400 border border-red-500/20' :
+                                item.category === 'feature' ? 'bg-blue-500/10 text-blue-400 border border-blue-500/20' :
+                                'bg-slate-500/10 text-slate-400 border border-slate-500/20'
+                              }`}>
+                                {item.category}
+                              </span>
+                            </td>
+                            <td className="p-4 font-semibold text-primary">{item.title}</td>
+                            <td className="p-4 text-muted-foreground max-w-xs truncate" title={item.details}>
+                              {item.details}
+                            </td>
+                            <td className="p-4 text-right text-xs text-muted-foreground font-mono">
+                              {new Date(item.createdAt).toLocaleDateString()}
+                            </td>
+                          </tr>
+                        ))
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        )}
       </div>
     </ProtectedLayout>
   )
 }
-

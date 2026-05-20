@@ -1,10 +1,7 @@
 import React from 'react'
 import type { Metadata, Viewport } from 'next'
-import { Outfit } from 'next/font/google'
 import './globals.css'
 import { DynamicTheme } from '@/components/DynamicTheme'
-
-const font = Outfit({ subsets: ['latin'] })
 
 export const viewport: Viewport = {
   width: 'device-width',
@@ -29,7 +26,7 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en" className="dark" suppressHydrationWarning>
-      <body className={`${font.className} bg-background text-foreground antialiased`} suppressHydrationWarning>
+      <body className="font-sans bg-background text-foreground antialiased" suppressHydrationWarning>
         <DynamicTheme />
         {children}
       </body>

@@ -2,11 +2,17 @@ import React from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Progress } from '@/components/ui/progress'
-import { Download, Upload, Database, ShieldCheck, FileJson, FileSpreadsheet, Trash2 } from 'lucide-react'
+import { Download, Database, ShieldCheck, FileJson, FileSpreadsheet, Trash2 } from 'lucide-react'
+import { apiClient } from '@/lib/api-client'
+import { useAuthStore } from '@/lib/store'
 
 export function DataSettings() {
   const [isExporting, setIsExporting] = React.useState(false)
   const [progress, setProgress] = React.useState(0)
+  const [isPurging, setIsPurging] = React.useState(false)
+
+  const user = useAuthStore((state: any) => state.user)
+  const isAllowedToPurge = user?.role && ['admin', 'ceo', 'cto', 'owner'].includes(user.role)
 
   const handleExport = () => {
     setIsExporting(true)
@@ -21,6 +27,45 @@ export function DataSettings() {
         return prev + 10
       })
     }, 200)
+  }
+
+  const handlePurge = async () => {
+    if (!isAllowedToPurge) {
+      alert('Error: Only top-level administrators (CEO, CTO, Owner, Admin) are authorized to purge system data.')
+      return
+    }
+
+    const firstConfirm = window.confirm(
+      '⚠️ WARNING: This will permanently delete ALL transactional data (members, invoices, payments, attendance, fitness classes, inventory items, staff, leads, campaigns, reminders, feedback, logs) under this gym. This action is irreversible.\n\nDo you want to continue?'
+    )
+    if (!firstConfirm) return
+
+    const secondConfirm = window.confirm(
+      '🛑 FINAL CONFIRMATION: Are you absolutely sure? Click OK to proceed to the verification step.'
+    )
+    if (!secondConfirm) return
+
+    const verificationText = window.prompt('Please type "PURGE" to verify and execute this action:')
+    if (verificationText !== 'PURGE') {
+      alert('Purge aborted. Verification word did not match.')
+      return
+    }
+
+    setIsPurging(true)
+    try {
+      const response = await apiClient.post('/api/settings/purge-data', {})
+      if (response.success) {
+        alert('🎉 System Reset Complete! All operational data has been successfully purged. The application will now reload.')
+        window.location.reload()
+      } else {
+        alert(`Failed to purge data: ${response.error || 'Unknown error'}`)
+      }
+    } catch (err: any) {
+      console.error(err)
+      alert(`An error occurred while purging data: ${err.message || 'Server error'}`)
+    } finally {
+      setIsPurging(false)
+    }
   }
 
   return (
@@ -107,9 +152,15 @@ export function DataSettings() {
                  <div className="font-bold text-red-900">Purge Sample Data</div>
                  <p className="text-xs text-red-700/60">Delete all demo members and records to start fresh</p>
               </div>
-              <Button variant="destructive" size="sm" className="gap-2">
+              <Button 
+                variant="destructive" 
+                size="sm" 
+                className="gap-2"
+                onClick={handlePurge}
+                disabled={isPurging}
+              >
                  <Trash2 className="h-3 w-3" />
-                 Purge Data
+                 {isPurging ? 'Purging...' : 'Purge Data'}
               </Button>
            </div>
         </CardContent>

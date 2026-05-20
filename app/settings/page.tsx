@@ -32,7 +32,7 @@ export default function SettingsPage() {
       setIsInitialLoading(false)
     }
     loadData()
-  }, [])
+  }, [fetchSettings])
 
   const renderSection = () => {
     if (!settings) return null

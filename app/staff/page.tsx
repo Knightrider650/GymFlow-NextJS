@@ -31,6 +31,7 @@ export default function StaffPage() {
   const user = useAuthStore((state: any) => state.user)
   const [isDialogOpen, setIsDialogOpen] = useState(false)
   const [selectedBranch, setSelectedBranch] = useState<string>('all')
+  const [editingStaffId, setEditingStaffId] = useState<string | null>(null)
   const [formData, setFormData] = useState({
     name: '',
     email: '',
@@ -54,17 +55,31 @@ export default function StaffPage() {
   const handleAddStaff = async (e: React.FormEvent) => {
     e.preventDefault()
     if (formData.name && formData.email && formData.salary) {
-      await addStaffMember({
-        name: formData.name,
-        email: formData.email,
-        phone: formData.phone,
-        position: formData.position,
-        salary: parseFloat(formData.salary),
-        status: formData.status,
-        branchId: formData.branchId,
-        joinDate: new Date().toISOString().split('T')[0],
-      })
+      const salaryVal = parseFloat(formData.salary) || 0
+      if (editingStaffId) {
+        await updateStaffMember(editingStaffId, {
+          name: formData.name,
+          email: formData.email,
+          phone: formData.phone,
+          position: formData.position,
+          salary: salaryVal,
+          status: formData.status,
+          branchId: formData.branchId,
+        })
+      } else {
+        await addStaffMember({
+          name: formData.name,
+          email: formData.email,
+          phone: formData.phone,
+          position: formData.position,
+          salary: salaryVal,
+          status: formData.status,
+          branchId: formData.branchId,
+          joinDate: new Date().toISOString().split('T')[0],
+        })
+      }
       setIsDialogOpen(false)
+      setEditingStaffId(null)
       setFormData({
         name: '',
         email: '',
@@ -105,21 +120,33 @@ export default function StaffPage() {
               </Select>
             </div>
             {!isTrainer(user?.role) && (
-              <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+              <Dialog open={isDialogOpen} onOpenChange={(open) => {
+                setIsDialogOpen(open)
+                if (!open) {
+                  setEditingStaffId(null)
+                  setFormData({ name: '', email: '', phone: '', position: 'Trainer', salary: '', status: 'active', branchId: '' })
+                }
+              }}>
                 <DialogTrigger asChild>
-                  <Button className="gap-2 w-fit bg-primary hover:bg-primary/90 shadow-lg shadow-primary/20">
+                  <Button 
+                    onClick={() => {
+                      setEditingStaffId(null)
+                      setFormData({ name: '', email: '', phone: '', position: 'Trainer', salary: '', status: 'active', branchId: '' })
+                    }}
+                    className="gap-2 w-fit bg-primary hover:bg-primary/90 shadow-lg shadow-primary/20"
+                  >
                     <Plus className="h-4 w-4" />
                     Add Staff Member
                   </Button>
                 </DialogTrigger>
               <DialogContent className="sm:max-w-[500px]">
                 <DialogHeader>
-                  <DialogTitle>Add Staff Member</DialogTitle>
+                  <DialogTitle>{editingStaffId ? 'Edit Staff Member' : 'Add Staff Member'}</DialogTitle>
                   <DialogDescription>
-                    Enter the details for a new member of the gym&apos;s staff.
+                    {editingStaffId ? 'Update the details for this employee.' : 'Enter the details for a new member of the gym\'s staff.'}
                   </DialogDescription>
                 </DialogHeader>
-                <form onSubmit={handleAddStaff} className="space-y-4 py-4">
+              <form onSubmit={handleAddStaff} className="space-y-4 py-4">
                   {/* ... form content ... */}
                   <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-2 col-span-2">
@@ -212,7 +239,7 @@ export default function StaffPage() {
                     </div>
                   </div>
                   <DialogFooter className="pt-4">
-                    <Button type="submit" className="w-full font-semibold">Confirm Onboarding</Button>
+                    <Button type="submit" className="w-full font-semibold">{editingStaffId ? 'Save Changes' : 'Confirm Onboarding'}</Button>
                   </DialogFooter>
                 </form>
               </DialogContent>
@@ -300,7 +327,24 @@ export default function StaffPage() {
                         {!isTrainer(user?.role) && (
                           <TableCell className="text-right">
                             <div className="flex justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                              <Button size="icon" variant="ghost" className="h-8 w-8 hover:text-primary">
+                              <Button 
+                                size="icon" 
+                                variant="ghost" 
+                                className="h-8 w-8 hover:text-primary"
+                                onClick={() => {
+                                  setFormData({
+                                    name: member.name,
+                                    email: member.email,
+                                    phone: member.phone || '',
+                                    position: member.position as any,
+                                    salary: member.salary.toString(),
+                                    status: member.status as any,
+                                    branchId: member.branchId || '',
+                                  })
+                                  setEditingStaffId(member.id)
+                                  setIsDialogOpen(true)
+                                }}
+                              >
                                 <Edit2 className="h-4 w-4" />
                               </Button>
                               <Button 

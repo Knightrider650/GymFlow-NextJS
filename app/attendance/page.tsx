@@ -36,7 +36,7 @@ export default function AttendancePage() {
     fetchAttendance()
     fetchMembers()
     fetchBranches()
-  }, [])
+  }, [fetchAttendance, fetchMembers, fetchBranches])
 
   const handleCheckIn = async (e: React.FormEvent) => {
     e.preventDefault()

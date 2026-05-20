@@ -8,6 +8,7 @@ export interface User {
   gymId?: string
   tenantId?: string
   isGlobal?: boolean
+  baseGymId?: string
   createdAt: string
 }
 

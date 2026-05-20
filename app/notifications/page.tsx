@@ -14,7 +14,7 @@ export default function NotificationsPage() {
 
   useEffect(() => {
     fetchNotifications()
-  }, [])
+  }, [fetchNotifications])
 
   const typeColors: Record<string, string> = {
     membership_expiry: 'danger',

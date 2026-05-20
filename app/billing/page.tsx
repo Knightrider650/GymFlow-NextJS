@@ -55,7 +55,7 @@ export default function BillingPage() {
     fetchMembers()
     fetchPlans()
     fetchSettings()
-  }, [])
+  }, [fetchInvoices, fetchMembers, fetchPlans, fetchSettings])
 
   // Auto-fill amount when member is selected
   const handleMemberSelect = (memberId: string) => {
@@ -197,6 +197,7 @@ export default function BillingPage() {
                   <Label htmlFor="member">Select Member *</Label>
                   <select
                     id="member"
+                    aria-label="Select member"
                     value={invoiceForm.memberId}
                     onChange={(e) => handleMemberSelect(e.target.value)}
                     className="w-full h-10 px-3 rounded-md border border-input bg-background text-sm focus:ring-2 focus:ring-primary outline-none transition-all"
@@ -435,6 +436,7 @@ export default function BillingPage() {
             <div className="space-y-2">
               <Label>Payment Method</Label>
               <select
+                aria-label="Payment method"
                 value={paymentForm.method}
                 onChange={(e) =>
                   setPaymentForm({

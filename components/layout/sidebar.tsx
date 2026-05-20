@@ -5,6 +5,7 @@ import { useAuth, useSettings } from '@/hooks'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import Link from 'next/link'
+import Image from 'next/image'
 import {
   BarChart3,
   Users,
@@ -129,7 +130,7 @@ export function Sidebar() {
         <div className="flex items-center justify-between gap-2 p-6 border-b border-white/5">
           <Link href="/dashboard" className="flex items-center gap-2 text-xl font-bold hover:opacity-80 transition-opacity">
             {settings?.gymLogo ? (
-              <img src={settings.gymLogo} alt="Gym Logo" className="w-8 h-8 rounded-md object-cover" />
+              <Image src={settings.gymLogo} alt="Gym Logo" width={32} height={32} className="w-8 h-8 rounded-md object-cover" unoptimized />
             ) : (
               <div className="text-2xl">💪</div>
             )}
@@ -216,6 +217,7 @@ export function Sidebar() {
 export function DashboardLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter()
   const user = useAuthStore(state => state.user)
+  const switchGym = useAuthStore(state => state.switchGym)
   const [isSupportMode, setIsSupportMode] = useState(() => {
     if (typeof window !== 'undefined') {
       const mode = localStorage.getItem('gymflow_support_session')
@@ -238,6 +240,8 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
   const handleExitSupport = async () => {
     localStorage.removeItem('gymflow_support_session')
     setIsSupportMode(false)
+    const targetGymId = user?.baseGymId || 'all'
+    await switchGym(targetGymId)
     router.push('/super-dashboard')
   }
 

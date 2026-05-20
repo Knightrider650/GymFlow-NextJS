@@ -113,7 +113,7 @@ export default function MembersPage() {
     fetchMembers()
     fetchPlans()
     fetchBranches()
-  }, [])
+  }, [fetchMembers, fetchPlans, fetchBranches])
 
   const onFormSubmit = async (data: MemberFormValues) => {
     try {

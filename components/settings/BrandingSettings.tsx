@@ -1,4 +1,5 @@
 import React from 'react'
+import Image from 'next/image'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Label } from '@/components/ui/label'
 import { Input } from '@/components/ui/input'
@@ -211,7 +212,7 @@ export function BrandingSettings({ settings, onSave }: BrandingSettingsProps) {
                 <div className="flex items-center gap-4">
                   <div className="w-20 h-20 rounded-xl border-2 border-dashed border-muted-foreground/20 flex items-center justify-center bg-slate-50 dark:bg-slate-900/60 relative overflow-hidden group shrink-0">
                     {formData.gymLogo ? (
-                      <img src={formData.gymLogo} alt="Gym Logo" className="w-full h-full object-contain p-2" />
+                      <Image src={formData.gymLogo} alt="Gym Logo" fill className="object-contain p-2" unoptimized />
                     ) : (
                       <Building2 className="h-6 w-6 text-muted-foreground/30" />
                     )}
@@ -234,7 +235,7 @@ export function BrandingSettings({ settings, onSave }: BrandingSettingsProps) {
                 <div className="flex items-center gap-4">
                   <div className="w-12 h-12 rounded-lg border border-muted-foreground/20 flex items-center justify-center bg-slate-50 dark:bg-slate-900/60 relative overflow-hidden shrink-0">
                     {formData.favicon ? (
-                      <img src={formData.favicon} alt="Favicon" className="w-8 h-8 object-contain" />
+                      <Image src={formData.favicon} alt="Favicon" width={32} height={32} className="w-8 h-8 object-contain" unoptimized />
                     ) : (
                       <Globe className="h-5 w-5 text-muted-foreground/30" />
                     )}
@@ -299,6 +300,7 @@ export function BrandingSettings({ settings, onSave }: BrandingSettingsProps) {
                   <select
                     id="themeMode"
                     name="themeMode"
+                    aria-label="Theme mode"
                     value={formData.themeMode || 'dark'}
                     onChange={handleChange}
                     className="w-full h-10 px-3 rounded-md border border-input bg-background/50 text-sm focus:ring-2 focus:ring-primary/20 outline-none"

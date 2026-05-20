@@ -103,7 +103,10 @@ export async function POST(request: Request) {
     return NextResponse.json({
       success: true,
       data: {
-        user: userWithoutPassword,
+        user: {
+          ...userWithoutPassword,
+          baseGymId: user.gymId
+        },
         accessToken,
         refreshToken
       }

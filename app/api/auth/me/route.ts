@@ -90,7 +90,8 @@ export async function GET(req: NextRequest) {
         ...userWithoutPassword,
         gym: currentGym,
         gymId: user.gymId, // Use gymId from JWT (contextual)
-        isGlobal: user.isGlobal // Include isGlobal from JWT
+        isGlobal: user.isGlobal, // Include isGlobal from JWT
+        baseGymId: userData.gymId // Keep a reference to the original base gym ID
       }
     })
   } catch (error) {

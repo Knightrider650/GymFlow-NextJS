@@ -87,7 +87,7 @@ export default function DashboardPage() {
     }
 
     loadData()
-  }, [fetchStats, fetchInvoices, fetchAttendance])
+  }, [fetchStats, fetchInvoices, fetchAttendance, fetchSettings])
 
   // Data is now pre-aggregated on the server
   if (!stats && isInitialLoading) {

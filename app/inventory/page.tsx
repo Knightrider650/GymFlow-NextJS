@@ -25,6 +25,7 @@ export default function InventoryPage() {
   const { inventory, isLoading, fetchInventory, addInventoryItem, updateInventoryItem, deleteInventoryItem } = useInventory()
   const { settings, fetchSettings } = useSettings()
   const [isDialogOpen, setIsDialogOpen] = useState(false)
+  const [editingItemId, setEditingItemId] = useState<string | null>(null)
   const [formData, setFormData] = useState({
     name: '',
     category: 'Equipment' as const,
@@ -36,19 +37,34 @@ export default function InventoryPage() {
   useEffect(() => {
     fetchInventory()
     fetchSettings()
-  }, [])
+  }, [fetchInventory, fetchSettings])
 
   const handleAddItem = async (e: React.FormEvent) => {
     e.preventDefault()
     if (formData.name && formData.quantity && formData.costPerUnit) {
-      await addInventoryItem({
-        name: formData.name,
-        category: formData.category,
-        quantity: parseInt(formData.quantity),
-        minThreshold: parseInt(formData.minThreshold) || 0,
-        costPerUnit: parseFloat(formData.costPerUnit),
-      })
+      const qty = parseInt(formData.quantity) || 0
+      const threshold = parseInt(formData.minThreshold) || 0
+      const cost = parseFloat(formData.costPerUnit) || 0
+
+      if (editingItemId) {
+        await updateInventoryItem(editingItemId, {
+          name: formData.name,
+          category: formData.category,
+          quantity: qty,
+          minThreshold: threshold,
+          costPerUnit: cost,
+        })
+      } else {
+        await addInventoryItem({
+          name: formData.name,
+          category: formData.category,
+          quantity: qty,
+          minThreshold: threshold,
+          costPerUnit: cost,
+        })
+      }
       setIsDialogOpen(false)
+      setEditingItemId(null)
       setFormData({
         name: '',
         category: 'Equipment',
@@ -73,18 +89,30 @@ export default function InventoryPage() {
               Track equipment, supplies, and merchandise
             </p>
           </div>
-          <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+          <Dialog open={isDialogOpen} onOpenChange={(open) => {
+            setIsDialogOpen(open)
+            if (!open) {
+              setEditingItemId(null)
+              setFormData({ name: '', category: 'Equipment', quantity: '', minThreshold: '', costPerUnit: '' })
+            }
+          }}>
             <DialogTrigger asChild>
-              <Button className="gap-2 w-fit bg-primary hover:bg-primary/90 shadow-lg shadow-primary/20">
+              <Button 
+                onClick={() => {
+                  setEditingItemId(null)
+                  setFormData({ name: '', category: 'Equipment', quantity: '', minThreshold: '', costPerUnit: '' })
+                }}
+                className="gap-2 w-fit bg-primary hover:bg-primary/90 shadow-lg shadow-primary/20"
+              >
                 <Plus className="h-4 w-4" />
                 Add Item
               </Button>
             </DialogTrigger>
             <DialogContent className="sm:max-w-[425px]">
               <DialogHeader>
-                <DialogTitle>Add Inventory Item</DialogTitle>
+                <DialogTitle>{editingItemId ? 'Edit Inventory Item' : 'Add Inventory Item'}</DialogTitle>
                 <DialogDescription>
-                  Add a new item to your gym&apos;s inventory tracking.
+                  {editingItemId ? 'Modify the stock level and unit cost configuration.' : 'Add a new item to your gym\'s inventory tracking.'}
                 </DialogDescription>
               </DialogHeader>
               <form onSubmit={handleAddItem} className="space-y-4 py-4">
@@ -103,6 +131,7 @@ export default function InventoryPage() {
                     <Label htmlFor="category">Category *</Label>
                     <select
                       id="category"
+                      aria-label="Inventory category"
                       value={formData.category}
                       onChange={(e) => setFormData({ ...formData, category: e.target.value as any })}
                       className="w-full h-10 px-3 rounded-md border border-input bg-background text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring"
@@ -151,7 +180,7 @@ export default function InventoryPage() {
                   </div>
                 </div>
                 <DialogFooter className="pt-4">
-                  <Button type="submit" className="w-full">Save Item</Button>
+                  <Button type="submit" className="w-full">{editingItemId ? 'Save Changes' : 'Save Item'}</Button>
                 </DialogFooter>
               </form>
             </DialogContent>
@@ -234,7 +263,22 @@ export default function InventoryPage() {
                         </TableCell>
                         <TableCell className="text-right">
                           <div className="flex justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                            <Button size="icon" variant="ghost" className="h-8 w-8 text-slate-400 hover:text-primary">
+                            <Button 
+                              size="icon" 
+                              variant="ghost" 
+                              className="h-8 w-8 text-slate-400 hover:text-primary"
+                              onClick={() => {
+                                setFormData({
+                                  name: item.name,
+                                  category: item.category as any,
+                                  quantity: item.quantity.toString(),
+                                  minThreshold: item.minThreshold.toString(),
+                                  costPerUnit: item.costPerUnit.toString(),
+                                })
+                                setEditingItemId(item.id)
+                                setIsDialogOpen(true)
+                              }}
+                            >
                               <Edit2 className="h-4 w-4" />
                             </Button>
                             <Button 

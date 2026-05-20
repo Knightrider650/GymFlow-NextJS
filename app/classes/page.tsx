@@ -33,6 +33,7 @@ export default function ClassesPage() {
   const [selectedClassId, setSelectedClassId] = useState<string | null>(null)
   const [selectedBranch, setSelectedBranch] = useState<string>('all')
   const [selectedMemberId, setSelectedMemberId] = useState('')
+  const [editingClassId, setEditingClassId] = useState<string | null>(null)
 
   const [formData, setFormData] = useState({
     name: '',
@@ -49,7 +50,7 @@ export default function ClassesPage() {
     fetchStaff()
     fetchBranches()
     fetchMembers()
-  }, [])
+  }, [fetchClasses, fetchStaff, fetchBranches, fetchMembers])
 
   const filteredClasses = selectedBranch === 'all'
     ? classes
@@ -57,12 +58,21 @@ export default function ClassesPage() {
 
   const handleAddClass = async (e: React.FormEvent) => {
     e.preventDefault()
-    await createClass({
-      ...formData,
-      maxCapacity: parseInt(formData.maxCapacity) || 0,
-      currentEnrollment: 0
-    })
+    const capacity = parseInt(formData.maxCapacity) || 0
+    if (editingClassId) {
+      await updateClass(editingClassId, {
+        ...formData,
+        maxCapacity: capacity,
+      })
+    } else {
+      await createClass({
+        ...formData,
+        maxCapacity: capacity,
+        currentEnrollment: 0
+      })
+    }
     setIsAddDialogOpen(false)
+    setEditingClassId(null)
     setFormData({ name: '', instructorName: '', maxCapacity: '', description: '', time: '10:00 AM', days: 'Mon, Wed, Fri', branchId: '' })
     fetchClasses()
   }
@@ -112,18 +122,30 @@ export default function ClassesPage() {
                 </SelectContent>
               </Select>
             </div>
-            <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
-              <DialogTrigger asChild>
-                <Button className="gap-2 w-fit shadow-lg shadow-primary/20 transition-all hover:scale-105 active:scale-95">
-                  <Plus className="h-4 w-4" />
-                  Add New Class
-                </Button>
-              </DialogTrigger>
+          <Dialog open={isAddDialogOpen} onOpenChange={(open) => {
+            setIsAddDialogOpen(open)
+            if (!open) {
+              setEditingClassId(null)
+              setFormData({ name: '', instructorName: '', maxCapacity: '', description: '', time: '10:00 AM', days: 'Mon, Wed, Fri', branchId: '' })
+            }
+          }}>
+            <DialogTrigger asChild>
+              <Button 
+                onClick={() => {
+                  setEditingClassId(null)
+                  setFormData({ name: '', instructorName: '', maxCapacity: '', description: '', time: '10:00 AM', days: 'Mon, Wed, Fri', branchId: '' })
+                }}
+                className="gap-2 w-fit shadow-lg shadow-primary/20 transition-all hover:scale-105 active:scale-95"
+              >
+                <Plus className="h-4 w-4" />
+                Add New Class
+              </Button>
+            </DialogTrigger>
             <DialogContent className="sm:max-w-[425px] max-h-[90vh] overflow-y-auto border-none shadow-2xl">
               <DialogHeader className="bg-slate-50 -m-6 mb-0 p-6 border-b border-slate-100">
-                <DialogTitle className="text-xl">Create Fitness Session</DialogTitle>
+                <DialogTitle className="text-xl">{editingClassId ? 'Edit Fitness Session' : 'Create Fitness Session'}</DialogTitle>
                 <DialogDescription>
-                  Define a new class schedule and assign a specialized instructor.
+                  {editingClassId ? 'Modify the class parameters and assigned instructor.' : 'Define a new class schedule and assign a specialized instructor.'}
                 </DialogDescription>
               </DialogHeader>
               <form onSubmit={handleAddClass} className="space-y-4 py-8 px-1">
@@ -143,6 +165,7 @@ export default function ClassesPage() {
                     <Label htmlFor="instructor">Lead Instructor</Label>
                     <select
                       id="instructor"
+                      aria-label="Lead instructor"
                       value={formData.instructorName}
                       onChange={(e) => setFormData({ ...formData, instructorName: e.target.value })}
                       className="w-full h-10 px-3 rounded-md border border-input bg-background text-sm focus:ring-2 focus:ring-primary/20 outline-none"
@@ -212,9 +235,9 @@ export default function ClassesPage() {
                     placeholder="Brief overview of class goals..." 
                   />
                 </div>
-                <DialogFooter className="pt-4">
-                  <Button type="submit" className="w-full font-bold h-11 text-lg">Save Class Schedule</Button>
-                </DialogFooter>
+                 <DialogFooter className="pt-4">
+                   <Button type="submit" className="w-full font-bold h-11 text-lg">{editingClassId ? 'Save Changes' : 'Save Class Schedule'}</Button>
+                 </DialogFooter>
               </form>
             </DialogContent>
           </Dialog>
@@ -260,6 +283,7 @@ export default function ClassesPage() {
                               days: fitnessClass.days || 'Mon, Wed, Fri',
                               branchId: fitnessClass.branchId || ''
                             })
+                            setEditingClassId(fitnessClass.id)
                             setIsAddDialogOpen(true)
                           }}
                         >
@@ -290,14 +314,9 @@ export default function ClassesPage() {
                           {fitnessClass.currentEnrollment}/{fitnessClass.maxCapacity} Seats
                         </span>
                       </div>
-                      <div className="h-2 w-full bg-slate-100 rounded-full overflow-hidden shadow-inner">
-                        <div 
-                          className={`h-full transition-all duration-500 rounded-full ${
-                            enrollmentPercent > 90 ? 'bg-red-500' : 'bg-primary'
-                          }`}
-                          style={{ width: `${enrollmentPercent}%` }}
-                        />
-                      </div>
+                      <svg className="h-2 w-full bg-slate-100 rounded-full overflow-hidden shadow-inner" viewBox="0 0 100 8" preserveAspectRatio="none" aria-hidden="true">
+                        <rect x="0" y="0" width={Math.min(enrollmentPercent, 100)} height="8" rx="4" fill={enrollmentPercent > 90 ? '#ef4444' : '#3b82f6'} />
+                      </svg>
                     </div>
 
                     <div className="flex flex-wrap gap-2 pt-2">
@@ -342,6 +361,7 @@ export default function ClassesPage() {
                 <Label htmlFor="member-select">Select Member</Label>
                 <select
                   id="member-select"
+                  aria-label="Select member"
                   value={selectedMemberId}
                   onChange={(e) => setSelectedMemberId(e.target.value)}
                   className="w-full h-10 px-3 rounded-md border border-input bg-background text-sm focus:ring-2 focus:ring-primary/20 outline-none"

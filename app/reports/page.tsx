@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { ProtectedLayout } from '@/components/layout/protected-layout'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -38,7 +38,7 @@ export default function ReportsPage() {
 
   useEffect(() => {
     fetchSettings()
-  }, [])
+  }, [fetchSettings])
 
   const fetchReport = async (type: ReportType) => {
     setIsLoading(true)
@@ -376,13 +376,9 @@ export default function ReportsPage() {
                           <td className="px-6 py-4 font-mono text-xs">{c.enrollment} / {c.capacity}</td>
                           <td className="px-6 py-4">
                             <div className="flex items-center gap-3">
-                              <div className="w-24 bg-white/10 rounded-full h-2 overflow-hidden">
-                                <div className={`h-full rounded-full ${
-                                  c.occupancyRate >= 80 ? 'bg-emerald-500' :
-                                  c.occupancyRate >= 50 ? 'bg-blue-500' :
-                                  'bg-amber-500'
-                                }`} style={{ width: `${Math.min(c.occupancyRate, 100)}%` }} />
-                              </div>
+                              <svg className="w-24 h-2 bg-white/10 rounded-full overflow-hidden" viewBox="0 0 100 8" preserveAspectRatio="none" aria-hidden="true">
+                                <rect x="0" y="0" width={Math.min(c.occupancyRate, 100)} height="8" rx="4" fill={c.occupancyRate >= 80 ? '#10b981' : c.occupancyRate >= 50 ? '#3b82f6' : '#f59e0b'} />
+                              </svg>
                               <span className="font-bold text-xs text-white">{c.occupancyRate}%</span>
                             </div>
                           </td>
@@ -535,14 +531,16 @@ export default function ReportsPage() {
                       <div key={d.name} className="space-y-2">
                         <div className="flex justify-between items-center text-sm">
                           <div className="flex items-center gap-2">
-                            <div className="w-3 h-3 rounded-full" style={{ backgroundColor: COLORS[index % COLORS.length] }} />
+                            <svg className="w-3 h-3 rounded-full" viewBox="0 0 12 12" aria-hidden="true">
+                              <circle cx="6" cy="6" r="6" fill={COLORS[index % COLORS.length]} />
+                            </svg>
                             <span className="font-medium text-white">{d.name}</span>
                           </div>
                           <span className="text-muted-foreground font-mono">{d.value} ({pct}%)</span>
                         </div>
-                        <div className="w-full bg-white/10 rounded-full h-2 overflow-hidden">
-                          <div className="h-full rounded-full" style={{ backgroundColor: COLORS[index % COLORS.length], width: `${pct}%` }} />
-                        </div>
+                        <svg className="w-full h-2 bg-white/10 rounded-full overflow-hidden" viewBox="0 0 100 8" preserveAspectRatio="none" aria-hidden="true">
+                          <rect x="0" y="0" width={pct} height="8" rx="4" fill={COLORS[index % COLORS.length]} />
+                        </svg>
                       </div>
                     )
                   })}
@@ -647,23 +645,25 @@ export default function ReportsPage() {
   const actorRole = useAuthStore(s => s.user?.role) as UserRole
   const isManagerOrAdmin = ['cto', 'ceo', 'admin', 'manager'].includes(actorRole)
 
-  const reportOptions = [
-    { value: 'member-summary', label: 'Member Growth & Summary', icon: Users, roles: ['cto', 'ceo', 'admin', 'manager', 'staff', 'trainer'] },
-    { value: 'expiring-members', label: 'Membership Retention Alerts', icon: UserCheck, roles: ['cto', 'ceo', 'admin', 'manager', 'staff'] },
-    { value: 'revenue', label: 'Financial Revenue Trends', icon: DollarSign, roles: ['cto', 'ceo', 'admin', 'manager'] },
-    { value: 'attendance', label: 'Traffic & Attendance Patterns', icon: Activity, roles: ['cto', 'ceo', 'admin', 'manager', 'staff', 'trainer'] },
-    { value: 'class-utilization', label: 'Class Enrollment Metrics', icon: Calendar, roles: ['cto', 'ceo', 'admin', 'manager', 'staff', 'trainer'] },
-    { value: 'equipment-status', label: 'Equipment Maintenance Log', icon: Package, roles: ['cto', 'ceo', 'admin', 'manager', 'staff'] },
-    { value: 'leads-conversion', label: 'Lead Conversion Pipeline', icon: Zap, roles: ['cto', 'ceo', 'admin', 'manager'] },
-    { value: 'staff-performance', label: 'Trainer & Staff Performance', icon: TrendingUp, roles: ['cto', 'ceo', 'admin', 'manager'] },
-  ].filter(opt => opt.roles.includes(actorRole))
+  const reportOptions = useMemo(() => {
+    return [
+      { value: 'member-summary', label: 'Member Growth & Summary', icon: Users, roles: ['cto', 'ceo', 'admin', 'manager', 'staff', 'trainer'] },
+      { value: 'expiring-members', label: 'Membership Retention Alerts', icon: UserCheck, roles: ['cto', 'ceo', 'admin', 'manager', 'staff'] },
+      { value: 'revenue', label: 'Financial Revenue Trends', icon: DollarSign, roles: ['cto', 'ceo', 'admin', 'manager'] },
+      { value: 'attendance', label: 'Traffic & Attendance Patterns', icon: Activity, roles: ['cto', 'ceo', 'admin', 'manager', 'staff', 'trainer'] },
+      { value: 'class-utilization', label: 'Class Enrollment Metrics', icon: Calendar, roles: ['cto', 'ceo', 'admin', 'manager', 'staff', 'trainer'] },
+      { value: 'equipment-status', label: 'Equipment Maintenance Log', icon: Package, roles: ['cto', 'ceo', 'admin', 'manager', 'staff'] },
+      { value: 'leads-conversion', label: 'Lead Conversion Pipeline', icon: Zap, roles: ['cto', 'ceo', 'admin', 'manager'] },
+      { value: 'staff-performance', label: 'Trainer & Staff Performance', icon: TrendingUp, roles: ['cto', 'ceo', 'admin', 'manager'] },
+    ].filter(opt => opt.roles.includes(actorRole))
+  }, [actorRole])
 
   // Set initial report type to the first available option for that role
   useEffect(() => {
     if (reportOptions.length > 0 && !reportOptions.find(o => o.value === reportType)) {
       setReportType(reportOptions[0].value as ReportType)
     }
-  }, [actorRole])
+  }, [actorRole, reportOptions, reportType])
 
   return (
     <ProtectedLayout>

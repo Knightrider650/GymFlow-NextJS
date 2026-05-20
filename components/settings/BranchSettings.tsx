@@ -16,7 +16,7 @@ export function BranchSettings() {
 
   React.useEffect(() => {
     fetchBranches()
-  }, [])
+  }, [fetchBranches])
 
   const handleEditClick = (branch: Branch) => {
     setActiveBranch(branch)
@@ -274,6 +274,7 @@ export function BranchSettings() {
                   name="isDefault"
                   checked={!!formData.isDefault}
                   onChange={handleChange}
+                  aria-label="Mark as default branch"
                   className="h-4 w-4 text-primary border-slate-300 rounded focus:ring-primary"
                 />
                 <Label htmlFor="isDefault" className="font-semibold cursor-pointer">
