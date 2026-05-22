@@ -122,11 +122,11 @@ export default function ActivityLogPage() {
                     
                     <div className="flex items-center gap-3 bg-muted/30 px-3 py-1.5 rounded-full self-start md:self-center">
                       <div className="h-6 w-6 rounded-full bg-primary/20 flex items-center justify-center text-[10px] font-bold text-primary">
-                        {activity.userName.charAt(0)}
+                        {(activity.userName || 'System').charAt(0)}
                       </div>
                       <div className="text-xs">
-                        <p className="font-semibold text-foreground">{activity.userName}</p>
-                        <p className="text-[10px] text-muted-foreground">User ID: {activity.userId.substring(0, 8)}</p>
+                        <p className="font-semibold text-foreground">{activity.userName || 'System'}</p>
+                        <p className="text-[10px] text-muted-foreground">User ID: {activity.userId ? activity.userId.substring(0, 8) : 'System'}</p>
                       </div>
                     </div>
                   </CardContent>

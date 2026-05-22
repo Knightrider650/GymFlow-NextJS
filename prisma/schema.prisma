@@ -23,6 +23,7 @@ model Gym {
   nextInvoiceNumber Int      @default(1000)
   createdAt        DateTime @default(now())
   updatedAt        DateTime @updatedAt
+  settingsConfig   Json?
 
   users            User[]
   members          Member[]

@@ -207,6 +207,8 @@ export function isTrainer(role?: string | null): boolean {
 /** Safe cast helper: returns the role as `UserRole` if valid, otherwise `undefined` */
 export function asUserRole(role?: string | null): UserRole | undefined {
   if (!role) return undefined
+  const normalized = role.trim().toLowerCase() as UserRole
   const keys = Object.keys(ROLE_HIERARCHY) as UserRole[]
-  return keys.includes(role as UserRole) ? (role as UserRole) : undefined
+  return keys.includes(normalized) ? normalized : undefined
 }
+

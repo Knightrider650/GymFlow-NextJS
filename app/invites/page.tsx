@@ -26,7 +26,7 @@ export default function InvitesPage() {
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [formData, setFormData] = useState({
     email: '',
-    role: 'Member'
+    role: 'member'
   })
 
   const fetchInvites = async () => {
@@ -58,7 +58,7 @@ export default function InvitesPage() {
         status: 'pending'
       })
       if (response.success) {
-        setFormData({ email: '', role: 'Member' })
+        setFormData({ email: '', role: 'member' })
         fetchInvites()
       }
     } catch (err) {
@@ -112,26 +112,26 @@ export default function InvitesPage() {
                 <div className="space-y-2">
                   <Label htmlFor="email">Email Address</Label>
                   <Input 
-                    id="email" 
-                    type="email" 
-                    placeholder="name@example.com" 
-                    required 
-                    value={formData.email}
-                    onChange={(e) => setFormData({...formData, email: e.target.value})}
+                     id="email" 
+                     type="email" 
+                     placeholder="name@example.com" 
+                     required 
+                     value={formData.email}
+                     onChange={(e) => setFormData({...formData, email: e.target.value})}
                   />
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="role">Assign Role</Label>
                   <select 
-                    id="role" 
-                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                    value={formData.role}
-                    onChange={(e) => setFormData({...formData, role: e.target.value})}
+                     id="role" 
+                     className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                     value={formData.role}
+                     onChange={(e) => setFormData({...formData, role: e.target.value})}
                   >
-                    <option value="Member">Member</option>
-                    <option value="Trainer">Trainer</option>
-                    <option value="Manager">Manager</option>
-                    <option value="Admin">Admin</option>
+                    <option value="member">Member</option>
+                    <option value="trainer">Trainer</option>
+                    <option value="manager">Manager</option>
+                    <option value="admin">Admin</option>
                   </select>
                 </div>
               </CardContent>

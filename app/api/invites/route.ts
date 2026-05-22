@@ -32,12 +32,13 @@ export async function POST(req: NextRequest) {
     }
 
     const data = await req.json()
-    const { email, role, expiresAt } = data
+    const { email, role: rawRole, expiresAt } = data
 
-    if (!email || !role) {
+    if (!email || !rawRole) {
       return NextResponse.json({ success: false, error: 'Missing required fields' }, { status: 400 })
     }
 
+    const role = rawRole.toLowerCase()
     const gymId = await getRequiredGymId(user, req, data)
 
     // Check if invite already exists

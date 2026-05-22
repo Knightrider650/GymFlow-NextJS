@@ -93,6 +93,17 @@ export default function CommunicationsPage() {
     }
   }
 
+  const handleSendCampaign = async (id: string) => {
+    try {
+      const res = await apiClient.post(`/api/campaigns/${id}/send`)
+      if (res.success) {
+        fetchData()
+      }
+    } catch (err) {
+      console.error('Failed to send campaign:', err)
+    }
+  }
+
   return (
     <ProtectedLayout>
       <div className="p-6 lg:p-8 space-y-8">
@@ -209,23 +220,48 @@ export default function CommunicationsPage() {
                  </div>
                ) : (
                  campaigns.map((campaign) => (
-                   <Card key={campaign.id} className="border-none bg-card/40 backdrop-blur-md group hover:bg-card/60 transition-all">
-                     <CardHeader>
-                       <div className="flex justify-between items-start mb-2">
-                         <Badge className="bg-primary/10 text-primary border-none">{campaign.targetSegment}</Badge>
-                         <span className="text-[10px] text-muted-foreground">{format(new Date(campaign.sentAt), 'MMM dd, yyyy')}</span>
-                       </div>
-                       <CardTitle className="group-hover:text-primary transition-colors">{campaign.title}</CardTitle>
-                       <CardDescription className="line-clamp-2">{campaign.subject}</CardDescription>
-                     </CardHeader>
-                     <CardContent>
-                       <div className="p-3 rounded-lg bg-black/20 text-xs text-muted-foreground italic mb-4">
-                         &quot;{campaign.content.substring(0, 100)}...&quot;
-                       </div>
+                   <Card key={campaign.id} className="border-none bg-card/40 backdrop-blur-md group hover:bg-card/60 transition-all flex flex-col justify-between">
+                     <div>
+                       <CardHeader>
+                         <div className="flex justify-between items-start mb-2 gap-2">
+                           <div className="flex flex-wrap gap-1.5">
+                             <Badge className="bg-primary/10 text-primary border-none">{campaign.targetSegment}</Badge>
+                             {campaign.status === 'sent' ? (
+                               <Badge variant="outline" className="bg-emerald-500/10 text-emerald-500 border-emerald-500/20 text-[10px] py-0 px-1.5">Sent</Badge>
+                             ) : (
+                               <Badge variant="outline" className="bg-amber-500/10 text-amber-500 border-amber-500/20 text-[10px] py-0 px-1.5">Draft</Badge>
+                             )}
+                           </div>
+                           <span className="text-[10px] text-muted-foreground shrink-0">{format(new Date(campaign.sentAt), 'MMM dd, yyyy')}</span>
+                         </div>
+                         <CardTitle className="group-hover:text-primary transition-colors">{campaign.title}</CardTitle>
+                         <CardDescription className="line-clamp-2">{campaign.subject}</CardDescription>
+                       </CardHeader>
+                       <CardContent className="pb-4">
+                         <div className="p-3 rounded-lg bg-black/20 text-xs text-muted-foreground italic">
+                           &quot;{campaign.content.substring(0, 100)}...&quot;
+                         </div>
+                       </CardContent>
+                     </div>
+                     <CardContent className="pt-0 flex flex-col gap-3">
                        <div className="flex items-center justify-between text-[10px] text-muted-foreground uppercase tracking-widest font-bold">
-                         <span>Sent by {campaign.createdBy}</span>
-                         <span className="flex items-center gap-1"><CheckCircle2 className="h-3 w-3 text-emerald-500" /> Delivered</span>
+                         <span>Sent by {campaign.createdBy || 'Staff'}</span>
+                         {campaign.status === 'sent' ? (
+                           <span className="flex items-center gap-1 text-emerald-500 font-bold"><CheckCircle2 className="h-3 w-3" /> Delivered</span>
+                         ) : (
+                           <span className="flex items-center gap-1 text-amber-500 font-bold"><AlertCircle className="h-3 w-3" /> Draft</span>
+                         )}
                        </div>
+                       {campaign.status !== 'sent' && (
+                         <Button 
+                           size="sm" 
+                           className="w-full gap-2 text-xs bg-emerald-600 hover:bg-emerald-700 text-white mt-1" 
+                           onClick={() => handleSendCampaign(campaign.id)}
+                         >
+                           <Send className="h-3.5 w-3.5" />
+                           Send Now
+                         </Button>
+                       )}
                      </CardContent>
                    </Card>
                  ))
