@@ -46,6 +46,10 @@ export async function middleware(req: NextRequest) {
 
   const routeScope = getRouteScope(pathname)
   if (routeScope && actor.scope && actor.scope !== routeScope) {
+    // Global administrators are allowed to access both platform and tenant routes for impersonation/support
+    if (actor.isGlobal) {
+      return NextResponse.next()
+    }
     const target = actor.scope === 'platform' ? '/super-dashboard' : '/dashboard'
     return NextResponse.redirect(new URL(target, req.url))
   }

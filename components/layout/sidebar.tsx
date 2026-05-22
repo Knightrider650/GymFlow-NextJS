@@ -81,11 +81,16 @@ export function Sidebar() {
   const router = useRouter()
   const { logout, user } = useAuth()
   const { settings } = useSettings()
+  const [mounted, setMounted] = useState(false)
   const [isOpen, setIsOpen] = useState(false)
   const [isSupportMode, setIsSupportMode] = useState(false)
 
   const actorRole = (user?.role ?? 'staff') as UserRole
   const isGlobalUser = !!user?.isGlobal
+
+  useEffect(() => {
+    setMounted(true)
+  }, [])
 
   useEffect(() => {
     if (typeof window === 'undefined') return
@@ -162,62 +167,81 @@ export function Sidebar() {
 
         {/* User Info */}
         <div className="p-4 border-b border-border">
-          <div className="flex items-center justify-between mb-1">
-            <p className="text-sm font-semibold text-foreground">{user?.fullname}</p>
-            {user?.isGlobal && (
-              <Badge variant="outline" className="text-[9px] h-4 bg-violet-500/10 text-violet-400 border-violet-500/20 px-1 py-0 leading-none">
-                GLOBAL
-              </Badge>
-            )}
-          </div>
-          <p className="text-xs text-muted-foreground">{user?.email}</p>
-          <div className="flex items-center gap-2 mt-2">
-            <span className="inline-block px-2 py-0.5 text-[10px] font-medium rounded bg-primary/10 text-primary uppercase tracking-wider">
-              {user?.role}
-            </span>
-            {isGlobalUser && pathname !== '/super-dashboard' && (
-              <Link href="/super-dashboard" className="text-[10px] text-violet-400 hover:text-violet-300 flex items-center gap-1 transition-colors">
-                <Globe className="h-3 w-3" />
-                Global View
-              </Link>
-            )}
-          </div>
+          {mounted && user ? (
+            <>
+              <div className="flex items-center justify-between mb-1">
+                <p className="text-sm font-semibold text-foreground">{user.fullname}</p>
+                {user.isGlobal && (
+                  <Badge variant="outline" className="text-[9px] h-4 bg-violet-500/10 text-violet-400 border-violet-500/20 px-1 py-0 leading-none">
+                    GLOBAL
+                  </Badge>
+                )}
+              </div>
+              <p className="text-xs text-muted-foreground">{user.email}</p>
+              <div className="flex items-center gap-2 mt-2">
+                <span className="inline-block px-2 py-0.5 text-[10px] font-medium rounded bg-primary/10 text-primary uppercase tracking-wider">
+                  {user.role}
+                </span>
+                {isGlobalUser && pathname !== '/super-dashboard' && (
+                  <Link href="/super-dashboard" className="text-[10px] text-violet-400 hover:text-violet-300 flex items-center gap-1 transition-colors">
+                    <Globe className="h-3 w-3" />
+                    Global View
+                  </Link>
+                )}
+              </div>
+            </>
+          ) : (
+            <div className="space-y-2 animate-pulse">
+              <div className="h-4 bg-white/5 rounded w-3/4"></div>
+              <div className="h-3 bg-white/5 rounded w-1/2"></div>
+            </div>
+          )}
         </div>
 
         {/* Navigation — role-filtered, grouped by section */}
         <nav className="flex-1 overflow-y-auto p-4">
-          {sections.map((section) => {
-            const items = visibleItems.filter((i) => (i.section ?? 'core') === section)
-            if (items.length === 0) return null
-            return (
-              <div key={section} className="mb-4">
-                <p className="text-[10px] font-bold uppercase tracking-[0.15em] text-muted-foreground/50 px-2 mb-1">
-                  {SECTION_LABELS[section]}
-                </p>
-                <div className="space-y-1">
-                  {items.map((item) => {
-                    const Icon = item.icon
-                    const active = isActive(item.href)
-                    return (
-                      <Link
-                        key={item.href}
-                        href={item.href}
-                        className={`flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-all duration-300 ${
-                          active
-                            ? 'bg-primary text-primary-foreground shadow-[0_0_15px_rgba(0,200,255,0.4)] scale-[1.02]'
-                            : 'text-muted-foreground hover:text-foreground hover:bg-white/5'
-                        }`}
-                        onClick={() => setIsOpen(false)}
-                      >
-                        <Icon className="w-4 h-4 shrink-0" />
-                        <span>{item.label}</span>
-                      </Link>
-                    )
-                  })}
+          {mounted ? (
+            sections.map((section) => {
+              const items = visibleItems.filter((i) => (i.section ?? 'core') === section)
+              if (items.length === 0) return null
+              return (
+                <div key={section} className="mb-4">
+                  <p className="text-[10px] font-bold uppercase tracking-[0.15em] text-muted-foreground/50 px-2 mb-1">
+                    {SECTION_LABELS[section]}
+                  </p>
+                  <div className="space-y-1">
+                    {items.map((item) => {
+                      const Icon = item.icon
+                      const active = isActive(item.href)
+                      return (
+                        <Link
+                          key={item.href}
+                          href={item.href}
+                          className={`flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-all duration-300 ${
+                            active
+                              ? 'bg-primary text-primary-foreground shadow-[0_0_15px_rgba(0,200,255,0.4)] scale-[1.02]'
+                              : 'text-muted-foreground hover:text-foreground hover:bg-white/5'
+                          }`}
+                          onClick={() => setIsOpen(false)}
+                        >
+                          <Icon className="w-4 h-4 shrink-0" />
+                          <span>{item.label}</span>
+                        </Link>
+                      )
+                    })}
+                  </div>
                 </div>
+              )
+            })
+          ) : (
+            <div className="space-y-4 animate-pulse">
+              <div className="h-4 bg-white/5 rounded w-2/3 mx-2"></div>
+              <div className="space-y-2">
+                <div className="h-8 bg-white/5 rounded-lg w-full"></div>
+                <div className="h-8 bg-white/5 rounded-lg w-full"></div>
               </div>
-            )
-          })}
+            </div>
+          )}
         </nav>
 
         {/* Logout */}
