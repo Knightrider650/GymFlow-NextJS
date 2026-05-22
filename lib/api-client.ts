@@ -3,6 +3,20 @@ import { ApiResponse } from '../types'
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || ''
 
+let isRefreshing = false
+let failedQueue: any[] = []
+
+const processQueue = (error: any, token: string | null = null) => {
+  failedQueue.forEach((prom) => {
+    if (error) {
+      prom.reject(error)
+    } else {
+      prom.resolve(token)
+    }
+  })
+  failedQueue = []
+}
+
 class ApiClient {
   private client: AxiosInstance
   private accessToken: string | null = null
@@ -92,7 +106,22 @@ class ApiClient {
       async (error: AxiosError) => {
         const originalRequest = error.config as any
         if (error.response?.status === 401 && !originalRequest._retry) {
+          if (isRefreshing) {
+            return new Promise((resolve, reject) => {
+              failedQueue.push({ resolve, reject })
+            })
+              .then((token) => {
+                originalRequest.headers.Authorization = `Bearer ${token}`
+                return this.client(originalRequest)
+              })
+              .catch((err) => {
+                return Promise.reject(err)
+              })
+          }
+
           originalRequest._retry = true
+          isRefreshing = true
+
           try {
             if (typeof window !== 'undefined') {
               const refreshToken = localStorage.getItem('refreshToken')
@@ -102,15 +131,38 @@ class ApiClient {
                   { refreshToken },
                 )
                 if (response.data?.data?.accessToken) {
-                  localStorage.setItem('accessToken', response.data.data.accessToken)
-                  originalRequest.headers.Authorization = `Bearer ${response.data.data.accessToken}`
+                  const newAccessToken = response.data.data.accessToken
+                  localStorage.setItem('accessToken', newAccessToken)
+                  document.cookie = `token=${newAccessToken}; path=/; max-age=86400; SameSite=Lax`
+
+                  if (response.data.data.refreshToken) {
+                    localStorage.setItem('refreshToken', response.data.data.refreshToken)
+                  }
+
+                  originalRequest.headers.Authorization = `Bearer ${newAccessToken}`
+                  processQueue(null, newAccessToken)
+                  isRefreshing = false
+
                   return this.client(originalRequest)
                 }
               }
             }
-          } catch (refreshError) {
+
+            processQueue(new Error('Token refresh failed'), null)
+            isRefreshing = false
+
             if (typeof window !== 'undefined') {
               localStorage.clear()
+              document.cookie = 'token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT'
+              window.location.href = '/login'
+            }
+          } catch (refreshError) {
+            processQueue(refreshError, null)
+            isRefreshing = false
+
+            if (typeof window !== 'undefined') {
+              localStorage.clear()
+              document.cookie = 'token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT'
               window.location.href = '/login'
             }
           }

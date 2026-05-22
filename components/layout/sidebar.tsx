@@ -32,6 +32,8 @@ import { useEffect, useState } from 'react'
 import { NAV_VISIBILITY, type UserRole } from '@/lib/permissions'
 import { useAuthStore } from '@/lib/store'
 
+const PLATFORM_ROUTES = new Set(['/super-dashboard', '/team'])
+
 interface NavItem {
   href: string
   label: string
@@ -80,8 +82,22 @@ export function Sidebar() {
   const { logout, user } = useAuth()
   const { settings } = useSettings()
   const [isOpen, setIsOpen] = useState(false)
+  const [isSupportMode, setIsSupportMode] = useState(false)
 
   const actorRole = (user?.role ?? 'staff') as UserRole
+  const isGlobalUser = !!user?.isGlobal
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+
+    const syncSupportMode = () => {
+      setIsSupportMode(localStorage.getItem('gymflow_support_session') === 'true')
+    }
+
+    syncSupportMode()
+    window.addEventListener('storage', syncSupportMode)
+    return () => window.removeEventListener('storage', syncSupportMode)
+  }, [pathname])
 
   const handleLogout = async () => {
     await logout()
@@ -92,7 +108,13 @@ export function Sidebar() {
   const visibleItems = ALL_NAV_ITEMS.filter((item) => {
     const allowed = NAV_VISIBILITY[item.href]
     if (!allowed) return true
-    return allowed.includes(actorRole)
+    if (!allowed.includes(actorRole)) return false
+
+    if (isGlobalUser && !isSupportMode) {
+      return PLATFORM_ROUTES.has(item.href)
+    }
+
+    return true
   })
 
   // Group by section while preserving order
@@ -128,7 +150,7 @@ export function Sidebar() {
       >
         {/* Logo */}
         <div className="flex items-center justify-between gap-2 p-6 border-b border-white/5">
-          <Link href="/dashboard" className="flex items-center gap-2 text-xl font-bold hover:opacity-80 transition-opacity">
+          <Link href={isGlobalUser && !isSupportMode ? '/super-dashboard' : '/dashboard'} className="flex items-center gap-2 text-xl font-bold hover:opacity-80 transition-opacity">
             {settings?.gymLogo ? (
               <Image src={settings.gymLogo} alt="Gym Logo" width={32} height={32} className="w-8 h-8 rounded-md object-cover" unoptimized />
             ) : (
@@ -153,7 +175,7 @@ export function Sidebar() {
             <span className="inline-block px-2 py-0.5 text-[10px] font-medium rounded bg-primary/10 text-primary uppercase tracking-wider">
               {user?.role}
             </span>
-            {user?.isGlobal && pathname !== '/super-dashboard' && (
+            {isGlobalUser && pathname !== '/super-dashboard' && (
               <Link href="/super-dashboard" className="text-[10px] text-violet-400 hover:text-violet-300 flex items-center gap-1 transition-colors">
                 <Globe className="h-3 w-3" />
                 Global View

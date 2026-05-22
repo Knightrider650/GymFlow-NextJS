@@ -18,7 +18,8 @@ export default function LoginPage() {
 
   useEffect(() => {
     checkAuth()
-  }, [checkAuth])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   useEffect(() => {
     if (isAuthenticated && user) {
