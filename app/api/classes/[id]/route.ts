@@ -10,8 +10,8 @@ export async function PUT(
     const user = await getAuthUser(req)
     if (!user) return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 })
 
-    // Only allow admin, ceo, cto to update classes
-    if (!['admin', 'ceo', 'cto'].includes(user.role)) {
+    // Only allow admin, ceo, cto, owner, manager to update classes
+    if (!['admin', 'ceo', 'cto', 'owner', 'manager'].includes(user.role)) {
       return NextResponse.json({ success: false, error: 'Forbidden' }, { status: 403 })
     }
 
@@ -66,8 +66,8 @@ export async function DELETE(
     const user = await getAuthUser(req)
     if (!user) return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 })
 
-    // Only allow admin, ceo, cto to delete classes
-    if (!['admin', 'ceo', 'cto'].includes(user.role)) {
+    // Only allow admin, ceo, cto, owner, manager to delete classes
+    if (!['admin', 'ceo', 'cto', 'owner', 'manager'].includes(user.role)) {
       return NextResponse.json({ success: false, error: 'Forbidden' }, { status: 403 })
     }
 

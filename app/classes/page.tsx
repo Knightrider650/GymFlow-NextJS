@@ -20,6 +20,7 @@ import { useClasses, useStaff, useBranches, useMembers } from '@/hooks'
 import { Plus, Edit2, Trash2, Clock, Users, User, Calendar, MapPin, CheckCircle2, Filter } from 'lucide-react'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { useAuthStore } from '@/lib/store'
+import { apiClient } from '@/lib/api-client'
 
 export default function ClassesPage() {
   const { classes, isLoading, fetchClasses, createClass, updateClass, deleteClass } = useClasses()
@@ -27,6 +28,7 @@ export default function ClassesPage() {
   const { branches, fetchBranches } = useBranches()
   const { members, fetchMembers } = useMembers()
   const user = useAuthStore((state: any) => state.user)
+  const userRole = user?.role || 'staff'
   
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false)
   const [isBookDialogOpen, setIsBookDialogOpen] = useState(false)
@@ -34,10 +36,12 @@ export default function ClassesPage() {
   const [selectedBranch, setSelectedBranch] = useState<string>('all')
   const [selectedMemberId, setSelectedMemberId] = useState('')
   const [editingClassId, setEditingClassId] = useState<string | null>(null)
+  const [users, setUsers] = useState<any[]>([])
 
   const [formData, setFormData] = useState({
     name: '',
     instructorName: '',
+    instructorId: '',
     maxCapacity: '',
     description: '',
     time: '10:00 AM',
@@ -51,6 +55,46 @@ export default function ClassesPage() {
     fetchBranches()
     fetchMembers()
   }, [fetchClasses, fetchStaff, fetchBranches, fetchMembers])
+
+  useEffect(() => {
+    const canFetchUsers = ['admin', 'ceo', 'cto', 'owner', 'manager'].includes(userRole)
+    if (!canFetchUsers) return
+
+    const loadUsers = async () => {
+      try {
+        const res = await apiClient.get('/api/users')
+        if (res.success && res.data) {
+          setUsers(res.data)
+        }
+      } catch (err) {
+        console.error('Error fetching users:', err)
+      }
+    }
+    loadUsers()
+  }, [userRole])
+
+  const activeTrainers = staff.filter(
+    (s) => s.status === 'active' && s.position?.toLowerCase() === 'trainer'
+  )
+
+  const canAddClass = ['admin', 'ceo', 'cto', 'owner', 'manager'].includes(userRole)
+  const canEditDeleteClass = ['admin', 'ceo', 'cto', 'owner', 'manager'].includes(userRole)
+  const canEnrollMember = ['admin', 'ceo', 'cto', 'owner', 'manager', 'staff'].includes(userRole)
+
+  const getSelectedStaffId = () => {
+    if (formData.instructorId) {
+      const matchingUser = users.find(u => u.id === formData.instructorId)
+      if (matchingUser) {
+        const matchingStaff = activeTrainers.find(s => s.email === matchingUser.email)
+        if (matchingStaff) return matchingStaff.id
+      }
+    }
+    if (formData.instructorName) {
+      const matchingStaff = activeTrainers.find(s => s.name === formData.instructorName)
+      if (matchingStaff) return matchingStaff.id
+    }
+    return ''
+  }
 
   const filteredClasses = selectedBranch === 'all'
     ? classes
@@ -73,7 +117,7 @@ export default function ClassesPage() {
     }
     setIsAddDialogOpen(false)
     setEditingClassId(null)
-    setFormData({ name: '', instructorName: '', maxCapacity: '', description: '', time: '10:00 AM', days: 'Mon, Wed, Fri', branchId: '' })
+    setFormData({ name: '', instructorName: '', instructorId: '', maxCapacity: '', description: '', time: '10:00 AM', days: 'Mon, Wed, Fri', branchId: '' })
     fetchClasses()
   }
 
@@ -122,58 +166,74 @@ export default function ClassesPage() {
                 </SelectContent>
               </Select>
             </div>
-          <Dialog open={isAddDialogOpen} onOpenChange={(open) => {
-            setIsAddDialogOpen(open)
-            if (!open) {
-              setEditingClassId(null)
-              setFormData({ name: '', instructorName: '', maxCapacity: '', description: '', time: '10:00 AM', days: 'Mon, Wed, Fri', branchId: '' })
-            }
-          }}>
-            <DialogTrigger asChild>
-              <Button 
-                onClick={() => {
-                  setEditingClassId(null)
-                  setFormData({ name: '', instructorName: '', maxCapacity: '', description: '', time: '10:00 AM', days: 'Mon, Wed, Fri', branchId: '' })
-                }}
-                className="gap-2 w-fit shadow-lg shadow-primary/20 transition-all hover:scale-105 active:scale-95"
-              >
-                <Plus className="h-4 w-4" />
-                Add New Class
-              </Button>
-            </DialogTrigger>
-            <DialogContent className="sm:max-w-[425px] max-h-[90vh] overflow-y-auto border-none shadow-2xl">
-              <DialogHeader className="bg-slate-50 -m-6 mb-0 p-6 border-b border-slate-100">
-                <DialogTitle className="text-xl">{editingClassId ? 'Edit Fitness Session' : 'Create Fitness Session'}</DialogTitle>
-                <DialogDescription>
-                  {editingClassId ? 'Modify the class parameters and assigned instructor.' : 'Define a new class schedule and assign a specialized instructor.'}
-                </DialogDescription>
-              </DialogHeader>
-              <form onSubmit={handleAddClass} className="space-y-4 py-8 px-1">
-                <div className="space-y-2">
-                  <Label htmlFor="name">Class Name *</Label>
-                  <Input 
-                    id="name" 
-                    placeholder="e.g. Morning Strength & Conditioning" 
-                    value={formData.name}
-                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                    required 
-                    className="focus:ring-primary/20"
-                  />
-                </div>
-                <div className="grid grid-cols-2 gap-4">
+          {canAddClass && (
+            <Dialog open={isAddDialogOpen} onOpenChange={(open) => {
+              setIsAddDialogOpen(open)
+              if (!open) {
+                setEditingClassId(null)
+                setFormData({ name: '', instructorName: '', instructorId: '', maxCapacity: '', description: '', time: '10:00 AM', days: 'Mon, Wed, Fri', branchId: '' })
+              }
+            }}>
+              <DialogTrigger asChild>
+                <Button 
+                  onClick={() => {
+                    setEditingClassId(null)
+                    setFormData({ name: '', instructorName: '', instructorId: '', maxCapacity: '', description: '', time: '10:00 AM', days: 'Mon, Wed, Fri', branchId: '' })
+                  }}
+                  className="gap-2 w-fit shadow-lg shadow-primary/20 transition-all hover:scale-105 active:scale-95"
+                >
+                  <Plus className="h-4 w-4" />
+                  Add New Class
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="sm:max-w-[425px] max-h-[90vh] overflow-y-auto border-none shadow-2xl">
+                <DialogHeader className="bg-slate-50 -m-6 mb-0 p-6 border-b border-slate-100">
+                  <DialogTitle className="text-xl">{editingClassId ? 'Edit Fitness Session' : 'Create Fitness Session'}</DialogTitle>
+                  <DialogDescription>
+                    {editingClassId ? 'Modify the class parameters and assigned instructor.' : 'Define a new class schedule and assign a specialized instructor.'}
+                  </DialogDescription>
+                </DialogHeader>
+                <form onSubmit={handleAddClass} className="space-y-4 py-8 px-1">
                   <div className="space-y-2">
-                    <Label htmlFor="instructor">Lead Instructor</Label>
-                    <select
-                      id="instructor"
-                      aria-label="Lead instructor"
-                      value={formData.instructorName}
-                      onChange={(e) => setFormData({ ...formData, instructorName: e.target.value })}
-                      className="w-full h-10 px-3 rounded-md border border-input bg-background text-sm focus:ring-2 focus:ring-primary/20 outline-none"
-                    >
-                      <option value="">None / Unassigned</option>
-                      {staff.map(s => <option key={s.id} value={s.name}>{s.name}</option>)}
-                    </select>
+                    <Label htmlFor="name">Class Name *</Label>
+                    <Input 
+                      id="name" 
+                      placeholder="e.g. Morning Strength & Conditioning" 
+                      value={formData.name}
+                      onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                      required 
+                      className="focus:ring-primary/20"
+                    />
                   </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="instructor">Lead Instructor</Label>
+                      <select
+                        id="instructor"
+                        aria-label="Lead instructor"
+                        value={getSelectedStaffId()}
+                        onChange={(e) => {
+                          const staffId = e.target.value
+                          if (!staffId) {
+                            setFormData({ ...formData, instructorName: '', instructorId: '' })
+                            return
+                          }
+                          const selectedStaff = activeTrainers.find(s => s.id === staffId)
+                          if (selectedStaff) {
+                            const matchingUser = users.find(u => u.email === selectedStaff.email && u.role === 'trainer')
+                            setFormData({
+                              ...formData,
+                              instructorName: selectedStaff.name,
+                              instructorId: matchingUser ? matchingUser.id : ''
+                            })
+                          }
+                        }}
+                        className="w-full h-10 px-3 rounded-md border border-input bg-background text-sm focus:ring-2 focus:ring-primary/20 outline-none"
+                      >
+                        <option value="">None / Unassigned</option>
+                        {activeTrainers.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+                      </select>
+                    </div>
                   <div className="space-y-2">
                     <Label htmlFor="capacity">Max Capacity *</Label>
                     <Input 
@@ -241,6 +301,7 @@ export default function ClassesPage() {
               </form>
             </DialogContent>
           </Dialog>
+          )}
         </div>
 
         {/* Classes Grid */}
@@ -249,9 +310,19 @@ export default function ClassesPage() {
             <div className="md:col-span-2 lg:col-span-3 py-20 flex flex-col items-center justify-center border-2 border-dashed rounded-3xl bg-white/50">
               <Calendar className="h-12 w-12 text-slate-300 mb-4" />
               <p className="text-xl font-semibold text-slate-500">
-                {isLoading ? 'Synchronizing schedule data...' : 'No active sessions scheduled.'}
+                {isLoading
+                  ? 'Synchronizing schedule data...'
+                  : userRole === 'trainer'
+                  ? 'No assigned sessions.'
+                  : 'No active sessions scheduled.'}
               </p>
-              <p className="text-slate-400 mt-1">Start by adding your first gym class above.</p>
+              <p className="text-slate-400 mt-1">
+                {isLoading
+                  ? ''
+                  : userRole === 'trainer'
+                  ? 'You do not have any assigned fitness sessions at this time.'
+                  : 'Start by adding your first gym class above.'}
+              </p>
             </div>
           ) : (
             filteredClasses.map((fitnessClass) => {
@@ -268,31 +339,34 @@ export default function ClassesPage() {
                           <span>Led by {fitnessClass.instructorName || 'Expert Trainer'}</span>
                         </div>
                       </div>
-                      <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                        <Button 
-                          size="icon" 
-                          variant="ghost" 
-                          className="h-8 w-8 text-slate-400 hover:text-primary"
-                          onClick={() => {
-                            setFormData({
-                              name: fitnessClass.name,
-                              instructorName: fitnessClass.instructorName || '',
-                              maxCapacity: fitnessClass.maxCapacity.toString(),
-                              description: fitnessClass.description || '',
-                              time: fitnessClass.time || '10:00 AM',
-                              days: fitnessClass.days || 'Mon, Wed, Fri',
-                              branchId: fitnessClass.branchId || ''
-                            })
-                            setEditingClassId(fitnessClass.id)
-                            setIsAddDialogOpen(true)
-                          }}
-                        >
-                          <Edit2 className="h-4 w-4" />
-                        </Button>
-                        <Button size="icon" variant="ghost" className="h-8 w-8 text-slate-400 hover:text-red-500" onClick={() => deleteClass(fitnessClass.id)}>
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </div>
+                      {canEditDeleteClass && (
+                        <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                          <Button 
+                            size="icon" 
+                            variant="ghost" 
+                            className="h-8 w-8 text-slate-400 hover:text-primary"
+                            onClick={() => {
+                              setFormData({
+                                name: fitnessClass.name,
+                                instructorName: fitnessClass.instructorName || '',
+                                instructorId: fitnessClass.instructorId || '',
+                                maxCapacity: fitnessClass.maxCapacity.toString(),
+                                description: fitnessClass.description || '',
+                                time: fitnessClass.time || '10:00 AM',
+                                days: fitnessClass.days || 'Mon, Wed, Fri',
+                                branchId: fitnessClass.branchId || ''
+                              })
+                              setEditingClassId(fitnessClass.id)
+                              setIsAddDialogOpen(true)
+                            }}
+                          >
+                            <Edit2 className="h-4 w-4" />
+                          </Button>
+                          <Button size="icon" variant="ghost" className="h-8 w-8 text-slate-400 hover:text-red-500" onClick={() => deleteClass(fitnessClass.id)}>
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      )}
                     </div>
                   </CardHeader>
                   <CardContent className="pt-5 space-y-5">
@@ -306,7 +380,7 @@ export default function ClassesPage() {
                         <span className="text-muted-foreground truncate">Main Studio</span>
                       </div>
                     </div>
-
+ 
                     <div className="space-y-2">
                       <div className="flex justify-between text-xs font-bold uppercase tracking-wider text-slate-400">
                         <span>Enrollment Density</span>
@@ -318,28 +392,30 @@ export default function ClassesPage() {
                         <rect x="0" y="0" width={Math.min(enrollmentPercent, 100)} height="8" rx="4" fill={enrollmentPercent > 90 ? '#ef4444' : '#3b82f6'} />
                       </svg>
                     </div>
-
+ 
                     <div className="flex flex-wrap gap-2 pt-2">
                       <Badge variant="secondary" className="bg-slate-100 text-slate-600 border-none">{fitnessClass.days || 'Weekdays'}</Badge>
                       <Badge className="bg-indigo-500/10 text-indigo-600 hover:bg-indigo-500/20 border-none font-bold">
                         {branches.find(b => b.id === fitnessClass.branchId)?.name || 'Main Branch'}
                       </Badge>
                     </div>
-
-                    <div className="pt-4 border-t border-white/10">
-                      <Button 
-                        className="w-full gap-2 font-bold" 
-                        variant={fitnessClass.currentEnrollment >= fitnessClass.maxCapacity ? 'secondary' : 'default'}
-                        disabled={fitnessClass.currentEnrollment >= fitnessClass.maxCapacity}
-                        onClick={() => {
-                          setSelectedClassId(fitnessClass.id)
-                          setIsBookDialogOpen(true)
-                        }}
-                      >
-                        <CheckCircle2 className="h-4 w-4" />
-                        {fitnessClass.currentEnrollment >= fitnessClass.maxCapacity ? 'Fully Booked' : 'Enroll Member'}
-                      </Button>
-                    </div>
+ 
+                    {canEnrollMember && (
+                      <div className="pt-4 border-t border-white/10">
+                        <Button 
+                          className="w-full gap-2 font-bold" 
+                          variant={fitnessClass.currentEnrollment >= fitnessClass.maxCapacity ? 'secondary' : 'default'}
+                          disabled={fitnessClass.currentEnrollment >= fitnessClass.maxCapacity}
+                          onClick={() => {
+                            setSelectedClassId(fitnessClass.id)
+                            setIsBookDialogOpen(true)
+                          }}
+                        >
+                          <CheckCircle2 className="h-4 w-4" />
+                          {fitnessClass.currentEnrollment >= fitnessClass.maxCapacity ? 'Fully Booked' : 'Enroll Member'}
+                        </Button>
+                      </div>
+                    )}
                   </CardContent>
                 </Card>
               )
