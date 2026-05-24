@@ -49,6 +49,23 @@ export default function ClassesPage() {
     branchId: '',
   })
 
+  const timePresets = [
+    '06:00 AM', '07:00 AM', '08:00 AM', '09:00 AM', '10:00 AM', '11:00 AM',
+    '12:00 PM', '01:00 PM', '02:00 PM', '03:00 PM', '04:00 PM', '05:00 PM',
+    '06:00 PM', '06:30 PM', '07:00 PM', '08:00 PM'
+  ]
+
+  const daysPresets = [
+    'Mon, Wed, Fri',
+    'Tue, Thu',
+    'Mon, Tue, Wed, Thu, Fri',
+    'Sat, Sun',
+    'Mon, Tue, Wed, Thu, Fri, Sat, Sun'
+  ]
+
+  const isPresetDays = daysPresets.includes(formData.days)
+  const isPresetTime = timePresets.includes(formData.time)
+
   useEffect(() => {
     fetchClasses()
     fetchStaff()
@@ -249,25 +266,98 @@ export default function ClassesPage() {
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label htmlFor="time">Preferred Time</Label>
-                    <Input 
-                      id="time" 
-                      type="text" 
-                      placeholder="9:00 AM" 
-                      value={formData.time}
-                      onChange={(e) => setFormData({ ...formData, time: e.target.value })}
-                    />
+                    <Select
+                      value={isPresetTime ? formData.time : "custom"}
+                      onValueChange={(val) => {
+                        if (val === "custom") {
+                          setFormData({ ...formData, time: formData.time || "09:00 AM" })
+                        } else {
+                          setFormData({ ...formData, time: val })
+                        }
+                      }}
+                    >
+                      <SelectTrigger id="time">
+                        <SelectValue placeholder="Select session time" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {timePresets.map((t) => (
+                          <SelectItem key={t} value={t}>{t}</SelectItem>
+                        ))}
+                        <SelectItem value="custom">Custom Time...</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    {!isPresetTime && (
+                      <Input
+                        type="text"
+                        placeholder="e.g. 09:15 AM"
+                        value={formData.time}
+                        onChange={(e) => setFormData({ ...formData, time: e.target.value })}
+                        className="mt-2"
+                      />
+                    )}
                   </div>
+
                   <div className="space-y-2">
                     <Label htmlFor="days">Active Days</Label>
-                    <Input 
-                      id="days" 
-                      type="text" 
-                      placeholder="Mon - Fri" 
-                      value={formData.days}
-                      onChange={(e) => setFormData({ ...formData, days: e.target.value })}
-                    />
+                    <Select
+                      value={isPresetDays ? formData.days : "custom"}
+                      onValueChange={(val) => {
+                        if (val === "custom") {
+                          setFormData({ ...formData, days: "Mon" })
+                        } else {
+                          setFormData({ ...formData, days: val })
+                        }
+                      }}
+                    >
+                      <SelectTrigger id="days">
+                        <SelectValue placeholder="Select active days" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="Mon, Wed, Fri">Mon, Wed, Fri</SelectItem>
+                        <SelectItem value="Tue, Thu">Tue, Thu</SelectItem>
+                        <SelectItem value="Mon, Tue, Wed, Thu, Fri">Mon - Fri (Weekdays)</SelectItem>
+                        <SelectItem value="Sat, Sun">Sat, Sun (Weekends)</SelectItem>
+                        <SelectItem value="Mon, Tue, Wed, Thu, Fri, Sat, Sun">Everyday (Mon - Sun)</SelectItem>
+                        <SelectItem value="custom">Custom Selection...</SelectItem>
+                      </SelectContent>
+                    </Select>
                   </div>
                 </div>
+
+                {!isPresetDays && (
+                  <div className="space-y-2">
+                    <Label>Select Days</Label>
+                    <div className="flex flex-wrap gap-2 p-3 bg-muted/30 rounded-lg border border-slate-100/50">
+                      {['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map(day => {
+                        const currentDaysList = formData.days.split(',').map(d => d.trim()).filter(Boolean)
+                        const active = currentDaysList.includes(day)
+                        return (
+                          <button
+                            key={day}
+                            type="button"
+                            onClick={() => {
+                              let newDays: string[]
+                              if (active) {
+                                newDays = currentDaysList.filter(d => d !== day)
+                              } else {
+                                const order = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
+                                newDays = [...currentDaysList, day].sort((a, b) => order.indexOf(a) - order.indexOf(b))
+                              }
+                              setFormData({ ...formData, days: newDays.join(', ') })
+                            }}
+                            className={`h-8 px-3 text-xs font-semibold rounded-full border transition-all duration-200 ${
+                              active 
+                                ? 'bg-primary border-primary text-white shadow-sm shadow-primary/20 scale-105' 
+                                : 'bg-white border-slate-200 hover:border-slate-300 text-slate-600 hover:bg-slate-50'
+                            }`}
+                          >
+                            {day}
+                          </button>
+                        )
+                      })}
+                    </div>
+                  </div>
+                )}
                 <div className="space-y-2">
                   <Label htmlFor="branch">Target Branch *</Label>
                   <Select 

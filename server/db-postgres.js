@@ -33,6 +33,7 @@ const db = {
         name TEXT NOT NULL,
         email TEXT,
         phone TEXT,
+        dob DATE,
         address TEXT,
         membership_type TEXT,
         status TEXT DEFAULT 'active',
@@ -157,7 +158,8 @@ const db = {
         name TEXT NOT NULL,
         price NUMERIC(10, 2),
         duration_months INTEGER DEFAULT 1,
-        features TEXT
+        duration_days INTEGER,
+        features TEXT[]
       );
 
       CREATE TABLE IF NOT EXISTS bookings (
@@ -177,6 +179,7 @@ const db = {
       const migrations = [
         // Members table
         "ALTER TABLE members ADD COLUMN IF NOT EXISTS branch_id UUID;",
+        "ALTER TABLE members ADD COLUMN IF NOT EXISTS dob DATE;",
         // Staff table
         "ALTER TABLE staff ADD COLUMN IF NOT EXISTS branch_id UUID;",
         // Billing table
@@ -187,7 +190,10 @@ const db = {
         "ALTER TABLE classes ADD COLUMN IF NOT EXISTS time TEXT;",
         "ALTER TABLE classes ADD COLUMN IF NOT EXISTS days TEXT;",
         // Settings table
-        "ALTER TABLE settings ADD COLUMN IF NOT EXISTS config JSONB DEFAULT '{}';"
+        "ALTER TABLE settings ADD COLUMN IF NOT EXISTS config JSONB DEFAULT '{}';",
+        // Plans table
+        "ALTER TABLE plans ADD COLUMN IF NOT EXISTS duration_days INTEGER;",
+        "ALTER TABLE plans ADD COLUMN IF NOT EXISTS features TEXT[];"
       ];
 
       for (const migration of migrations) {
@@ -244,20 +250,20 @@ const db = {
   async addMember(member, ownerId) {
     const branchId = member.branchId || member.branch_id || null;
     const res = await pool.query(
-      'INSERT INTO members (id, owner_id, name, email, phone, membership_type, status, join_date, expiry_date, branch_id) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING *',
-      [member.id, ownerId, member.name, member.email, member.phone, member.membershipType || member.membership_type, member.status, member.joinDate || member.join_date, member.expiryDate || member.expiry_date, branchId]
+      'INSERT INTO members (id, owner_id, name, email, phone, membership_type, status, join_date, expiry_date, branch_id, dob) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) RETURNING *',
+      [member.id, ownerId, member.name, member.email, member.phone, member.membershipType || member.membership_type, member.status, member.joinDate || member.join_date, member.expiryDate || member.expiry_date, branchId, member.dob || null]
     );
     return res.rows[0];
   },
- 
+  
   async bulkAddMembers(membersArray, ownerId) {
     // Basic iterative strategy for PostgreSQL bulk insert compatibility
     const inserted = [];
     for (const member of membersArray) {
       const branchId = member.branchId || member.branch_id || null;
       const res = await pool.query(
-        'INSERT INTO members (id, owner_id, name, email, phone, membership_type, status, join_date, expiry_date, branch_id) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING *',
-        [member.id, ownerId, member.name, member.email, member.phone, member.membershipType || member.membership_type, member.status, member.joinDate || member.join_date, member.expiryDate || member.expiry_date, branchId]
+        'INSERT INTO members (id, owner_id, name, email, phone, membership_type, status, join_date, expiry_date, branch_id, dob) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) RETURNING *',
+        [member.id, ownerId, member.name, member.email, member.phone, member.membershipType || member.membership_type, member.status, member.joinDate || member.join_date, member.expiryDate || member.expiry_date, branchId, member.dob || null]
       );
       inserted.push(res.rows[0]);
     }
@@ -274,7 +280,7 @@ const db = {
       membershipType: 'membership_type', membership_type: 'membership_type',
       status: 'status', joinDate: 'join_date', join_date: 'join_date',
       expiryDate: 'expiry_date', expiry_date: 'expiry_date',
-      branchId: 'branch_id', branch_id: 'branch_id'
+      branchId: 'branch_id', branch_id: 'branch_id', dob: 'dob'
     };
  
     for (const [key, value] of Object.entries(patch)) {
@@ -844,34 +850,102 @@ const db = {
   // Membership Plans
   async getPlans(ownerId) {
     const res = await pool.query('SELECT * FROM plans WHERE owner_id = $1 ORDER BY price ASC', [ownerId]);
-    return res.rows;
+    return res.rows.map(row => {
+      let mappedFeatures = '';
+      if (Array.isArray(row.features)) {
+        mappedFeatures = row.features.join(', ');
+      } else if (typeof row.features === 'string') {
+        mappedFeatures = row.features;
+      }
+      return {
+        ...row,
+        durationMonths: row.duration_months,
+        durationDays: row.duration_days,
+        features: mappedFeatures
+      };
+    });
   },
 
   async addPlan(plan, ownerId) {
+    let featuresArray = [];
+    if (typeof plan.features === 'string') {
+      featuresArray = plan.features.split(',').map(f => f.trim()).filter(Boolean);
+    } else if (Array.isArray(plan.features)) {
+      featuresArray = plan.features;
+    }
+
     const res = await pool.query(
-      'INSERT INTO plans (id, owner_id, name, price, duration_months, features) VALUES ($1, $2, $3, $4, $5, $6) RETURNING *',
-      [plan.id, ownerId, plan.name, plan.price, plan.durationMonths || plan.duration_months, plan.features]
+      'INSERT INTO plans (id, owner_id, name, price, duration_months, duration_days, features) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *',
+      [
+        plan.id,
+        ownerId,
+        plan.name,
+        plan.price,
+        plan.durationMonths !== undefined ? plan.durationMonths : plan.duration_months,
+        plan.durationDays !== undefined ? plan.durationDays : plan.duration_days,
+        featuresArray
+      ]
     );
-    return res.rows[0];
+    const row = res.rows[0];
+    if (!row) return null;
+    return {
+      ...row,
+      durationMonths: row.duration_months,
+      durationDays: row.duration_days,
+      features: Array.isArray(row.features) ? row.features.join(', ') : (row.features || '')
+    };
   },
 
   async updatePlan(id, patch, ownerId) {
     const fields = [];
     const values = [];
     let idx = 1;
+    
+    const allowed = {
+      name: 'name',
+      price: 'price',
+      durationMonths: 'duration_months',
+      duration_months: 'duration_months',
+      durationDays: 'duration_days',
+      duration_days: 'duration_days',
+      features: 'features'
+    };
+
     for (const [key, value] of Object.entries(patch)) {
-      const col = key === 'durationMonths' ? 'duration_months' : key;
-      if (['name', 'price', 'duration_months', 'features'].includes(col)) {
+      const col = allowed[key];
+      if (col) {
         fields.push(`${col} = $${idx}`);
-        values.push(value);
+        if (col === 'features') {
+          let featuresArray = [];
+          if (typeof value === 'string') {
+            featuresArray = value.split(',').map(f => f.trim()).filter(Boolean);
+          } else if (Array.isArray(value)) {
+            featuresArray = value;
+          }
+          values.push(featuresArray);
+        } else {
+          values.push(value);
+        }
         idx++;
       }
     }
+    
     if (fields.length === 0) return null;
     values.push(id);
     values.push(ownerId);
-    const res = await pool.query(`UPDATE plans SET ${fields.join(', ')} WHERE id = $${idx} AND owner_id = $${idx + 1} RETURNING *`, values);
-    return res.rows[0];
+    
+    const res = await pool.query(
+      `UPDATE plans SET ${fields.join(', ')} WHERE id = $${idx} AND owner_id = $${idx + 1} RETURNING *`,
+      values
+    );
+    const row = res.rows[0];
+    if (!row) return null;
+    return {
+      ...row,
+      durationMonths: row.duration_months,
+      durationDays: row.duration_days,
+      features: Array.isArray(row.features) ? row.features.join(', ') : (row.features || '')
+    };
   },
 
   async deletePlan(id, ownerId) {

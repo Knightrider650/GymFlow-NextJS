@@ -4,17 +4,25 @@ import { useEffect } from 'react'
 import { usePathname, useRouter } from 'next/navigation'
 import { useAuth } from '@/hooks'
 import { DashboardLayout } from '@/components/layout/sidebar'
-import { useAuthStore } from '@/lib/store'
+import { useAuthStore, useGymStore } from '@/lib/store'
 import { ROUTE_PERMISSIONS, type UserRole } from '@/lib/permissions'
 
 export function ProtectedLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter()
   const { isAuthenticated, isLoading, checkAuth } = useAuth()
+  const initStream = useGymStore((state) => state.initStream)
 
   useEffect(() => {
     checkAuth()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
+
+  useEffect(() => {
+    if (isAuthenticated) {
+      const cleanup = initStream()
+      return cleanup
+    }
+  }, [isAuthenticated, initStream])
 
   useEffect(() => {
     if (!isLoading && !isAuthenticated) {

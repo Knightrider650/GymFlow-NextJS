@@ -27,7 +27,8 @@ import { UserRole } from '@/lib/permissions'
 const planSchema = z.object({
   name: z.string().min(2, 'Name must be at least 2 characters'),
   price: z.coerce.number().min(0, 'Price must be positive'),
-  durationMonths: z.coerce.number().min(1, 'Duration must be at least 1 month'),
+  durationValue: z.coerce.number().min(1, 'Duration must be at least 1'),
+  durationUnit: z.enum(['months', 'days']),
   features: z.string().optional(),
 })
 
@@ -51,7 +52,8 @@ export default function PlansPage() {
     defaultValues: {
       name: '',
       price: 0,
-      durationMonths: 1,
+      durationValue: 1,
+      durationUnit: 'months',
       features: '',
     },
   })
@@ -77,17 +79,30 @@ export default function PlansPage() {
     setEditingId(plan.id)
     setValue('name', plan.name)
     setValue('price', plan.price)
-    setValue('durationMonths', plan.durationMonths || plan.duration_months)
+    if (plan.durationDays || plan.duration_days) {
+      setValue('durationValue', plan.durationDays || plan.duration_days)
+      setValue('durationUnit', 'days')
+    } else {
+      setValue('durationValue', plan.durationMonths || plan.duration_months || 1)
+      setValue('durationUnit', 'months')
+    }
     setValue('features', plan.features || '')
     setIsDialogOpen(true)
   }
 
   const onSubmit = async (data: PlanFormValues) => {
+    const payload = {
+      name: data.name,
+      price: data.price,
+      durationMonths: data.durationUnit === 'months' ? data.durationValue : null,
+      durationDays: data.durationUnit === 'days' ? data.durationValue : null,
+      features: data.features
+    }
     try {
       if (editingId) {
-        await updatePlan(editingId, data)
+        await updatePlan(editingId, payload)
       } else {
-        await createPlan(data)
+        await createPlan(payload)
       }
       setIsDialogOpen(false)
     } catch (error) {
@@ -135,10 +150,24 @@ export default function PlansPage() {
                     <Input id="price" type="number" step="0.01" {...register('price')} className="bg-slate-800 border-slate-700" />
                     {errors.price && <p className="text-xs text-red-400">{errors.price.message}</p>}
                   </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="durationMonths">Duration (Months)</Label>
-                    <Input id="durationMonths" type="number" {...register('durationMonths')} className="bg-slate-800 border-slate-700" />
-                    {errors.durationMonths && <p className="text-xs text-red-400">{errors.durationMonths.message}</p>}
+                  <div className="grid grid-cols-2 gap-2">
+                    <div className="space-y-2">
+                      <Label htmlFor="durationValue">Duration</Label>
+                      <Input id="durationValue" type="number" {...register('durationValue')} className="bg-slate-800 border-slate-700" />
+                      {errors.durationValue && <p className="text-xs text-red-400">{errors.durationValue.message}</p>}
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="durationUnit">Unit</Label>
+                      <select
+                        id="durationUnit"
+                        {...register('durationUnit')}
+                        className="w-full h-10 px-3 rounded-md border border-slate-700 bg-slate-800 text-sm focus:outline-none text-slate-100"
+                      >
+                        <option value="months">Months</option>
+                        <option value="days">Days</option>
+                      </select>
+                      {errors.durationUnit && <p className="text-xs text-red-400">{errors.durationUnit.message}</p>}
+                    </div>
                   </div>
                 </div>
 
@@ -191,7 +220,10 @@ export default function PlansPage() {
                         {plan.name}
                       </TableCell>
                       <TableCell className="text-slate-300">
-                        {plan.durationMonths || plan.duration_months} Months
+                        {plan.durationDays || plan.duration_days 
+                          ? `${plan.durationDays || plan.duration_days} Days`
+                          : `${plan.durationMonths || plan.duration_months || 0} Months`
+                        }
                       </TableCell>
                       <TableCell className="font-bold">
                         {formatCurrency(plan.price, settings?.currency)}

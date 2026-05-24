@@ -105,6 +105,69 @@ function withTenantPayload(payload, tenantId) {
   };
 }
 
+function mapAttendanceRecord(r) {
+  if (!r) return null;
+  return {
+    ...r,
+    memberId: r.member_id || r.memberId,
+    checkInTime: r.check_in_time || r.checkInTime,
+    checkOutTime: r.check_out_time || r.checkOutTime,
+    recordedDate: r.recorded_date || r.recordedDate,
+  };
+}
+
+function mapInvoice(i) {
+  if (!i) return null;
+  return {
+    ...i,
+    invoiceNumber: i.invoice_number || i.invoiceNumber,
+    memberId: i.member_id || i.memberId,
+    taxAmount: i.tax_amount || i.taxAmount,
+    invoiceDate: i.invoice_date || i.invoiceDate,
+    dueDate: i.due_date || i.dueDate,
+    paymentDate: i.payment_date || i.paymentDate,
+  };
+}
+
+function mapClass(c) {
+  if (!c) return null;
+  return {
+    ...c,
+    maxCapacity: c.max_capacity ?? c.maxCapacity,
+    currentEnrollment: c.current_enrollment ?? c.currentEnrollment ?? 0,
+    instructorName: c.instructor_name ?? c.instructorName,
+    branchId: c.branch_id ?? c.branchId,
+  };
+}
+
+function mapStaff(s) {
+  if (!s) return null;
+  return {
+    ...s,
+    branchId: s.branch_id || s.branchId,
+    emergencyContact: s.emergency_contact || s.emergencyContact,
+  };
+}
+
+function mapInventoryItem(i) {
+  if (!i) return null;
+  return {
+    ...i,
+    minThreshold: i.min_threshold ?? i.minThreshold,
+    costPerUnit: i.cost_per_unit ?? i.costPerUnit,
+    lastUpdated: i.last_updated ?? i.lastUpdated,
+  };
+}
+
+function mapPlan(p) {
+  if (!p) return null;
+  return {
+    ...p,
+    durationMonths: p.durationMonths ?? p.duration_months,
+    durationDays: p.durationDays ?? p.duration_days,
+  };
+}
+
 // ============================================================================
 // AUTHENTICATION ROUTES
 // ============================================================================
@@ -344,7 +407,8 @@ app.get('/api/members', authMiddleware, async (req, res) => {
     ...m,
     membershipType: m.membership_type || m.membershipType,
     joinDate: m.join_date || m.joinDate,
-    expiryDate: m.expiry_date || m.expiryDate
+    expiryDate: m.expiry_date || m.expiryDate,
+    dob: m.dob
   }));
   res.json({ success: true, data: members });
 });
@@ -391,6 +455,55 @@ app.put('/api/members/:id', authMiddleware, async (req, res) => {
   res.json({ success: !!member, data: member });
 });
 
+app.post('/api/members/message', authMiddleware, async (req, res) => {
+  try {
+    const tenantId = getTenantContextId(req);
+    const { memberIds, channel, subject, message } = req.body;
+    
+    if (!memberIds || !Array.isArray(memberIds) || memberIds.length === 0) {
+      return res.status(400).json({ success: false, error: 'Recipient member IDs are required' });
+    }
+    if (!message) {
+      return res.status(400).json({ success: false, error: 'Message content is required' });
+    }
+    
+    const count = memberIds.length;
+    
+    await db.logActivity(
+      req.user.id,
+      req.user.name || req.user.email,
+      'send_message',
+      'Member',
+      memberIds[0],
+      'Multiple Members',
+      `Sent ${channel.toUpperCase()} message to ${count} members: "${message.substring(0, 50)}..."`
+    );
+    
+    if (db.createReminder) {
+      for (const memberId of memberIds) {
+        try {
+          await db.createReminder({
+            id: uuidv4(),
+            user_id: req.user.id,
+            recipient_id: memberId,
+            message: `${subject ? `[${subject}] ` : ''}${message}`,
+            status: 'sent',
+            sent_at: new Date().toISOString(),
+            createdAt: new Date().toISOString()
+          }, tenantId);
+        } catch (e) {
+          console.error('Failed to save reminder log:', e);
+        }
+      }
+    }
+    
+    res.json({ success: true, message: `Message successfully dispatched to ${count} members via ${channel.toUpperCase()}` });
+  } catch (err) {
+    console.error('Send member message error:', err);
+    res.status(500).json({ success: false, error: 'Failed to dispatch messages' });
+  }
+});
+
 
 // ============================================================================
 // ATTENDANCE ROUTES
@@ -400,21 +513,129 @@ app.get('/api/attendance', authMiddleware, async (req, res) => {
   const tenantId = getTenantContextId(req);
   const trainerId = req.user.role === 'trainer' ? req.user.id : null;
   const data = await db.getAttendance(req.query, tenantId, trainerId);
-  res.json({ success: true, data });
+  res.json({ success: true, data: data.map(mapAttendanceRecord) });
 });
 
 app.post('/api/attendance/checkin', authMiddleware, async (req, res) => {
   const tenantId = getTenantContextId(req);
   const record = await db.checkIn(req.body.memberId, req.body.notes, tenantId);
-  broadcast('attendance:update', record);
-  res.status(201).json({ success: true, data: record });
+  const mapped = mapAttendanceRecord(record);
+  broadcast('attendance:update', mapped);
+  res.status(201).json({ success: true, data: mapped });
 });
 
 app.post('/api/attendance/:id/checkout', authMiddleware, async (req, res) => {
   const tenantId = getTenantContextId(req);
   const record = await db.checkOut(req.params.id, tenantId);
-  if (record) broadcast('attendance:update', record);
-  res.json({ success: !!record, data: record });
+  const mapped = mapAttendanceRecord(record);
+  if (mapped) broadcast('attendance:update', mapped);
+  res.json({ success: !!mapped, data: mapped });
+});
+
+app.post('/api/attendance/scan', authMiddleware, async (req, res) => {
+  try {
+    const tenantId = getTenantContextId(req);
+    const { memberId } = req.body;
+    if (!memberId) {
+      return res.status(400).json({ success: false, error: 'Member ID is required' });
+    }
+
+    // 1. Fetch member details
+    const members = await db.getMembers(tenantId);
+    const member = members.find(m => m.id === memberId);
+    if (!member) {
+      broadcast('attendance:error', { memberId, error: 'Member not found' });
+      return res.status(404).json({ success: false, error: 'Member not found' });
+    }
+
+    const today = new Date().toISOString().split('T')[0];
+
+    // 2. Check if already checked in today without checking out
+    const attendanceRecords = await db.getAttendance({ memberId }, tenantId);
+    
+    // Find active check-in with robust compatibility for both JSON and Postgres DB schemas
+    const activeCheckin = attendanceRecords.find(r => {
+      const rMemberId = r.memberId || r.member_id;
+      let rDate = r.recordedDate || r.recorded_date;
+      if (rDate instanceof Date) {
+        rDate = rDate.toISOString().split('T')[0];
+      } else if (typeof rDate === 'string' && rDate.includes('T')) {
+        rDate = rDate.split('T')[0];
+      }
+      const isToday = rDate === today;
+      const isCheckedIn = !r.checkOutTime && !r.check_out_time;
+      return rMemberId === memberId && isToday && isCheckedIn;
+    });
+
+    if (activeCheckin) {
+      // Perform Check-Out
+      const record = await db.checkOut(activeCheckin.id, tenantId);
+      
+      await db.logActivity(
+        req.user.id,
+        req.user.name || req.user.email,
+        'Check Out',
+        'Attendance',
+        record.id,
+        member.name,
+        `${member.name} checked out via QR scan`
+      );
+
+      const formattedData = {
+        ...mapAttendanceRecord(record),
+        memberName: member.name,
+        membershipType: member.membership_type || member.membershipType || 'Basic',
+        memberStatus: member.status
+      };
+
+      broadcast('attendance:update', formattedData);
+      return res.json({
+        success: true,
+        action: 'checkout',
+        message: `${member.name} checked out successfully`,
+        data: formattedData
+      });
+    } else {
+      // Perform Check-In
+      const isExpired = member.status === 'expired' || new Date(member.expiry_date || member.expiryDate) < new Date();
+
+      try {
+        const record = await db.checkIn(memberId, 'Checked in via QR scan', tenantId);
+
+        await db.logActivity(
+          req.user.id,
+          req.user.name || req.user.email,
+          'Check In',
+          'Attendance',
+          record.id,
+          member.name,
+          `${member.name} checked in via QR scan${isExpired ? ' (Membership Expired/Warning)' : ''}`
+        );
+
+        const formattedData = {
+          ...mapAttendanceRecord(record),
+          memberName: member.name,
+          membershipType: member.membership_type || member.membershipType || 'Basic',
+          memberStatus: member.status
+        };
+
+        broadcast('attendance:update', formattedData);
+        return res.json({
+          success: true,
+          action: 'checkin',
+          warning: isExpired ? 'Membership is expired or inactive' : null,
+          message: `${member.name} checked in successfully`,
+          data: formattedData
+        });
+      } catch (err) {
+        broadcast('attendance:error', { memberId, memberName: member.name, error: err.message });
+        return res.status(400).json({ success: false, error: err.message });
+      }
+    }
+  } catch (error) {
+    console.error('Scan attendance error:', error);
+    return res.status(500).json({ success: false, error: 'Failed to process QR code scan' });
+  }
 });
 
 // ============================================================================
@@ -424,6 +645,7 @@ app.post('/api/attendance/:id/checkout', authMiddleware, async (req, res) => {
 app.get('/api/staff', authMiddleware, async (req, res) => {
   const tenantId = getTenantContextId(req);
   let data = await db.getStaff(tenantId);
+  data = data.map(mapStaff);
   
   // Report requirement: No money/salary visibility for trainers
   if (isTrainerRole(req.user.role)) {
@@ -436,15 +658,17 @@ app.get('/api/staff', authMiddleware, async (req, res) => {
 app.post('/api/staff', authMiddleware, authorizeRoles(['admin', 'ceo', 'cto', 'manager']), async (req, res) => {
   const tenantId = getTenantContextId(req);
   const member = await db.addStaff(withTenantPayload({ ...req.body, id: uuidv4() }, tenantId), tenantId);
-  broadcast('staff:update', member);
-  res.status(201).json({ success: true, data: member });
+  const mapped = mapStaff(member);
+  broadcast('staff:update', mapped);
+  res.status(201).json({ success: true, data: mapped });
 });
 
 app.put('/api/staff/:id', authMiddleware, authorizeRoles(['admin', 'ceo', 'cto', 'manager']), async (req, res) => {
   const tenantId = getTenantContextId(req);
   const member = await db.updateStaff(req.params.id, req.body, tenantId);
-  if (member) broadcast('staff:update', member);
-  res.json({ success: !!member, data: member });
+  const mapped = mapStaff(member);
+  if (mapped) broadcast('staff:update', mapped);
+  res.json({ success: !!mapped, data: mapped });
 });
 
 app.delete('/api/staff/:id', authMiddleware, authorizeRoles(['admin', 'ceo', 'cto']), async (req, res) => {
@@ -461,27 +685,23 @@ app.delete('/api/staff/:id', authMiddleware, authorizeRoles(['admin', 'ceo', 'ct
 app.get('/api/inventory', authMiddleware, authorizeRoles(['admin', 'ceo', 'cto', 'manager', 'staff']), async (req, res) => {
   const tenantId = getTenantContextId(req);
   let data = await db.getInventory(tenantId);
-  data = data.map(i => ({
-    ...i,
-    minThreshold: i.min_threshold ?? i.minThreshold,
-    costPerUnit: i.cost_per_unit ?? i.costPerUnit,
-    lastUpdated: i.last_updated ?? i.lastUpdated
-  }));
-  res.json({ success: true, data });
+  res.json({ success: true, data: data.map(mapInventoryItem) });
 });
 
 app.post('/api/inventory', authMiddleware, async (req, res) => {
   const tenantId = getTenantContextId(req);
   const item = await db.addInventoryItem(withTenantPayload({ ...req.body, id: uuidv4() }, tenantId), tenantId);
-  broadcast('inventory:update', item);
-  res.status(201).json({ success: true, data: item });
+  const mapped = mapInventoryItem(item);
+  broadcast('inventory:update', mapped);
+  res.status(201).json({ success: true, data: mapped });
 });
 
 app.put('/api/inventory/:id', authMiddleware, async (req, res) => {
   const tenantId = getTenantContextId(req);
   const item = await db.updateInventoryItem(req.params.id, req.body, tenantId);
-  if (item) broadcast('inventory:update', item);
-  res.json({ success: !!item, data: item });
+  const mapped = mapInventoryItem(item);
+  if (mapped) broadcast('inventory:update', mapped);
+  res.json({ success: !!mapped, data: mapped });
 });
 
 app.delete('/api/inventory/:id', authMiddleware, authorizeRoles(['admin', 'ceo', 'cto']), async (req, res) => {
@@ -498,28 +718,31 @@ app.delete('/api/inventory/:id', authMiddleware, authorizeRoles(['admin', 'ceo',
 app.get('/api/billing', authMiddleware, authorizeRoles(['admin', 'ceo', 'cto', 'manager', 'staff']), async (req, res) => {
   const tenantId = getTenantContextId(req);
   const data = await db.getInvoices(tenantId);
-  res.json({ success: true, data });
+  res.json({ success: true, data: data.map(mapInvoice) });
 });
 
 app.post('/api/billing', authMiddleware, async (req, res) => {
   const tenantId = getTenantContextId(req);
   const invoice = await db.addInvoice(withTenantPayload({ ...req.body, id: uuidv4(), status: 'pending' }, tenantId), tenantId);
-  broadcast('billing:update', invoice);
-  res.status(201).json({ success: true, data: invoice });
+  const mapped = mapInvoice(invoice);
+  broadcast('billing:update', mapped);
+  res.status(201).json({ success: true, data: mapped });
 });
 
 app.post('/api/billing/:id/pay', authMiddleware, async (req, res) => {
   const tenantId = getTenantContextId(req);
   const record = await db.payInvoice(req.params.id, req.body, tenantId);
-  if (record) broadcast('billing:update', record);
-  res.json({ success: !!record, data: record });
+  const mapped = mapInvoice(record);
+  if (mapped) broadcast('billing:update', mapped);
+  res.json({ success: !!mapped, data: mapped });
 });
 
 app.put('/api/billing/:id', authMiddleware, async (req, res) => {
   const tenantId = getTenantContextId(req);
   const invoice = await db.updateInvoice(req.params.id, req.body, tenantId);
-  if (invoice) broadcast('billing:update', invoice);
-  res.json({ success: !!invoice, data: invoice });
+  const mapped = mapInvoice(invoice);
+  if (mapped) broadcast('billing:update', mapped);
+  res.json({ success: !!mapped, data: mapped });
 });
 
 app.delete('/api/billing/:id', authMiddleware, authorizeRoles(['admin', 'ceo', 'cto']), async (req, res) => {
@@ -537,21 +760,23 @@ app.get('/api/classes', authMiddleware, async (req, res) => {
   const tenantId = getTenantContextId(req);
   const instructorId = isTrainerRole(req.user.role) ? req.user.id : null;
   const data = await db.getClasses(tenantId, instructorId);
-  res.json({ success: true, data });
+  res.json({ success: true, data: data.map(mapClass) });
 });
 
 app.post('/api/classes', authMiddleware, authorizeRoles(['admin', 'ceo', 'cto', 'manager', 'staff']), async (req, res) => {
   const tenantId = getTenantContextId(req);
   const cls = await db.addClass(withTenantPayload({ ...req.body, id: uuidv4(), currentEnrollment: 0 }, tenantId), tenantId);
-  broadcast('classes:update', cls);
-  res.status(201).json({ success: true, data: cls });
+  const mapped = mapClass(cls);
+  broadcast('classes:update', mapped);
+  res.status(201).json({ success: true, data: mapped });
 });
 
 app.put('/api/classes/:id', authMiddleware, async (req, res) => {
   const tenantId = getTenantContextId(req);
   const cls = await db.updateClass(req.params.id, req.body, tenantId);
-  if (cls) broadcast('classes:update', cls);
-  res.json({ success: !!cls, data: cls });
+  const mapped = mapClass(cls);
+  if (mapped) broadcast('classes:update', mapped);
+  res.json({ success: !!mapped, data: mapped });
 });
 
 app.delete('/api/classes/:id', authMiddleware, authorizeRoles(['admin', 'ceo', 'cto']), async (req, res) => {
@@ -591,14 +816,14 @@ app.delete('/api/bookings/:id', authMiddleware, async (req, res) => {
 
 app.get('/api/settings', authMiddleware, async (req, res) => {
   const tenantId = getTenantContextId(req);
-  const classes = await db.getClasses(tenantId);
-  res.json({ success: true, data });
+  const settings = await db.getSettings(tenantId);
+  res.json({ success: true, data: settings });
 });
 
 app.put('/api/settings', authMiddleware, authorizeRoles(['admin', 'ceo', 'cto', 'manager']), async (req, res) => {
   const tenantId = getTenantContextId(req);
-  const cls = await db.addClass(withTenantPayload({ ...req.body, id: uuidv4() }, tenantId), tenantId);
-  res.json({ success: true, data });
+  const settings = await db.updateSettings(req.body, tenantId);
+  res.json({ success: true, data: settings });
 });
 
 app.get('/api/dashboard-stats', authMiddleware, async (req, res) => {
@@ -685,21 +910,23 @@ app.post('/api/leads/:id/convert', authMiddleware, async (req, res) => {
 app.get('/api/plans', authMiddleware, async (req, res) => {
   const tenantId = getTenantContextId(req);
   const data = await db.getPlans(tenantId);
-  res.json({ success: true, data });
+  res.json({ success: true, data: data.map(mapPlan) });
 });
 
 app.post('/api/plans', authMiddleware, async (req, res) => {
   const tenantId = getTenantContextId(req);
   const plan = await db.addPlan(withTenantPayload({ ...req.body, id: uuidv4() }, tenantId), tenantId);
-  broadcast('plans:update', plan);
-  res.status(201).json({ success: true, data: plan });
+  const mapped = mapPlan(plan);
+  broadcast('plans:update', mapped);
+  res.status(201).json({ success: true, data: mapped });
 });
 
 app.put('/api/plans/:id', authMiddleware, async (req, res) => {
   const tenantId = getTenantContextId(req);
   const plan = await db.updatePlan(req.params.id, req.body, tenantId);
-  if (plan) broadcast('plans:update', plan);
-  res.json({ success: !!plan, data: plan });
+  const mapped = mapPlan(plan);
+  if (mapped) broadcast('plans:update', mapped);
+  res.json({ success: !!mapped, data: mapped });
 });
 
 app.delete('/api/plans/:id', authMiddleware, async (req, res) => {

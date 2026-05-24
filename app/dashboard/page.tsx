@@ -15,6 +15,7 @@ import {
   AlertCircle,
   RefreshCw,
   Activity,
+  CheckCircle2,
 } from 'lucide-react'
 import { formatCurrency, formatDate } from '@/utils/format'
 import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
@@ -65,7 +66,8 @@ export default function DashboardPage() {
     fetchStats, stats, statsLoading,
     fetchInvoices, invoices, 
     fetchAttendance, attendance,
-    settings, fetchSettings 
+    settings, fetchSettings,
+    scanErrors, clearScanErrors
   } = useGymStore()
   const [isInitialLoading, setIsInitialLoading] = useState(true)
 
@@ -235,7 +237,7 @@ export default function DashboardPage() {
         </div>
 
         {/* Recent Activity */}
-        <div className="grid gap-4 lg:grid-cols-2">
+        <div className={`grid gap-4 ${isTrainer(user?.role) ? 'lg:grid-cols-2' : 'lg:grid-cols-3'}`}>
           {/* Recent Invoices */}
           {!isTrainer(user?.role) && (
             <Card>
@@ -295,11 +297,81 @@ export default function DashboardPage() {
                         {new Date(record.checkInTime).toLocaleTimeString()}
                       </p>
                     </div>
-                    <Badge variant="info" className="text-xs">
-                      Checked In
-                    </Badge>
+                    {record.checkOutTime ? (
+                      <div className="text-right">
+                        <Badge variant="outline" className="text-xs bg-slate-100 text-slate-600 border-slate-200">
+                          Checked Out
+                        </Badge>
+                        {record.duration && (
+                          <p className="text-[10px] text-muted-foreground mt-0.5 font-medium">
+                            {record.duration} mins
+                          </p>
+                        )}
+                      </div>
+                    ) : (
+                      <Badge variant="info" className="text-xs bg-blue-100 text-blue-700 hover:bg-blue-100 border-none">
+                        Checked In
+                      </Badge>
+                    )}
                   </div>
                 ))}
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Live Alerts & Warnings */}
+          <Card className="border-none shadow-xl bg-card/65 backdrop-blur-md relative overflow-hidden">
+            <div className="absolute top-0 right-0 p-3 text-red-500/10 pointer-events-none">
+              <AlertCircle className="h-24 w-24" />
+            </div>
+            <CardHeader className="flex flex-row items-center justify-between pb-2">
+              <div>
+                <CardTitle className="text-lg font-bold text-slate-800">Live Scan Alerts</CardTitle>
+                <CardDescription>Real-time check-in warnings & failures</CardDescription>
+              </div>
+              {scanErrors.length > 0 && (
+                <Button 
+                  variant="ghost" 
+                  size="sm" 
+                  className="text-xs text-muted-foreground hover:text-red-500 hover:bg-red-50/50" 
+                  onClick={clearScanErrors}
+                >
+                  Clear Logs
+                </Button>
+              )}
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                {scanErrors.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center py-8 text-muted-foreground text-center">
+                    <CheckCircle2 className="h-10 w-10 text-emerald-500/30 mb-2" />
+                    <p className="text-xs font-semibold">No recent scanner issues</p>
+                    <p className="text-[10px] text-slate-400">Scan events are normal</p>
+                  </div>
+                ) : (
+                  scanErrors.map((err) => (
+                    <div
+                      key={err.id}
+                      className="flex items-start justify-between p-2.5 rounded-lg bg-red-500/5 border border-red-500/10 animate-in fade-in slide-in-from-top-2 duration-300"
+                    >
+                      <div className="space-y-0.5">
+                        <p className="font-bold text-xs text-slate-700">
+                          {err.memberName || 'Unknown Member'}
+                        </p>
+                        <p className="text-[10px] text-red-600 font-semibold flex items-center gap-1">
+                          <AlertCircle className="h-3 w-3 flex-shrink-0" />
+                          {err.error || 'Check-in blocked'}
+                        </p>
+                        <span className="text-[9px] text-slate-400 font-mono block">
+                          ID: {err.memberId?.substring(0, 8)}...
+                        </span>
+                      </div>
+                      <span className="text-[9px] text-slate-400 font-medium">
+                        {new Date(err.timestamp).toLocaleTimeString()}
+                      </span>
+                    </div>
+                  ))
+                )}
               </div>
             </CardContent>
           </Card>

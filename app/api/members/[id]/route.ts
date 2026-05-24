@@ -37,6 +37,12 @@ export async function PUT(
       ...rest
     }
 
+    if (updateData.dob) {
+      updateData.dob = new Date(updateData.dob)
+    } else if (updateData.dob === '') {
+      updateData.dob = null
+    }
+
     if (targetBranchId !== undefined) {
       updateData.branchId = targetBranchId
     }

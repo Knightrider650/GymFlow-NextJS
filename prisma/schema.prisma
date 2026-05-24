@@ -64,6 +64,7 @@ model Member {
   name             String
   email            String
   phone            String
+  dob              DateTime?
   address          String?
   membershipType   String
   status           String   @default("active") // active, expired, pending, cancelled

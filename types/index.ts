@@ -35,6 +35,7 @@ export interface Member {
   name: string
   email: string
   phone: string
+  dob?: string | null
   address?: string
   branchId?: string
   membershipType: string

@@ -23,6 +23,7 @@ interface GymState {
   bulkCreateMembers: (members: any[]) => Promise<void>
   updateMember: (id: string, member: Partial<Member>) => Promise<void>
   deleteMember: (id: string) => Promise<void>
+  sendMessageToMembers: (payload: { memberIds: string[], channel: string, subject?: string, message: string }) => Promise<{ success: boolean; message?: string; error?: string }>
 
   // Attendance
   attendance: Attendance[]
@@ -121,7 +122,10 @@ interface GymState {
   fetchActivityLogs: (filters?: any) => Promise<any[]>
   logActivity: (action: string, entityType: string, entityId?: string, entityName?: string, details?: string) => Promise<void>
   // Real-time
-  initStream: () => void
+  scanErrors: any[]
+  addScanError: (error: any) => void
+  clearScanErrors: () => void
+  initStream: () => () => void
 }
 
 export const useAuthStore = create<AuthState>()(
@@ -236,6 +240,13 @@ export const useGymStore = create<GymState>()((set, get) => ({
   error: null,
   setError: (error: string | null) => set({ error }),
 
+  // Scan Errors
+  scanErrors: [],
+  addScanError: (error: any) => set((state) => ({
+    scanErrors: [error, ...state.scanErrors].slice(0, 10)
+  })),
+  clearScanErrors: () => set({ scanErrors: [] }),
+
   membersLoaded: false,
   attendanceLoaded: false,
   invoicesLoaded: false,
@@ -306,6 +317,20 @@ export const useGymStore = create<GymState>()((set, get) => ({
     } catch (error) {
       console.error('Error deleting member:', error)
       set({ error: 'Failed to delete member' })
+    }
+  },
+
+  sendMessageToMembers: async (payload: { memberIds: string[]; channel: string; subject?: string; message: string }) => {
+    try {
+      const response = await apiClient.post('/api/members/message', payload)
+      return {
+        success: response.success,
+        message: response.message || (response as any).data?.message,
+        error: response.error,
+      }
+    } catch (error: any) {
+      console.error('Error sending messages to members:', error)
+      return { success: false, error: error.message || 'Failed to dispatch messages' }
     }
   },
 
@@ -476,7 +501,7 @@ export const useGymStore = create<GymState>()((set, get) => ({
     try {
       const response = await apiClient.post('/api/inventory', item)
       if (response.success) {
-        await get().fetchInventory()
+        await get().fetchInventory(undefined, true)
       }
     } catch (error) {
       console.error('Error adding inventory item:', error)
@@ -487,7 +512,7 @@ export const useGymStore = create<GymState>()((set, get) => ({
     try {
       const response = await apiClient.put(`/api/inventory/${id}`, item)
       if (response.success) {
-        await get().fetchInventory()
+        await get().fetchInventory(undefined, true)
       }
     } catch (error) {
       console.error('Error updating inventory item:', error)
@@ -498,7 +523,7 @@ export const useGymStore = create<GymState>()((set, get) => ({
     try {
       const response = await apiClient.delete(`/api/inventory/${id}`)
       if (response.success) {
-        await get().fetchInventory()
+        await get().fetchInventory(undefined, true)
       }
     } catch (error) {
       console.error('Error deleting inventory item:', error)
@@ -766,11 +791,69 @@ export const useGymStore = create<GymState>()((set, get) => ({
 
   // Real-time SSE
   initStream: () => {
-    if (typeof window === 'undefined') return;
+    if (typeof window === 'undefined') return () => {};
     const url = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
     const evtSource = new EventSource(`${url}/api/sync/stream`);
+    
     evtSource.onmessage = (event) => {
-      console.log('SSE Sync Pulse:', event.data);
+      console.log('SSE Generic Pulse:', event.data);
+    };
+
+    const handleUpdate = (event: MessageEvent) => {
+      try {
+        const data = JSON.parse(event.data);
+        console.log(`SSE Event [${event.type}]:`, data);
+        
+        if (event.type === 'attendance:update') {
+          get().fetchAttendance(undefined, true);
+          get().fetchStats(true);
+        } else if (event.type === 'attendance:error') {
+          get().addScanError({
+            id: Math.random().toString(),
+            timestamp: new Date().toISOString(),
+            ...data
+          });
+        } else if (event.type.startsWith('billing:')) {
+          get().fetchInvoices(undefined, true);
+          get().fetchStats(true);
+        } else if (event.type.startsWith('members:')) {
+          get().fetchMembers(undefined, true);
+          get().fetchStats(true);
+        } else if (event.type.startsWith('classes:')) {
+          get().fetchClasses(true);
+        } else if (event.type.startsWith('leads:')) {
+          get().fetchLeads(true);
+        } else if (event.type.startsWith('plans:')) {
+          get().fetchPlans(true);
+        }
+      } catch (err) {
+        console.error('Error parsing SSE data:', err);
+      }
+    };
+
+    const events = [
+      'attendance:update',
+      'attendance:error',
+      'billing:update',
+      'billing:delete',
+      'members:update',
+      'members:update_bulk',
+      'members:delete',
+      'classes:update',
+      'classes:delete',
+      'leads:update',
+      'leads:delete',
+      'plans:update',
+      'plans:delete',
+      'activity:new'
+    ];
+
+    events.forEach(evtName => {
+      evtSource.addEventListener(evtName, handleUpdate);
+    });
+
+    return () => {
+      evtSource.close();
     };
   },
 }))

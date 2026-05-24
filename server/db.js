@@ -105,8 +105,8 @@ const INITIAL_DATA = {
     }
   ],
   members: [
-    { id: 'm-1', name: 'John Doe', email: 'john@example.com', phone: '555-0101', membership_type: 'Premium', status: 'active', join_date: '2023-11-01', expiry_date: '2024-11-01', tenant_id: DEFAULT_TENANT_ID },
-    { id: 'm-2', name: 'Jane Smith', email: 'jane@example.com', phone: '555-0102', membership_type: 'Basic', status: 'active', join_date: '2023-12-15', expiry_date: '2024-06-15', tenant_id: DEFAULT_TENANT_ID }
+    { id: 'm-1', name: 'John Doe', email: 'john@example.com', phone: '555-0101', dob: '1995-10-15', membership_type: 'Premium', status: 'active', join_date: '2023-11-01', expiry_date: '2024-11-01', tenant_id: DEFAULT_TENANT_ID },
+    { id: 'm-2', name: 'Jane Smith', email: 'jane@example.com', phone: '555-0102', dob: '1990-04-20', membership_type: 'Basic', status: 'active', join_date: '2023-12-15', expiry_date: '2024-06-15', tenant_id: DEFAULT_TENANT_ID }
   ],
   staff: [
     { id: 's-1', name: 'Mike Tyson', position: 'Head Trainer', salary: 5000, email: 'mike@gym.com', phone: '555-0201', tenant_id: DEFAULT_TENANT_ID },
@@ -508,14 +508,29 @@ const db = {
 
   // Membership Plans
   async getPlans(ownerId) {
-    return filterByTenant(data.plans || [], ownerId);
+    const plans = filterByTenant(data.plans || [], ownerId);
+    return plans.map(p => ({
+      ...p,
+      durationMonths: p.durationMonths ?? p.duration_months,
+      durationDays: p.durationDays ?? p.duration_days,
+      features: Array.isArray(p.features) ? p.features.join(', ') : (p.features || '')
+    }));
   },
 
   async addPlan(plan, ownerId) {
     if (!data.plans) data.plans = [];
-    data.plans.push(attachTenant({ ...plan, owner_id: ownerId }, ownerId));
+    const newPlan = attachTenant({
+      ...plan,
+      durationMonths: plan.durationMonths ?? plan.duration_months,
+      durationDays: plan.durationDays ?? plan.duration_days,
+      owner_id: ownerId
+    }, ownerId);
+    data.plans.push(newPlan);
     await this.save();
-    return attachTenant(plan, ownerId);
+    return {
+      ...newPlan,
+      features: Array.isArray(newPlan.features) ? newPlan.features.join(', ') : (newPlan.features || '')
+    };
   },
 
   async updatePlan(id, patch, ownerId) {
@@ -523,9 +538,19 @@ const db = {
     const index = data.plans.findIndex(p => p.id === id);
     if (index === -1) return null;
     if (ownerId && getRecordTenantId(data.plans[index]) !== ownerId) return null;
-    data.plans[index] = { ...data.plans[index], ...patch };
+    
+    const updatedPlan = {
+      ...data.plans[index],
+      ...patch,
+      durationMonths: patch.durationMonths !== undefined ? patch.durationMonths : (patch.duration_months !== undefined ? patch.duration_months : data.plans[index].durationMonths),
+      durationDays: patch.durationDays !== undefined ? patch.durationDays : (patch.duration_days !== undefined ? patch.duration_days : data.plans[index].durationDays)
+    };
+    data.plans[index] = updatedPlan;
     await this.save();
-    return data.plans[index];
+    return {
+      ...updatedPlan,
+      features: Array.isArray(updatedPlan.features) ? updatedPlan.features.join(', ') : (updatedPlan.features || '')
+    };
   },
 
   async deletePlan(id, ownerId) {

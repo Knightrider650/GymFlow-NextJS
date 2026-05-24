@@ -63,6 +63,12 @@ export async function POST(req: NextRequest) {
     
     const { gymId: dummy, branchId: dummy2, ...rest } = data
 
+    if (rest.dob) {
+      rest.dob = new Date(rest.dob)
+    } else {
+      delete rest.dob
+    }
+
     const newMember = await prisma.member.create({
       data: {
         ...rest,
