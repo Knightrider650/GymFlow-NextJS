@@ -197,6 +197,17 @@ const server = http.createServer((req, res) => {
 
       // SPECIAL ENDPOINTS
       
+      // SYNC STREAM
+      else if (path === '/api/sync/stream' && method === 'GET') {
+        res.writeHead(200, {
+          'Content-Type': 'text/event-stream',
+          'Cache-Control': 'no-cache',
+          'Connection': 'keep-alive'
+        });
+        res.write('data: {"status": "connected"}\n\n');
+        return;
+      }
+      
       // ATTENDANCE
       else if (path === '/api/attendance' && method === 'GET') {
         statusCode = 200;
