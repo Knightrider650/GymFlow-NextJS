@@ -18,6 +18,8 @@ interface BrandingSettingsProps {
 export function BrandingSettings({ settings, onSave }: BrandingSettingsProps) {
   const [formData, setFormData] = React.useState<Partial<AppSettings>>({})
   const [isSaving, setIsSaving] = React.useState(false)
+  const logoInputRef = React.useRef<HTMLInputElement>(null)
+  const faviconInputRef = React.useRef<HTMLInputElement>(null)
 
   React.useEffect(() => {
     if (settings) {
@@ -28,6 +30,24 @@ export function BrandingSettings({ settings, onSave }: BrandingSettingsProps) {
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { name, value } = e.target
     setFormData(prev => ({ ...prev, [name]: value }))
+  }
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>, fieldName: 'gymLogo' | 'favicon') => {
+    const file = e.target.files?.[0]
+    if (!file) return
+
+    // Limit file size to 2MB to keep Base64 strings reasonable
+    if (file.size > 2 * 1024 * 1024) {
+      alert("File is too large! Please choose an image smaller than 2MB.")
+      return
+    }
+
+    const reader = new FileReader()
+    reader.onloadend = () => {
+      const base64String = reader.result as string
+      setFormData(prev => ({ ...prev, [fieldName]: base64String }))
+    }
+    reader.readAsDataURL(file)
   }
 
   const handleSocialChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -208,7 +228,7 @@ export function BrandingSettings({ settings, onSave }: BrandingSettingsProps) {
             {/* Logo and Favicon uploaders */}
             <div className="space-y-6 lg:border-r border-slate-100 dark:border-slate-800 lg:pr-8">
               <div className="space-y-2">
-                <Label className="font-semibold text-slate-700 dark:text-slate-300">Gym Logo URL</Label>
+                <Label className="font-semibold text-slate-700 dark:text-slate-300">Gym Logo</Label>
                 <div className="flex items-center gap-4">
                   <div className="w-20 h-20 rounded-xl border-2 border-dashed border-muted-foreground/20 flex items-center justify-center bg-slate-50 dark:bg-slate-900/60 relative overflow-hidden group shrink-0">
                     {formData.gymLogo ? (
@@ -217,21 +237,40 @@ export function BrandingSettings({ settings, onSave }: BrandingSettingsProps) {
                       <Building2 className="h-6 w-6 text-muted-foreground/30" />
                     )}
                   </div>
-                  <div className="flex-1 space-y-1">
-                    <Input 
-                      name="gymLogo" 
-                      value={formData.gymLogo || ''} 
-                      onChange={handleChange} 
-                      placeholder="Paste image link..."
-                      className="text-xs h-9 bg-background/50"
-                    />
-                    <p className="text-[10px] text-muted-foreground">Or paste link for header logo</p>
+                  <div className="flex-1 space-y-2">
+                    <div className="flex gap-2">
+                      <Input 
+                        name="gymLogo" 
+                        value={formData.gymLogo || ''} 
+                        onChange={handleChange} 
+                        placeholder="Paste image link or upload..."
+                        className="text-xs h-9 bg-background/50 flex-1"
+                      />
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className="h-9 gap-1 text-xs shrink-0 cursor-pointer"
+                        onClick={() => logoInputRef.current?.click()}
+                      >
+                        <Upload className="h-3.5 w-3.5" />
+                        Upload
+                      </Button>
+                      <input 
+                        type="file" 
+                        ref={logoInputRef}
+                        accept="image/*"
+                        className="hidden" 
+                        onChange={(e) => handleFileChange(e, 'gymLogo')}
+                      />
+                    </div>
+                    <p className="text-[10px] text-muted-foreground">Upload from device or paste web link</p>
                   </div>
                 </div>
               </div>
 
               <div className="space-y-2">
-                <Label className="font-semibold text-slate-700 dark:text-slate-300">Favicon URL</Label>
+                <Label className="font-semibold text-slate-700 dark:text-slate-300">Favicon</Label>
                 <div className="flex items-center gap-4">
                   <div className="w-12 h-12 rounded-lg border border-muted-foreground/20 flex items-center justify-center bg-slate-50 dark:bg-slate-900/60 relative overflow-hidden shrink-0">
                     {formData.favicon ? (
@@ -240,14 +279,33 @@ export function BrandingSettings({ settings, onSave }: BrandingSettingsProps) {
                       <Globe className="h-5 w-5 text-muted-foreground/30" />
                     )}
                   </div>
-                  <div className="flex-1 space-y-1">
-                    <Input 
-                      name="favicon" 
-                      value={formData.favicon || ''} 
-                      onChange={handleChange} 
-                      placeholder="Paste favicon link..."
-                      className="text-xs h-9 bg-background/50"
-                    />
+                  <div className="flex-1 space-y-2">
+                    <div className="flex gap-2">
+                      <Input 
+                        name="favicon" 
+                        value={formData.favicon || ''} 
+                        onChange={handleChange} 
+                        placeholder="Paste favicon link or upload..."
+                        className="text-xs h-9 bg-background/50 flex-1"
+                      />
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className="h-9 gap-1 text-xs shrink-0 cursor-pointer"
+                        onClick={() => faviconInputRef.current?.click()}
+                      >
+                        <Upload className="h-3.5 w-3.5" />
+                        Upload
+                      </Button>
+                      <input 
+                        type="file" 
+                        ref={faviconInputRef}
+                        accept="image/*"
+                        className="hidden" 
+                        onChange={(e) => handleFileChange(e, 'favicon')}
+                      />
+                    </div>
                   </div>
                 </div>
               </div>
