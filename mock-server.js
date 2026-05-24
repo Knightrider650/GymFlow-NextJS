@@ -260,7 +260,33 @@ const server = http.createServer((req, res) => {
         statusCode = 200;
         const today = new Date().toISOString().split('T')[0];
         const month = today.substring(0, 7);
-        const revenue = invoices.filter(i => i.status === 'paid' && i.updatedAt?.startsWith(today)).reduce((s, i) => s + Number(i.amount), 0);
+        const revenue = invoices.filter(i => i.status === 'paid' && (i.updatedAt?.startsWith(today) || i.invoiceDate?.startsWith(today))).reduce((s, i) => s + Number(i.amount), 0);
+        
+        const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+        const last7Days = Array.from({ length: 7 }, (_, i) => {
+          const d = new Date();
+          d.setDate(d.getDate() - (6 - i));
+          return d.toISOString().split('T')[0];
+        });
+
+        const revenueTrend = last7Days.map(dateStr => {
+          const d = new Date(dateStr);
+          return {
+            name: days[d.getDay()],
+            revenue: invoices
+              .filter(i => i.status === 'paid' && (i.updatedAt?.startsWith(dateStr) || i.invoiceDate?.startsWith(dateStr)))
+              .reduce((sum, i) => sum + Number(i.amount), 0)
+          };
+        });
+
+        const attendanceTrend = last7Days.map(dateStr => {
+          const d = new Date(dateStr);
+          return {
+            name: days[d.getDay()],
+            visits: attendance.filter(a => a.recordedDate === dateStr).length
+          };
+        });
+
         response = {
           success: true,
           data: {
@@ -269,9 +295,9 @@ const server = http.createServer((req, res) => {
             pendingPayments: invoices.filter(i => i.status === 'pending').length,
             todayVisits: attendance.filter(a => a.recordedDate === today).length,
             todayRevenue: revenue,
-            monthlyRevenue: invoices.filter(i => i.status === 'paid' && i.updatedAt?.startsWith(month)).reduce((s, i) => s + Number(i.amount), 0),
-            revenueTrend: [{ name: 'Mon', revenue: 100 }, { name: 'Tue', revenue: 200 }, { name: 'Sun', revenue: revenue || 150 }],
-            attendanceTrend: [{ name: 'Mon', visits: 10 }, { name: 'Sun', visits: attendance.filter(a => a.recordedDate === today).length || 5 }]
+            monthlyRevenue: invoices.filter(i => i.status === 'paid' && (i.updatedAt?.startsWith(month) || i.invoiceDate?.startsWith(month))).reduce((s, i) => s + Number(i.amount), 0),
+            revenueTrend,
+            attendanceTrend
           }
         };
       }

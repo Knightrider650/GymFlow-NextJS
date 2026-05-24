@@ -825,6 +825,8 @@ export const useGymStore = create<GymState>()((set, get) => ({
           get().fetchLeads(true);
         } else if (event.type.startsWith('plans:')) {
           get().fetchPlans(true);
+        } else if (event.type.startsWith('notifications:')) {
+          get().fetchNotifications();
         }
       } catch (err) {
         console.error('Error parsing SSE data:', err);
@@ -845,7 +847,9 @@ export const useGymStore = create<GymState>()((set, get) => ({
       'leads:delete',
       'plans:update',
       'plans:delete',
-      'activity:new'
+      'activity:new',
+      'notifications:new',
+      'notifications:update'
     ];
 
     events.forEach(evtName => {

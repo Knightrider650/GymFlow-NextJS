@@ -30,7 +30,7 @@ import {
 } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { NAV_VISIBILITY, type UserRole } from '@/lib/permissions'
-import { useAuthStore } from '@/lib/store'
+import { useAuthStore, useGymStore } from '@/lib/store'
 
 const PLATFORM_ROUTES = new Set(['/super-dashboard', '/team'])
 
@@ -85,12 +85,18 @@ export function Sidebar() {
   const [isOpen, setIsOpen] = useState(false)
   const [isSupportMode, setIsSupportMode] = useState(false)
 
+  const unreadCount = useGymStore((state) => state.unreadCount)
+  const fetchNotifications = useGymStore((state) => state.fetchNotifications)
+
   const actorRole = (user?.role ?? 'staff') as UserRole
   const isGlobalUser = !!user?.isGlobal
 
   useEffect(() => {
     setMounted(true)
-  }, [])
+    if (user) {
+      fetchNotifications()
+    }
+  }, [user, fetchNotifications])
 
   useEffect(() => {
     if (typeof window === 'undefined') return
@@ -225,7 +231,12 @@ export function Sidebar() {
                           onClick={() => setIsOpen(false)}
                         >
                           <Icon className="w-4 h-4 shrink-0" />
-                          <span>{item.label}</span>
+                          <span className="flex-1">{item.label}</span>
+                          {item.href === '/notifications' && unreadCount > 0 && (
+                            <Badge className="bg-red-500 hover:bg-red-600 text-white border-none text-[10px] px-1.5 py-0.5 font-bold animate-pulse">
+                              {unreadCount}
+                            </Badge>
+                          )}
                         </Link>
                       )
                     })}

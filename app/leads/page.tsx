@@ -53,9 +53,44 @@ export default function LeadsPage() {
   const [convertingLeadId, setConvertingLeadId] = useState<string | null>(null)
   const [selectedPlan, setSelectedPlan] = useState('')
 
+  const matchesSearch = (text: string, query: string) => {
+    if (!text) return false
+    const normText = text.toLowerCase()
+    const normQuery = query.toLowerCase()
+    if (normText.includes(normQuery)) return true
+    
+    if (normQuery.length < 3) return false
+    
+    // Check if query is a subsequence of the text (allows gaps)
+    let qIdx = 0
+    for (let i = 0; i < normText.length; i++) {
+      if (normText[i] === normQuery[qIdx]) {
+        qIdx++
+        if (qIdx === normQuery.length) return true
+      }
+    }
+
+    // Check transposition / character presence (e.g., prahsant vs prash)
+    let matchedChars = 0
+    let tempText = normText
+    for (let i = 0; i < normQuery.length; i++) {
+      const idx = tempText.indexOf(normQuery[i])
+      if (idx !== -1) {
+        matchedChars++
+        tempText = tempText.substring(0, idx) + tempText.substring(idx + 1)
+      }
+    }
+    
+    if (matchedChars >= normQuery.length - 1) {
+      return normText[0] === normQuery[0]
+    }
+    
+    return false
+  }
+
   const filteredLeads = leads.filter(lead =>
-    lead.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    lead.email?.toLowerCase().includes(searchTerm.toLowerCase())
+    matchesSearch(lead.name, searchTerm) ||
+    matchesSearch(lead.email, searchTerm)
   )
 
   const form = useForm<LeadFormValues>({

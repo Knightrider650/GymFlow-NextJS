@@ -345,7 +345,15 @@ const db = {
 
   // Attendance Methods
   async getAttendance(filters, ownerId) {
-    return filterByTenant(data.attendance, ownerId);
+    const attendance = filterByTenant(data.attendance, ownerId);
+    return attendance.map(a => {
+      const memberId = a.memberId || a.member_id;
+      const member = data.members.find(m => m.id === memberId);
+      return {
+        ...a,
+        memberName: member ? member.name : (a.memberName || 'Unknown')
+      };
+    });
   },
 
   async checkIn(memberId, notes, ownerId) {
@@ -372,18 +380,40 @@ const db = {
     if (ownerId && getRecordTenantId(data.attendance[index]) !== ownerId) return null;
     data.attendance[index].checkOutTime = new Date().toISOString();
     await this.save();
-    return data.attendance[index];
+    
+    const record = data.attendance[index];
+    const memberId = record.memberId || record.member_id;
+    const member = data.members.find(m => m.id === memberId);
+    return {
+      ...record,
+      memberName: member ? member.name : (record.memberName || 'Unknown')
+    };
   },
 
   // Invoices & Billing
   async getInvoices(ownerId) {
-    return filterByTenant(data.billing, ownerId);
+    const billing = filterByTenant(data.billing, ownerId);
+    return billing.map(b => {
+      const memberId = b.memberId || b.member_id;
+      const member = data.members.find(m => m.id === memberId);
+      return {
+        ...b,
+        memberName: member ? member.name : (b.memberName || 'Unknown')
+      };
+    });
   },
 
   async addInvoice(invoice, ownerId) {
-    data.billing.push(attachTenant({ ...invoice, owner_id: ownerId }, ownerId));
+    const record = attachTenant({ ...invoice, owner_id: ownerId }, ownerId);
+    data.billing.push(record);
     await this.save();
-    return attachTenant(invoice, ownerId);
+    
+    const memberId = record.memberId || record.member_id;
+    const member = data.members.find(m => m.id === memberId);
+    return {
+      ...record,
+      memberName: member ? member.name : (record.memberName || 'Unknown')
+    };
   },
 
   async payInvoice(id, paymentData, ownerId) {
@@ -394,7 +424,14 @@ const db = {
     data.billing[index].paymentMethod = paymentData.method;
     data.billing[index].paymentDate = new Date().toISOString();
     await this.save();
-    return data.billing[index];
+    
+    const record = data.billing[index];
+    const memberId = record.memberId || record.member_id;
+    const member = data.members.find(m => m.id === memberId);
+    return {
+      ...record,
+      memberName: member ? member.name : (record.memberName || 'Unknown')
+    };
   },
 
   async updateInvoice(id, patch, ownerId) {
@@ -403,7 +440,14 @@ const db = {
     if (ownerId && getRecordTenantId(data.billing[index]) !== ownerId) return null;
     data.billing[index] = { ...data.billing[index], ...patch };
     await this.save();
-    return data.billing[index];
+    
+    const record = data.billing[index];
+    const memberId = record.memberId || record.member_id;
+    const member = data.members.find(m => m.id === memberId);
+    return {
+      ...record,
+      memberName: member ? member.name : (record.memberName || 'Unknown')
+    };
   },
 
   async deleteInvoice(id, ownerId) {
@@ -457,7 +501,7 @@ const db = {
 
   // Notifications
   async getNotifications(ownerId) {
-    return data.notifications;
+    return filterByTenant(data.notifications || [], ownerId);
   },
 
   async markNotificationRead(id, ownerId) {
@@ -466,6 +510,22 @@ const db = {
     data.notifications[index].read = true;
     await this.save();
     return data.notifications[index];
+  },
+
+  async addNotification(notification, ownerId) {
+    if (!data.notifications) data.notifications = [];
+    const newNotification = attachTenant({
+      id: notification.id || uuidv4(),
+      title: notification.title,
+      message: notification.message,
+      type: notification.type || 'info',
+      read: false,
+      createdAt: new Date().toISOString(),
+      owner_id: ownerId
+    }, ownerId);
+    data.notifications.push(newNotification);
+    await this.save();
+    return newNotification;
   },
 
   // Leads (CRM)
@@ -662,12 +722,24 @@ const db = {
   },
 
   async getTenants() {
-    return (data.tenants || []).map((tenant) => ({
-      ...tenant,
-      membersCount: filterByTenant(data.members, tenant.id).length,
-      branchesCount: filterByTenant(data.branches || [], tenant.id).length,
-      lastActiveAt: tenant.lastActiveAt || tenant.updatedAt || tenant.createdAt,
-    }));
+    return (data.tenants || []).map((tenant) => {
+      const tenantMembers = filterByTenant(data.members, tenant.id);
+      const activeMembers = tenantMembers.filter(m => m.status === 'active').length;
+      const tenantBilling = filterByTenant(data.billing, tenant.id);
+      const totalRevenue = tenantBilling
+        .filter(i => i.status === 'paid')
+        .reduce((sum, i) => sum + Number(i.amount || 0), 0);
+
+      return {
+        ...tenant,
+        activeMembers,
+        totalMembers: tenantMembers.length,
+        membersCount: tenantMembers.length,
+        totalRevenue,
+        branchesCount: filterByTenant(data.branches || [], tenant.id).length,
+        lastActiveAt: tenant.lastActiveAt || tenant.updatedAt || tenant.createdAt,
+      };
+    });
   },
 
   async getTenantById(id) {

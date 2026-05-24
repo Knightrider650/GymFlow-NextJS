@@ -117,7 +117,8 @@
       "amount": 99.99,
       "status": "paid",
       "paymentMethod": "Card",
-      "paymentDate": "2026-04-24T22:32:53.342Z",
+      "paymentDate": "2026-05-20T22:32:53.342Z",
+      "invoiceDate": "2026-05-20",
       "tenant_id": "gym-001",
       "tenantId": "gym-001"
     },
@@ -127,7 +128,8 @@
       "amount": 49.99,
       "status": "paid",
       "paymentMethod": "Cash",
-      "paymentDate": "2026-04-25T22:32:53.342Z",
+      "paymentDate": "2026-05-22T22:32:53.342Z",
+      "invoiceDate": "2026-05-22",
       "tenant_id": "gym-001",
       "tenantId": "gym-001"
     },
@@ -137,7 +139,8 @@
       "amount": 150,
       "status": "paid",
       "paymentMethod": "UPI",
-      "paymentDate": "2026-04-26T22:32:53.342Z",
+      "paymentDate": "2026-05-24T22:32:53.342Z",
+      "invoiceDate": "2026-05-24",
       "tenant_id": "gym-001",
       "tenantId": "gym-001"
     }

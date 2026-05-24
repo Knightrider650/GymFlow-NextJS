@@ -1,16 +1,26 @@
 'use client'
 
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { ProtectedLayout } from '@/components/layout/protected-layout'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Calendar as CalendarIcon, Users } from 'lucide-react'
 import { useGymStore } from '@/lib/store'
+import { Button } from '@/components/ui/button'
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from '@/components/ui/dialog'
 
 export default function CalendarPage() {
   const fetchClasses = useGymStore(state => state.fetchClasses)
   const classes = useGymStore(state => state.classes) || []
   const classesLoading = useGymStore(state => state.classesLoading)
+  const [selectedClass, setSelectedClass] = useState<any | null>(null)
 
   useEffect(() => {
     fetchClasses()
@@ -88,7 +98,10 @@ export default function CalendarPage() {
                         return (
                           <div key={`${dayShort}-${time}`} className="p-1.5 border-r border-white/5 last:border-r-0 hover:bg-muted/20 transition-colors min-h-[90px]">
                             {slotClass && (
-                              <div className="h-full w-full rounded-lg bg-primary/10 border border-primary/20 p-2.5 text-sm flex flex-col gap-1.5 hover:bg-primary/15 transition-colors cursor-default">
+                              <div 
+                                onClick={() => setSelectedClass(slotClass)}
+                                className="h-full w-full rounded-lg bg-primary/10 border border-primary/20 p-2.5 text-sm flex flex-col gap-1.5 hover:bg-primary/15 hover:scale-[1.02] active:scale-[0.98] transition-all cursor-pointer duration-200"
+                              >
                                 <div className="font-bold text-primary text-xs leading-tight">{slotClass.name}</div>
                                 <div className="flex items-center text-muted-foreground text-[10px]">
                                   <Users className="h-3 w-3 mr-1 flex-shrink-0" />
@@ -122,6 +135,75 @@ export default function CalendarPage() {
             ))}
           </div>
         )}
+
+        {/* Class Detail Dialog */}
+        <Dialog open={!!selectedClass} onOpenChange={(open) => !open && setSelectedClass(null)}>
+          <DialogContent className="sm:max-w-[425px]">
+            <DialogHeader>
+              <DialogTitle className="text-xl font-bold flex items-center gap-2 text-primary">
+                <CalendarIcon className="h-5 w-5" />
+                {selectedClass?.name}
+              </DialogTitle>
+              <DialogDescription>
+                Detailed information for this scheduled fitness session.
+              </DialogDescription>
+            </DialogHeader>
+            
+            {selectedClass && (
+              <div className="space-y-6 py-4">
+                <div className="space-y-1">
+                  <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Instructor</div>
+                  <div className="text-sm font-medium text-foreground bg-muted/40 px-3 py-2 rounded-md">
+                    {selectedClass.instructorName || 'TBA'}
+                  </div>
+                </div>
+
+                <div className="space-y-1">
+                  <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Time Slot</div>
+                  <div className="text-sm font-medium text-foreground bg-muted/40 px-3 py-2 rounded-md">
+                    {selectedClass.time || 'N/A'}
+                  </div>
+                </div>
+
+                <div className="space-y-1">
+                  <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Schedule Days</div>
+                  <div className="text-sm font-medium text-foreground bg-muted/40 px-3 py-2 rounded-md">
+                    {Array.isArray(selectedClass.days) ? selectedClass.days.join(', ') : selectedClass.days || 'N/A'}
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <div className="flex justify-between text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                    <span>Capacity / Enrollment</span>
+                    <span>{selectedClass.currentEnrollment || 0} / {selectedClass.maxCapacity || 20}</span>
+                  </div>
+                  <div className="w-full bg-slate-800 rounded-full h-2 overflow-hidden">
+                    <div 
+                      className="bg-primary h-full rounded-full transition-all duration-300"
+                      style={{ width: `${Math.min(100, Math.round(((selectedClass.currentEnrollment || 0) / (selectedClass.maxCapacity || 20)) * 100))}%` }}
+                    />
+                  </div>
+                </div>
+
+                {selectedClass.description && (
+                  <div className="space-y-1">
+                    <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Description</div>
+                    <p className="text-sm text-muted-foreground leading-relaxed">
+                      {selectedClass.description}
+                    </p>
+                  </div>
+                )}
+              </div>
+            )}
+            
+            <DialogFooter>
+              <Button onClick={() => setSelectedClass(null)} className="w-full sm:w-auto">
+                Close
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
       </div>
     </ProtectedLayout>
   )

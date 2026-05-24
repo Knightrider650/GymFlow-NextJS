@@ -73,6 +73,19 @@ const broadcast = (event, data) => {
   }
 };
 
+const createAndBroadcastNotification = async (title, message, type, tenantId) => {
+  try {
+    const notification = await db.addNotification({
+      title,
+      message,
+      type
+    }, tenantId);
+    broadcast('notifications:new', notification);
+  } catch (err) {
+    console.error('Failed to create/broadcast notification:', err);
+  }
+};
+
 function getTenantContextId(req) {
   if (!req) return null;
 
@@ -417,6 +430,14 @@ app.post('/api/members', authMiddleware, authorizeRoles(['admin', 'ceo', 'cto', 
   const tenantId = getTenantContextId(req);
   const member = await db.addMember(withTenantPayload({ ...req.body, id: uuidv4() }, tenantId), tenantId);
   broadcast('members:update', member);
+  if (member) {
+    createAndBroadcastNotification(
+      'New Member Registered',
+      `${member.name} has joined the gym.`,
+      'members',
+      tenantId
+    );
+  }
   res.status(201).json({ success: true, data: member });
 });
 
@@ -434,6 +455,14 @@ app.post('/api/members/bulk', authMiddleware, authorizeRoles(['admin', 'ceo', 'c
     
     // Broadcast bulk update so all connected clients fetch fresh state
     broadcast('members:update_bulk', { count: inserted.length });
+    if (inserted && inserted.length > 0) {
+      createAndBroadcastNotification(
+        'Bulk Import Completed',
+        `Successfully imported ${inserted.length} members.`,
+        'members',
+        tenantId
+      );
+    }
     res.status(201).json({ success: true, data: inserted });
   } catch (err) {
     console.error('Bulk Import Error:', err);
@@ -521,6 +550,14 @@ app.post('/api/attendance/checkin', authMiddleware, async (req, res) => {
   const record = await db.checkIn(req.body.memberId, req.body.notes, tenantId);
   const mapped = mapAttendanceRecord(record);
   broadcast('attendance:update', mapped);
+  if (mapped) {
+    createAndBroadcastNotification(
+      'Member Check-in',
+      `${mapped.memberName || 'A member'} has checked in.`,
+      'attendance',
+      tenantId
+    );
+  }
   res.status(201).json({ success: true, data: mapped });
 });
 
@@ -528,7 +565,15 @@ app.post('/api/attendance/:id/checkout', authMiddleware, async (req, res) => {
   const tenantId = getTenantContextId(req);
   const record = await db.checkOut(req.params.id, tenantId);
   const mapped = mapAttendanceRecord(record);
-  if (mapped) broadcast('attendance:update', mapped);
+  if (mapped) {
+    broadcast('attendance:update', mapped);
+    createAndBroadcastNotification(
+      'Member Check-out',
+      `${mapped.memberName || 'A member'} has checked out.`,
+      'attendance',
+      tenantId
+    );
+  }
   res.json({ success: !!mapped, data: mapped });
 });
 
@@ -571,6 +616,13 @@ app.post('/api/attendance/scan', authMiddleware, async (req, res) => {
       // Perform Check-Out
       const record = await db.checkOut(activeCheckin.id, tenantId);
       
+      createAndBroadcastNotification(
+        'Member Check-out',
+        `${member.name} has checked out (QR Scan).`,
+        'attendance',
+        tenantId
+      );
+      
       await db.logActivity(
         req.user.id,
         req.user.name || req.user.email,
@@ -601,6 +653,13 @@ app.post('/api/attendance/scan', authMiddleware, async (req, res) => {
 
       try {
         const record = await db.checkIn(memberId, 'Checked in via QR scan', tenantId);
+        
+        createAndBroadcastNotification(
+          isExpired ? 'Member Check-in Warning' : 'Member Check-in',
+          `${member.name} has checked in (QR Scan).${isExpired ? ' WARNING: Membership Expired.' : ''}`,
+          'attendance',
+          tenantId
+        );
 
         await db.logActivity(
           req.user.id,
@@ -726,6 +785,14 @@ app.post('/api/billing', authMiddleware, async (req, res) => {
   const invoice = await db.addInvoice(withTenantPayload({ ...req.body, id: uuidv4(), status: 'pending' }, tenantId), tenantId);
   const mapped = mapInvoice(invoice);
   broadcast('billing:update', mapped);
+  if (mapped) {
+    createAndBroadcastNotification(
+      'New Invoice Created',
+      `Invoice ${mapped.invoiceNumber || mapped.id} created for ${mapped.memberName || 'a member'}: $${mapped.amount}`,
+      'billing',
+      tenantId
+    );
+  }
   res.status(201).json({ success: true, data: mapped });
 });
 
@@ -733,7 +800,15 @@ app.post('/api/billing/:id/pay', authMiddleware, async (req, res) => {
   const tenantId = getTenantContextId(req);
   const record = await db.payInvoice(req.params.id, req.body, tenantId);
   const mapped = mapInvoice(record);
-  if (mapped) broadcast('billing:update', mapped);
+  if (mapped) {
+    broadcast('billing:update', mapped);
+    createAndBroadcastNotification(
+      'Invoice Paid',
+      `Invoice ${mapped.invoiceNumber || mapped.id} for ${mapped.memberName || 'a member'} has been marked as paid: $${mapped.amount}`,
+      'billing',
+      tenantId
+    );
+  }
   res.json({ success: !!mapped, data: mapped });
 });
 
@@ -899,6 +974,12 @@ app.post('/api/leads/:id/convert', authMiddleware, async (req, res) => {
   if (member) {
     broadcast('leads:delete', { id: req.params.id });
     broadcast('members:update', member);
+    createAndBroadcastNotification(
+      'Lead Converted',
+      `Lead ${member.name} converted to member successfully under plan ${member.membershipType || 'Basic'}.`,
+      'leads',
+      tenantId
+    );
   }
   res.json({ success: !!member, data: member });
 });
