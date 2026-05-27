@@ -676,7 +676,7 @@ const db = {
     if (res.rows.length === 0) {
       const defaultSettings = { 
         gym_name: 'GymFlow Pro', 
-        currency: 'USD', 
+        currency: 'INR', 
         tax_rate: 0.08, 
         enable_notifications: true,
         config: JSON.stringify({

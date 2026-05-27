@@ -169,7 +169,7 @@ const INITIAL_DATA = {
     gymName: 'GymFlow Pro',
     gymLogo: '',
     gymEmail: 'admin@gymflow.com',
-    currency: 'USD',
+    currency: 'INR',
     taxRate: 0.08,
     enableNotifications: true
   }
