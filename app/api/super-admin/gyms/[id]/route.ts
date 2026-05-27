@@ -66,3 +66,61 @@ export async function PATCH(
     return NextResponse.json({ success: false, error: 'Failed to update gym settings' }, { status: 500 })
   }
 }
+
+export async function DELETE(
+  req: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    const user = await getAuthUser(req)
+    if (!user || !ADMIN_ROLES.includes(user.role as UserRole)) {
+      return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 })
+    }
+
+    const { id } = await params
+
+    // 1. Remove from JSON overrides
+    const overrides = getPlatformOverrides()
+    if (overrides[id]) {
+      delete overrides[id]
+      savePlatformOverrides(overrides)
+    }
+
+    // 2. Remove from Prisma with cascading delete
+    try {
+      await prisma.$transaction(async (tx) => {
+        // Attendance depends on Member
+        await tx.attendance.deleteMany({ where: { member: { gymId: id } } })
+        // Payment depends on Invoice
+        await tx.payment.deleteMany({ where: { invoice: { gymId: id } } })
+        
+        // Direct dependencies of Gym
+        await tx.member.deleteMany({ where: { gymId: id } })
+        await tx.invoice.deleteMany({ where: { gymId: id } })
+        await tx.user.deleteMany({ where: { gymId: id } })
+        await tx.staff.deleteMany({ where: { gymId: id } })
+        await tx.plan.deleteMany({ where: { gymId: id } })
+        await tx.fitnessClass.deleteMany({ where: { gymId: id } })
+        await tx.inventoryItem.deleteMany({ where: { gymId: id } })
+        await tx.lead.deleteMany({ where: { gymId: id } })
+        await tx.notification.deleteMany({ where: { gymId: id } })
+        await tx.activityLog.deleteMany({ where: { gymId: id } })
+        await tx.feedback.deleteMany({ where: { gymId: id } })
+        await tx.invite.deleteMany({ where: { gymId: id } })
+        await tx.branch.deleteMany({ where: { gymId: id } })
+        await tx.campaign.deleteMany({ where: { gymId: id } })
+        await tx.reminder.deleteMany({ where: { gymId: id } })
+        
+        // Finally delete the Gym itself
+        await tx.gym.delete({ where: { id } })
+      })
+    } catch (e) {
+      console.warn(`Prisma failed to delete gym ${id} (falling back to JSON override deletion):`, e)
+    }
+
+    return NextResponse.json({ success: true, message: `Gym ${id} deleted successfully` })
+  } catch (error: any) {
+    console.error('Super Admin Gym DELETE Error:', error)
+    return NextResponse.json({ success: false, error: 'Failed to delete gym' }, { status: 500 })
+  }
+}

@@ -34,7 +34,9 @@ import {
   Shield,
   Plus,
   Grid,
-  Filter
+  Filter,
+  Trash2,
+  Bell
 } from 'lucide-react'
 import { apiClient } from '@/lib/api-client'
 import { useAuthStore } from '@/lib/store'
@@ -197,6 +199,15 @@ export default function SuperDashboard() {
   const [searchTerm, setSearchTerm] = useState('')
   const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'suspended'>('all')
 
+  const [selectedIds, setSelectedIds] = useState<string[]>([])
+  const [isNotifyOpen, setIsNotifyOpen] = useState(false)
+  const [notificationTitle, setNotificationTitle] = useState('')
+  const [notificationMessage, setNotificationMessage] = useState('')
+  const [notifyTargetIds, setNotifyTargetIds] = useState<string[]>([])
+
+  const [isDeleteOpen, setIsDeleteOpen] = useState(false)
+  const [deleteTargetIds, setDeleteTargetIds] = useState<string[]>([])
+
   const switchGym = useAuthStore(state => state.switchGym)
   const router = useRouter()
 
@@ -254,6 +265,79 @@ export default function SuperDashboard() {
       }
     } catch (err) {
       console.error('Error updating tenant overrides:', err)
+    }
+  }
+
+  const handleDeleteAction = async () => {
+    if (deleteTargetIds.length === 1) {
+      await handleSingleDelete(deleteTargetIds[0])
+    } else if (deleteTargetIds.length > 1) {
+      await handleBulkDelete(deleteTargetIds)
+    }
+  }
+
+  const handleSingleDelete = async (id: string) => {
+    try {
+      const response = await fetch(`/api/super-admin/gyms/${id}`, {
+        method: 'DELETE'
+      })
+      if (response.ok) {
+        setSelectedIds(prev => prev.filter(x => x !== id))
+        setIsDeleteOpen(false)
+        setSelectedTenant(null)
+        await fetchGyms()
+      } else {
+        alert('Failed to delete gym')
+      }
+    } catch (err) {
+      console.error('Delete error:', err)
+    }
+  }
+
+  const handleBulkDelete = async (ids: string[]) => {
+    try {
+      const response = await fetch('/api/super-admin/gyms', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ids })
+      })
+      if (response.ok) {
+        setSelectedIds([])
+        setIsDeleteOpen(false)
+        await fetchGyms()
+      } else {
+        alert('Failed to delete gyms')
+      }
+    } catch (err) {
+      console.error('Delete error:', err)
+    }
+  }
+
+  const handleSendNotifications = async () => {
+    if (!notificationTitle.trim() || !notificationMessage.trim()) {
+      alert('Title and message are required')
+      return
+    }
+    try {
+      const response = await fetch('/api/super-admin/gyms/notify', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          ids: notifyTargetIds,
+          title: notificationTitle,
+          message: notificationMessage
+        })
+      })
+      if (response.ok) {
+        setIsNotifyOpen(false)
+        setNotificationTitle('')
+        setNotificationMessage('')
+        alert(`Notifications successfully sent to ${notifyTargetIds.length} gym(s).`)
+      } else {
+        alert('Failed to send notifications')
+      }
+    } catch (err) {
+      console.error('Notify error:', err)
     }
   }
 
@@ -571,6 +655,48 @@ export default function SuperDashboard() {
         {/* ──────── TAB 2: TENANTS MANAGEMENT ──────── */}
         {activeTab === 'tenants' && (
           <div className="space-y-6 animate-in fade-in duration-300">
+            {/* Bulk Actions Banner */}
+            {selectedIds.length > 0 && (
+              <div className="bg-gradient-to-r from-violet-950/60 via-indigo-950/60 to-slate-950/80 border border-violet-500/30 rounded-2xl p-4 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between shadow-2xl animate-in slide-in-from-top duration-300">
+                <div className="flex items-center gap-3">
+                  <Badge className="bg-violet-600 text-slate-50 font-black px-2.5 py-1 text-xs">{selectedIds.length} Selected</Badge>
+                  <span className="text-sm font-semibold text-slate-200">Bulk operations on selected gym tenants.</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Button 
+                    variant="outline" 
+                    className="border-violet-500/20 text-violet-400 hover:bg-violet-500/10 font-bold text-xs"
+                    onClick={() => {
+                      setNotifyTargetIds(selectedIds)
+                      setIsNotifyOpen(true)
+                    }}
+                  >
+                    <Bell className="h-3 w-3 mr-1" />
+                    Send Broadcast Notification
+                  </Button>
+                  <Button 
+                    variant="destructive" 
+                    className="font-bold text-xs bg-red-950/60 border border-red-500/30 text-red-400 hover:bg-red-900/60"
+                    onClick={() => {
+                      setDeleteTargetIds(selectedIds)
+                      setIsDeleteOpen(true)
+                    }}
+                  >
+                    <Trash2 className="h-3 w-3 mr-1" />
+                    Delete Selected
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-8 px-2 hover:bg-slate-800 text-slate-400 font-bold text-xs"
+                    onClick={() => setSelectedIds([])}
+                  >
+                    Clear Selection
+                  </Button>
+                </div>
+              </div>
+            )}
+
             <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
               <div className="flex flex-wrap items-center gap-3">
                 <div className="relative">
@@ -605,7 +731,7 @@ export default function SuperDashboard() {
                   </button>
                 </div>
               </div>
-
+ 
               <Button 
                 onClick={() => setIsNewTenantOpen(true)}
                 className="gap-2 font-bold shadow-lg shadow-primary/20 hover:scale-105 active:scale-95 transition-transform"
@@ -614,12 +740,26 @@ export default function SuperDashboard() {
                 Provision Gym Tenant
               </Button>
             </div>
-
+ 
             {/* Gyms Directory Table */}
             <Card className="border-none bg-slate-900/40 backdrop-blur-sm overflow-hidden shadow-xl">
               <Table>
                 <TableHeader>
                   <TableRow className="bg-slate-900 border-slate-800 hover:bg-slate-900">
+                    <TableHead className="w-[50px] font-bold text-slate-300">
+                      <input 
+                        type="checkbox"
+                        checked={filteredTenants.length > 0 && selectedIds.length === filteredTenants.length}
+                        onChange={(e) => {
+                          if (e.target.checked) {
+                            setSelectedIds(filteredTenants.map(g => g.id))
+                          } else {
+                            setSelectedIds([])
+                          }
+                        }}
+                        className="rounded border-slate-800 bg-slate-950 text-violet-600 focus:ring-violet-500 w-4 h-4 cursor-pointer"
+                      />
+                    </TableHead>
                     <TableHead className="font-bold text-slate-300">Gym Identity</TableHead>
                     <TableHead className="font-bold text-slate-300">Subdomain Slug</TableHead>
                     <TableHead className="font-bold text-slate-300">Plan</TableHead>
@@ -632,7 +772,7 @@ export default function SuperDashboard() {
                 <TableBody>
                   {filteredTenants.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={7} className="text-center py-20 text-slate-400 font-bold">
+                      <TableCell colSpan={8} className="text-center py-20 text-slate-400 font-bold">
                         No customer gyms match current platform filter keys.
                       </TableCell>
                     </TableRow>
@@ -641,8 +781,24 @@ export default function SuperDashboard() {
                       <TableRow 
                         key={gym.id} 
                         onClick={() => setSelectedTenant(gym)}
-                        className="hover:bg-slate-900/60 border-slate-800 cursor-pointer transition-colors group"
+                        className={`hover:bg-slate-900/60 border-slate-800 cursor-pointer transition-colors group ${
+                          selectedIds.includes(gym.id) ? 'bg-violet-950/15' : ''
+                        }`}
                       >
+                        <TableCell onClick={(e) => e.stopPropagation()}>
+                          <input 
+                            type="checkbox"
+                            checked={selectedIds.includes(gym.id)}
+                            onChange={(e) => {
+                              if (e.target.checked) {
+                                setSelectedIds(prev => [...prev, gym.id])
+                              } else {
+                                setSelectedIds(prev => prev.filter(id => id !== gym.id))
+                              }
+                            }}
+                            className="rounded border-slate-800 bg-slate-950 text-violet-600 focus:ring-violet-500 w-4 h-4 cursor-pointer"
+                          />
+                        </TableCell>
                         <TableCell>
                           <div className="flex flex-col">
                             <span className="font-extrabold text-slate-200 group-hover:text-primary transition-colors">{gym.name}</span>
@@ -692,7 +848,7 @@ export default function SuperDashboard() {
                           </Badge>
                         </TableCell>
                         <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
-                          <div className="flex items-center justify-end gap-2">
+                          <div className="flex items-center justify-end gap-1.5">
                             <Button 
                               variant="ghost" 
                               size="sm" 
@@ -709,6 +865,30 @@ export default function SuperDashboard() {
                             >
                               <Play className="h-3 w-3" />
                               Impersonate
+                            </Button>
+                            <Button 
+                              variant="ghost" 
+                              size="icon" 
+                              className="h-8 w-8 text-slate-400 hover:text-violet-400 hover:bg-slate-800"
+                              title="Notify Gym"
+                              onClick={() => {
+                                setNotifyTargetIds([gym.id])
+                                setIsNotifyOpen(true)
+                              }}
+                            >
+                              <Bell className="h-4 w-4" />
+                            </Button>
+                            <Button 
+                              variant="ghost" 
+                              size="icon" 
+                              className="h-8 w-8 text-slate-400 hover:text-red-400 hover:bg-slate-800"
+                              title="Delete Gym"
+                              onClick={() => {
+                                setDeleteTargetIds([gym.id])
+                                setIsDeleteOpen(true)
+                              }}
+                            >
+                              <Trash2 className="h-4 w-4" />
                             </Button>
                           </div>
                         </TableCell>
@@ -1240,12 +1420,131 @@ export default function SuperDashboard() {
 
               </div>
 
-              <div className="p-6 border-t border-slate-800 bg-slate-900/60 flex justify-end gap-3">
-                <Button onClick={() => setSelectedTenant(null)} className="font-bold">
-                  Close Detail Overview
+              <div className="p-6 border-t border-slate-800 bg-slate-900/60 flex items-center justify-between gap-3">
+                <Button 
+                  variant="destructive" 
+                  className="bg-red-950/60 border border-red-500/30 text-red-400 hover:bg-red-900/60 font-bold text-xs"
+                  onClick={() => {
+                    setDeleteTargetIds([selectedTenant.id])
+                    setIsDeleteOpen(true)
+                  }}
+                >
+                  <Trash2 className="h-3 w-3 mr-1" />
+                  Delete Tenant
+                </Button>
+                <div className="flex items-center gap-2">
+                  <Button 
+                    variant="outline" 
+                    className="border-violet-500/20 text-violet-400 hover:bg-violet-500/10 font-bold text-xs"
+                    onClick={() => {
+                      setNotifyTargetIds([selectedTenant.id])
+                      setIsNotifyOpen(true)
+                    }}
+                  >
+                    <Bell className="h-3 w-3 mr-1" />
+                    Send Notification
+                  </Button>
+                  <Button onClick={() => setSelectedTenant(null)} className="font-bold text-xs">
+                    Close Details
+                  </Button>
+                </div>
+              </div>
+
+            </div>
+          </div>
+        )}
+
+        {/* Send Notification Modal */}
+        {isNotifyOpen && (
+          <div className="fixed inset-0 bg-slate-950/70 backdrop-blur-sm z-[60] flex items-center justify-center p-4">
+            <div className="bg-slate-900 border border-slate-800 shadow-2xl rounded-2xl w-full max-w-lg overflow-hidden animate-in zoom-in-95 duration-200">
+              <div className="p-6 bg-slate-900 border-b border-slate-800 flex items-center justify-between">
+                <div>
+                  <h3 className="text-lg font-bold text-slate-100">Send System Notification</h3>
+                  <p className="text-xs text-slate-400">Broadcast notification to {notifyTargetIds.length} target tenant(s).</p>
+                </div>
+                <Button variant="ghost" size="icon" onClick={() => setIsNotifyOpen(false)} className="h-8 w-8 text-slate-400 hover:text-slate-100 hover:bg-slate-800">
+                  <X className="h-4 w-4" />
                 </Button>
               </div>
 
+              <div className="p-6 space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="notifyTitle">Notification Title *</Label>
+                  <Input 
+                    id="notifyTitle" 
+                    required 
+                    value={notificationTitle}
+                    onChange={(e) => setNotificationTitle(e.target.value)}
+                    placeholder="e.g., Platform Maintenance Window" 
+                    className="bg-slate-950 border-slate-800 text-slate-100 focus:border-violet-500"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="notifyMessage">Message Content *</Label>
+                  <textarea 
+                    id="notifyMessage" 
+                    required
+                    rows={4}
+                    value={notificationMessage}
+                    onChange={(e) => setNotificationMessage(e.target.value)}
+                    placeholder="Write detailed system announcement details..." 
+                    className="w-full rounded-md border border-slate-800 bg-slate-950 text-sm p-3 focus:outline-none text-slate-100 focus:border-violet-500"
+                  />
+                </div>
+
+                <div className="flex justify-end gap-3 pt-6 border-t border-slate-800">
+                  <Button type="button" variant="outline" onClick={() => setIsNotifyOpen(false)} className="border-slate-800 hover:bg-slate-800 font-bold text-xs">
+                    Cancel
+                  </Button>
+                  <Button 
+                    type="button" 
+                    onClick={handleSendNotifications}
+                    className="font-bold bg-violet-600 hover:bg-violet-500 text-slate-50 text-xs"
+                  >
+                    Send Announcement
+                  </Button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Delete Confirmation Modal */}
+        {isDeleteOpen && (
+          <div className="fixed inset-0 bg-slate-950/70 backdrop-blur-sm z-[60] flex items-center justify-center p-4">
+            <div className="bg-slate-900 border border-red-500/20 shadow-2xl rounded-2xl w-full max-w-md overflow-hidden animate-in zoom-in-95 duration-200">
+              <div className="p-6 bg-slate-900 border-b border-slate-800 flex items-center justify-between">
+                <div className="flex items-center gap-2 text-red-400">
+                  <AlertTriangle className="h-5 w-5 animate-pulse" />
+                  <h3 className="text-lg font-bold">Confirm Deletion</h3>
+                </div>
+                <Button variant="ghost" size="icon" onClick={() => setIsDeleteOpen(false)} className="h-8 w-8 text-slate-400 hover:text-slate-100 hover:bg-slate-800">
+                  <X className="h-4 w-4" />
+                </Button>
+              </div>
+
+              <div className="p-6 space-y-4">
+                <p className="text-sm text-slate-300 leading-relaxed">
+                  Are you absolutely sure you want to delete <span className="font-bold text-white">{deleteTargetIds.length} selected tenant(s)</span>? 
+                  This will permanently delete all isolated tables and database records for this tenant. This operation is irreversible.
+                </p>
+
+                <div className="flex justify-end gap-3 pt-6 border-t border-slate-800">
+                  <Button type="button" variant="outline" onClick={() => setIsDeleteOpen(false)} className="border-slate-800 hover:bg-slate-800 font-bold text-xs">
+                    Cancel
+                  </Button>
+                  <Button 
+                    type="button" 
+                    variant="destructive"
+                    onClick={handleDeleteAction}
+                    className="font-bold bg-red-600 hover:bg-red-500 text-white text-xs"
+                  >
+                    Permanently Delete
+                  </Button>
+                </div>
+              </div>
             </div>
           </div>
         )}
