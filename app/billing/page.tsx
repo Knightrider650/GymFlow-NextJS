@@ -213,9 +213,11 @@ export default function BillingPage() {
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="amount">Amount (USD) *</Label>
+                  <Label htmlFor="amount">Amount ({settings?.currency || 'USD'}) *</Label>
                   <div className="relative">
-                    <DollarSign className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                    <span className="absolute left-3 top-2.5 text-sm font-semibold text-muted-foreground select-none">
+                      {settings?.currency === 'INR' ? '₹' : settings?.currency === 'EUR' ? '€' : settings?.currency === 'GBP' ? '£' : '$'}
+                    </span>
                     <Input
                       id="amount"
                       type="number"
@@ -268,11 +270,11 @@ export default function BillingPage() {
                 </div>
               </CardHeader>
               <CardContent>
-                <p className="text-2xl font-bold text-green-700">{formatCurrency(stats.totalRevenue)}</p>
+                <p className="text-2xl font-bold text-green-700">{formatCurrency(stats.totalRevenue, settings?.currency)}</p>
                 <p className="text-xs text-green-600/70 mt-1">Successfully processed</p>
               </CardContent>
             </Card>
-
+ 
             <Card className="border-none shadow-lg bg-gradient-to-br from-amber-500/10 to-orange-500/10 backdrop-blur-sm">
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                 <CardTitle className="text-sm font-medium">Outstanding</CardTitle>
@@ -281,7 +283,7 @@ export default function BillingPage() {
                 </div>
               </CardHeader>
               <CardContent>
-                <p className="text-2xl font-bold text-amber-700">{formatCurrency(stats.pendingAmount)}</p>
+                <p className="text-2xl font-bold text-amber-700">{formatCurrency(stats.pendingAmount, settings?.currency)}</p>
                 <p className="text-xs text-amber-600/70 mt-1">Pending verification</p>
               </CardContent>
             </Card>
@@ -420,7 +422,9 @@ export default function BillingPage() {
             <div className="space-y-2">
               <Label>Receivable Amount</Label>
               <div className="relative">
-                <DollarSign className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                <span className="absolute left-3 top-2.5 text-sm font-semibold text-muted-foreground select-none">
+                  {settings?.currency === 'INR' ? '₹' : settings?.currency === 'EUR' ? '€' : settings?.currency === 'GBP' ? '£' : '$'}
+                </span>
                 <Input
                   type="number"
                   step="0.01"

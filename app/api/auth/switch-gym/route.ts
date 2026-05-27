@@ -68,7 +68,7 @@ export async function POST(req: NextRequest) {
             email: `contact@${gymId}.com`,
             phone: '+1 (555) 999-0000',
             address: 'Generated Impersonation Campus',
-            currency: 'USD',
+            currency: 'INR',
             dateFormat: 'MM/DD/YYYY'
           }
         })
@@ -77,7 +77,7 @@ export async function POST(req: NextRequest) {
         gym = {
           id: gymId,
           name: gymId.split('-').map((w: string) => w.charAt(0).toUpperCase() + w.slice(1)).join(' '),
-          currency: 'USD',
+          currency: 'INR',
           dateFormat: 'MM/DD/YYYY'
         } as any
       }

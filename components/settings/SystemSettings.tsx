@@ -22,13 +22,15 @@ export function SystemSettings({ settings, onSave }: SystemSettingsProps) {
     fontSize: 'medium'
   })
 
+  const [currency, setCurrency] = React.useState(settings.currency || 'INR')
+
   const handleChange = (name: string, value: any) => {
     setFormData(prev => ({ ...prev, [name]: value }))
   }
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
-    onSave({ system: formData })
+    onSave({ system: formData, currency })
   }
 
   return (
@@ -106,6 +108,20 @@ export function SystemSettings({ settings, onSave }: SystemSettingsProps) {
                   <SelectItem value="UTC+5:30">India (IST)</SelectItem>
                   <SelectItem value="UTC+0">London (GMT)</SelectItem>
                   <SelectItem value="UTC-5">New York (EST)</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label>Default Currency</Label>
+              <Select value={currency} onValueChange={(v) => setCurrency(v)}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select Currency" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="INR">Indian Rupee (₹)</SelectItem>
+                  <SelectItem value="USD">US Dollar ($)</SelectItem>
+                  <SelectItem value="EUR">Euro (€)</SelectItem>
+                  <SelectItem value="GBP">Pound Sterling (£)</SelectItem>
                 </SelectContent>
               </Select>
             </div>

@@ -33,10 +33,10 @@ export const formatDateTime = (date: string | Date | undefined | null, formatStr
   }
 }
 
-export const formatCurrency = (amount: number, currency = 'USD') => {
+export const formatCurrency = (amount: number, currency = 'INR') => {
   return new Intl.NumberFormat('en-US', {
     style: 'currency',
-    currency: currency || 'USD',
+    currency: currency || 'INR',
   }).format(amount)
 }
 

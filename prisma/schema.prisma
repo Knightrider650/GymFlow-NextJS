@@ -16,7 +16,7 @@ model Gym {
   email            String
   phone            String
   address          String
-  currency         String   @default("USD")
+  currency         String   @default("INR")
   dateFormat       String   @default("MM/DD/YYYY")
   timeZone         String   @default("UTC")
   invoicePrefix    String   @default("INV-")
@@ -100,7 +100,8 @@ model Plan {
   id             String   @id @default(cuid())
   name           String
   price          Float
-  durationMonths Int
+  durationMonths Int?
+  durationDays   Int?
   features       String?  // Comma separated or JSON string
   gymId          String
   gym            Gym      @relation(fields: [gymId], references: [id])

@@ -21,7 +21,7 @@ async function main() {
       email: 'contact@gymflow.com',
       phone: '+1 (555) 999-8888',
       address: '123 Fitness Ave, Wellness City',
-      currency: 'USD',
+      currency: 'INR',
       dateFormat: 'MM/DD/YYYY',
       invoicePrefix: 'GF-',
     },
