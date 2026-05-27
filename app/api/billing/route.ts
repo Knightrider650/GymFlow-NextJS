@@ -46,7 +46,14 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ success: false, error: 'Missing required fields' }, { status: 400 })
     }
 
-    const gymId = await getRequiredGymId(user, req, data)
+    // Lookup the member to get their gymId context to avoid mismatch issues
+    const memberRecord = await prisma.member.findUnique({
+      where: { id: memberId }
+    })
+    if (!memberRecord) {
+      return NextResponse.json({ success: false, error: 'Member not found' }, { status: 404 })
+    }
+    const gymId = memberRecord.gymId
 
     // Perform inside transaction to auto-increment nextInvoiceNumber safely
     const newInvoice = await prisma.$transaction(async (tx) => {

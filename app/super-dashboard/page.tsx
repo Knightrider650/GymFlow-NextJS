@@ -39,6 +39,7 @@ import {
 import { apiClient } from '@/lib/api-client'
 import { useAuthStore } from '@/lib/store'
 import { useRouter } from 'next/navigation'
+import { formatDate } from '@/utils/format'
 
 interface SuperStats {
   totalGyms: number
@@ -1217,7 +1218,7 @@ export default function SuperDashboard() {
                     </div>
                     <div className="space-y-1">
                       <span className="text-slate-500 block">Created On</span>
-                      <span className="font-semibold text-slate-300">{new Date(selectedTenant.createdAt).toLocaleDateString()}</span>
+                      <span className="font-semibold text-slate-300">{formatDate(selectedTenant.createdAt)}</span>
                     </div>
                     <div className="space-y-1">
                       <span className="text-slate-500 block">Isolation Status</span>

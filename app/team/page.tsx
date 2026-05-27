@@ -44,6 +44,7 @@ import {
 } from 'lucide-react'
 import { apiClient } from '@/lib/api-client'
 import { useAuthStore } from '@/lib/store'
+import { formatDate } from '@/utils/format'
 import {
   ROLE_DEFINITIONS,
   ELEVATED_ROLES,
@@ -358,7 +359,7 @@ export default function TeamPage() {
                               </Badge>
                             </TableCell>
                             <TableCell className="text-xs text-muted-foreground">
-                              {new Date(u.createdAt).toLocaleDateString()}
+                              {formatDate(u.createdAt)}
                             </TableCell>
                             {isElevated && (
                               <TableCell className="text-right">

@@ -23,6 +23,25 @@ export async function POST(
 
     // 2. Perform conversion inside transaction
     const result = await prisma.$transaction(async (tx) => {
+      // Look up the selected membership plan to determine the duration
+      const plan = await tx.plan.findFirst({
+        where: {
+          name: body.membershipType || 'Monthly',
+          gymId: user.gymId
+        }
+      })
+
+      let expiryDate = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000) // Default fallback 30 days
+      if (plan) {
+        if (plan.durationMonths) {
+          const d = new Date()
+          d.setMonth(d.getMonth() + plan.durationMonths)
+          expiryDate = d
+        } else if (plan.durationDays) {
+          expiryDate = new Date(Date.now() + plan.durationDays * 24 * 60 * 60 * 1000)
+        }
+      }
+
       // Create new member
       const newMember = await tx.member.create({
         data: {
@@ -33,7 +52,7 @@ export async function POST(
           membershipType: body.membershipType || 'Monthly',
           status: 'active',
           joinDate: new Date(),
-          expiryDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+          expiryDate,
           gymId: user.gymId
         }
       })

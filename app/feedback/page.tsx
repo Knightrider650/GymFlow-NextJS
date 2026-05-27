@@ -11,6 +11,7 @@ import { Send, CheckCircle2, MessageSquare } from 'lucide-react'
 import { apiClient } from '@/lib/api-client'
 import { useActivityLogs } from '@/hooks'
 import { useAuthStore } from '@/lib/store'
+import { formatDate } from '@/utils/format'
 
 export default function FeedbackPage() {
   const [isSubmitting, setIsSubmitting] = useState(false)
@@ -217,7 +218,7 @@ export default function FeedbackPage() {
                               {item.details}
                             </td>
                             <td className="p-4 text-right text-xs text-muted-foreground font-mono">
-                              {new Date(item.createdAt).toLocaleDateString()}
+                              {formatDate(item.createdAt)}
                             </td>
                           </tr>
                         ))

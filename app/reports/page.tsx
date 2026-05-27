@@ -26,7 +26,7 @@ type ReportType =
 const COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899']
 
 import { useAuthStore, useGymStore } from '@/lib/store'
-import { formatCurrency } from '@/utils/format'
+import { formatCurrency, formatDate } from '@/utils/format'
 import { UserRole } from '@/lib/permissions'
 
 export default function ReportsPage() {
@@ -222,7 +222,7 @@ export default function ReportsPage() {
                           </td>
                           <td className="px-6 py-4">{m.membershipType}</td>
                           <td className="px-6 py-4 text-amber-500 font-mono text-xs">
-                            {new Date(m.expiryDate).toLocaleDateString()}
+                            {formatDate(m.expiryDate)}
                           </td>
                         </tr>
                       ))

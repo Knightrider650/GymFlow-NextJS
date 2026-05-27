@@ -181,6 +181,17 @@ function mapPlan(p) {
   };
 }
 
+function mapCampaign(c) {
+  if (!c) return null;
+  return {
+    ...c,
+    subject: c.description || c.subject || '',
+    content: c.message || c.content || '',
+    targetSegment: c.target_audience || c.targetSegment || 'All Members',
+    sentAt: c.sent_at || c.sentAt || c.createdAt
+  };
+}
+
 // ============================================================================
 // AUTHENTICATION ROUTES
 // ============================================================================
@@ -1418,12 +1429,16 @@ app.delete('/api/team/members/:id', authMiddleware, authorizeRoles(['admin', 'ce
 // CAMPAIGNS & REMINDERS API
 // ============================================================================
 
-app.post('/api/campaigns', authMiddleware, authorizeRoles(['admin']), async (req, res) => {
+app.post('/api/campaigns', authMiddleware, authorizeRoles(['admin', 'ceo', 'cto', 'owner', 'manager']), async (req, res) => {
   try {
-    const { title, description, targetAudience, message, scheduledDate } = req.body;
+    const title = req.body.title;
+    const message = req.body.message || req.body.content;
+    const description = req.body.description || req.body.subject || '';
+    const targetAudience = req.body.targetAudience || req.body.targetSegment || 'All Members';
+    const scheduledDate = req.body.scheduledDate || req.body.scheduled_date || null;
     
     if (!title || !message) {
-      return res.status(400).json({ error: 'Title and message are required' });
+      return res.status(400).json({ error: 'Title and message (or content) are required' });
     }
 
     const tenantId = getTenantContextId(req);
@@ -1450,26 +1465,26 @@ app.post('/api/campaigns', authMiddleware, authorizeRoles(['admin']), async (req
       `Created campaign targeting: ${targetAudience}`
     );
 
-    broadcast('campaign:created', campaign);
-    res.status(201).json({ success: true, data: campaign });
+    broadcast('campaign:created', mapCampaign(campaign));
+    res.status(201).json({ success: true, data: mapCampaign(campaign) });
   } catch (err) {
     console.error('Campaign creation error:', err);
     res.status(500).json({ error: 'Failed to create campaign' });
   }
 });
 
-app.get('/api/campaigns', authMiddleware, authorizeRoles(['admin']), async (req, res) => {
+app.get('/api/campaigns', authMiddleware, authorizeRoles(['admin', 'ceo', 'cto', 'owner', 'manager']), async (req, res) => {
   try {
     const tenantId = getTenantContextId(req);
     const campaigns = await db.getCampaigns(tenantId);
-    res.json({ success: true, data: campaigns });
+    res.json({ success: true, data: campaigns.map(mapCampaign) });
   } catch (err) {
     console.error('Fetch campaigns error:', err);
     res.status(500).json({ error: 'Failed to fetch campaigns' });
   }
 });
 
-app.put('/api/campaigns/:id', authMiddleware, authorizeRoles(['admin']), async (req, res) => {
+app.put('/api/campaigns/:id', authMiddleware, authorizeRoles(['admin', 'ceo', 'cto', 'owner', 'manager']), async (req, res) => {
   try {
     const { id } = req.params;
     const tenantId = getTenantContextId(req);
@@ -1489,14 +1504,14 @@ app.put('/api/campaigns/:id', authMiddleware, authorizeRoles(['admin']), async (
       `Updated campaign status to: ${req.body.status}`
     );
 
-    res.json({ success: true, data: campaign });
+    res.json({ success: true, data: mapCampaign(campaign) });
   } catch (err) {
     console.error('Campaign update error:', err);
     res.status(500).json({ error: 'Failed to update campaign' });
   }
 });
 
-app.delete('/api/campaigns/:id', authMiddleware, authorizeRoles(['admin']), async (req, res) => {
+app.delete('/api/campaigns/:id', authMiddleware, authorizeRoles(['admin', 'ceo', 'cto', 'owner', 'manager']), async (req, res) => {
   try {
     const { id } = req.params;
     const tenantId = getTenantContextId(req);
@@ -1523,7 +1538,7 @@ app.delete('/api/campaigns/:id', authMiddleware, authorizeRoles(['admin']), asyn
   }
 });
 
-app.get('/api/reminders', authMiddleware, authorizeRoles(['admin']), async (req, res) => {
+app.get('/api/reminders', authMiddleware, authorizeRoles(['admin', 'ceo', 'cto', 'owner', 'manager']), async (req, res) => {
   try {
     const tenantId = getTenantContextId(req);
     const reminders = await db.getReminders(tenantId);
@@ -1535,19 +1550,21 @@ app.get('/api/reminders', authMiddleware, authorizeRoles(['admin']), async (req,
   }
 });
 
-app.post('/api/campaigns/:id/send', authMiddleware, authorizeRoles(['admin']), async (req, res) => {
+app.post('/api/campaigns/:id/send', authMiddleware, authorizeRoles(['admin', 'ceo', 'cto', 'owner', 'manager']), async (req, res) => {
   try {
     const { id } = req.params;
     const tenantId = getTenantContextId(req);
-    const campaign = await db.getCampaigns(tenantId);
-    const targetCampaign = campaign.find(c => c.id === id);
+    const campaignsList = await db.getCampaigns(null);
+    const targetCampaign = campaignsList.find(c => c.id === id);
     
     if (!targetCampaign) {
       return res.status(404).json({ error: 'Campaign not found' });
     }
 
-    // Create reminders for all members
-    const members = await db.getMembers(tenantId);
+    const campaignTenantId = getRecordTenantId(targetCampaign) || tenantId;
+
+    // Create reminders for all members of this specific gym/tenant
+    const members = await db.getMembers(campaignTenantId);
     let reminderCount = 0;
     
     for (const member of members) {
@@ -1556,16 +1573,16 @@ app.post('/api/campaigns/:id/send', authMiddleware, authorizeRoles(['admin']), a
         campaign_id: id,
         user_id: req.user.id,
         recipient_id: member.id,
-        message: targetCampaign.message,
+        message: targetCampaign.message || targetCampaign.content || '',
         status: 'sent',
         sent_at: new Date().toISOString(),
         createdAt: new Date().toISOString()
-      }, tenantId);
+      }, campaignTenantId);
       reminderCount++;
     }
 
     // Update campaign status
-    await db.updateCampaign(id, { status: 'sent' }, tenantId);
+    await db.updateCampaign(id, { status: 'sent' }, campaignTenantId);
 
     await db.logActivity(
       req.user.id,
@@ -1574,7 +1591,8 @@ app.post('/api/campaigns/:id/send', authMiddleware, authorizeRoles(['admin']), a
       'campaign',
       id,
       targetCampaign.title,
-      `Sent campaign to ${reminderCount} members`
+      `Sent campaign to ${reminderCount} members`,
+      campaignTenantId
     );
 
     broadcast('campaign:sent', { campaignId: id, reminderCount });
@@ -1586,7 +1604,7 @@ app.post('/api/campaigns/:id/send', authMiddleware, authorizeRoles(['admin']), a
 });
 
 // Invites & Signup
-app.post('/api/invites', authMiddleware, authorizeRoles(['admin']), async (req, res) => {
+app.post('/api/invites', authMiddleware, authorizeRoles(['admin', 'ceo', 'cto', 'owner', 'manager']), async (req, res) => {
   try {
     const { email } = req.body;
     
@@ -1625,7 +1643,7 @@ app.post('/api/invites', authMiddleware, authorizeRoles(['admin']), async (req, 
   }
 });
 
-app.get('/api/invites', authMiddleware, authorizeRoles(['admin']), async (req, res) => {
+app.get('/api/invites', authMiddleware, authorizeRoles(['admin', 'ceo', 'cto', 'owner', 'manager']), async (req, res) => {
   try {
     const { email, status } = req.query;
     const invites = await db.getInvites({ email, status });

@@ -22,7 +22,7 @@ import {
   Megaphone
 } from 'lucide-react'
 import { apiClient } from '@/lib/api-client'
-import { format } from 'date-fns'
+import { formatDate, formatDateTime } from '@/utils/format'
 
 interface MessageLog {
   id: string
@@ -195,7 +195,7 @@ export default function CommunicationsPage() {
                         </div>
                         <div className="flex items-center gap-4 text-right shrink-0">
                           <div className="text-xs text-muted-foreground">
-                            {format(new Date(log.sentAt), 'MMM dd • hh:mm a')}
+                            {formatDateTime(log.sentAt, 'MMM dd • hh:mm a')}
                           </div>
                           <Badge className="bg-emerald-500/10 text-emerald-500 border-none">
                             <CheckCircle2 className="h-3 w-3 mr-1" />
@@ -232,7 +232,7 @@ export default function CommunicationsPage() {
                                <Badge variant="outline" className="bg-amber-500/10 text-amber-500 border-amber-500/20 text-[10px] py-0 px-1.5">Draft</Badge>
                              )}
                            </div>
-                           <span className="text-[10px] text-muted-foreground shrink-0">{format(new Date(campaign.sentAt), 'MMM dd, yyyy')}</span>
+                           <span className="text-[10px] text-muted-foreground shrink-0">{formatDate(campaign.sentAt, 'MMM dd, yyyy')}</span>
                          </div>
                          <CardTitle className="group-hover:text-primary transition-colors">{campaign.title}</CardTitle>
                          <CardDescription className="line-clamp-2">{campaign.subject}</CardDescription>

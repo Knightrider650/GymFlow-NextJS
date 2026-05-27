@@ -7,7 +7,7 @@ import { apiClient } from '@/lib/api-client'
 import { History, User, Activity, Clock, Search, Filter } from 'lucide-react'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
-import { format } from 'date-fns'
+import { formatDateTime } from '@/utils/format'
 
 interface ActivityRecord {
   id: string
@@ -113,7 +113,7 @@ export default function ActivityLogPage() {
                             {activity.action}
                           </Badge>
                           <span className="text-xs text-muted-foreground">
-                            {format(new Date(activity.timestamp), 'MMM dd, yyyy • hh:mm:ss a')}
+                            {formatDateTime(activity.timestamp, 'MMM dd, yyyy • hh:mm:ss a')}
                           </span>
                         </div>
                         <p className="text-sm font-medium text-foreground">{activity.details}</p>

@@ -170,6 +170,44 @@ const db = {
         status TEXT DEFAULT 'confirmed', -- confirmed, cancelled, attended, no-show
         booked_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       );
+
+      CREATE TABLE IF NOT EXISTS campaigns (
+        id UUID PRIMARY KEY,
+        owner_id UUID,
+        user_id UUID,
+        title TEXT NOT NULL,
+        description TEXT,
+        target_audience TEXT DEFAULT 'All Members',
+        message TEXT NOT NULL,
+        status TEXT DEFAULT 'draft',
+        scheduled_date TIMESTAMP,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+
+      CREATE TABLE IF NOT EXISTS reminders (
+        id UUID PRIMARY KEY,
+        owner_id UUID,
+        user_id UUID,
+        campaign_id UUID,
+        recipient_id UUID,
+        message TEXT NOT NULL,
+        status TEXT DEFAULT 'pending',
+        sent_at TIMESTAMP,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+
+      CREATE TABLE IF NOT EXISTS invites (
+        id UUID PRIMARY KEY,
+        tenant_id UUID,
+        email TEXT NOT NULL,
+        token TEXT NOT NULL,
+        inviter_id UUID,
+        inviter_name TEXT,
+        status TEXT DEFAULT 'pending',
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        expires_at TIMESTAMP,
+        accepted_at TIMESTAMP
+      );
     `;
 
     try {
@@ -950,6 +988,236 @@ const db = {
 
   async deletePlan(id, ownerId) {
     const res = await pool.query('DELETE FROM plans WHERE id = $1 AND owner_id = $2', [id, ownerId]);
+    return (res.rowCount || 0) > 0;
+  },
+
+  // Campaigns & Reminders
+  async getCampaigns(ownerId) {
+    let query = 'SELECT * FROM campaigns';
+    const params = [];
+    if (ownerId) {
+      query += ' WHERE owner_id = $1';
+      params.push(ownerId);
+    }
+    query += ' ORDER BY created_at DESC';
+    const res = await pool.query(query, params);
+    return res.rows.map(row => ({
+      ...row,
+      createdAt: row.created_at,
+      targetAudience: row.target_audience,
+      scheduledDate: row.scheduled_date
+    }));
+  },
+
+  async createCampaign(campaign, ownerId) {
+    const res = await pool.query(
+      'INSERT INTO campaigns (id, owner_id, user_id, title, description, target_audience, message, status, scheduled_date, created_at) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING *',
+      [
+        campaign.id,
+        ownerId,
+        campaign.userId || campaign.user_id,
+        campaign.title,
+        campaign.description,
+        campaign.target_audience || campaign.targetAudience,
+        campaign.message,
+        campaign.status || 'draft',
+        campaign.scheduled_date || campaign.scheduledDate,
+        campaign.createdAt || new Date()
+      ]
+    );
+    const row = res.rows[0];
+    if (!row) return null;
+    return {
+      ...row,
+      createdAt: row.created_at,
+      targetAudience: row.target_audience,
+      scheduledDate: row.scheduled_date
+    };
+  },
+
+  async updateCampaign(id, updates, ownerId) {
+    const fields = [];
+    const values = [];
+    let idx = 1;
+
+    const allowed = {
+      title: 'title',
+      description: 'description',
+      target_audience: 'target_audience',
+      targetAudience: 'target_audience',
+      message: 'message',
+      status: 'status',
+      scheduled_date: 'scheduled_date',
+      scheduledDate: 'scheduled_date'
+    };
+
+    for (const [key, value] of Object.entries(updates)) {
+      const col = allowed[key];
+      if (col) {
+        fields.push(`${col} = $${idx}`);
+        values.push(value);
+        idx++;
+      }
+    }
+
+    if (fields.length === 0) return null;
+    values.push(id);
+    values.push(ownerId);
+
+    const res = await pool.query(
+      `UPDATE campaigns SET ${fields.join(', ')} WHERE id = $${idx} AND owner_id = $${idx + 1} RETURNING *`,
+      values
+    );
+    const row = res.rows[0];
+    if (!row) return null;
+    return {
+      ...row,
+      createdAt: row.created_at,
+      targetAudience: row.target_audience,
+      scheduledDate: row.scheduled_date
+    };
+  },
+
+  async deleteCampaign(id, ownerId) {
+    const res = await pool.query('DELETE FROM campaigns WHERE id = $1 AND owner_id = $2', [id, ownerId]);
+    return (res.rowCount || 0) > 0;
+  },
+
+  async createReminder(reminder, ownerId) {
+    const res = await pool.query(
+      'INSERT INTO reminders (id, owner_id, user_id, recipient_id, message, status, sent_at, created_at) VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING *',
+      [
+        reminder.id,
+        ownerId,
+        reminder.user_id || reminder.userId,
+        reminder.recipient_id || reminder.recipientId,
+        reminder.message,
+        reminder.status || 'pending',
+        reminder.sent_at || reminder.sentAt || new Date(),
+        reminder.createdAt || new Date()
+      ]
+    );
+    return res.rows[0];
+  },
+
+  async getReminders(ownerId) {
+    const res = await pool.query('SELECT * FROM reminders WHERE owner_id = $1 ORDER BY created_at DESC', [ownerId]);
+    return res.rows.map(row => ({
+      ...row,
+      createdAt: row.created_at,
+      sentAt: row.sent_at
+    }));
+  },
+
+  async getReminderStats(ownerId) {
+    const totalRes = await pool.query('SELECT COUNT(*) FROM reminders WHERE owner_id = $1', [ownerId]);
+    const sentRes = await pool.query("SELECT COUNT(*) FROM reminders WHERE owner_id = $1 AND status = 'sent'", [ownerId]);
+    const pendingRes = await pool.query("SELECT COUNT(*) FROM reminders WHERE owner_id = $1 AND status = 'pending'", [ownerId]);
+    const failedRes = await pool.query("SELECT COUNT(*) FROM reminders WHERE owner_id = $1 AND status = 'failed'", [ownerId]);
+
+    return {
+      total: parseInt(totalRes.rows[0].count || 0),
+      sent: parseInt(sentRes.rows[0].count || 0),
+      pending: parseInt(pendingRes.rows[0].count || 0),
+      failed: parseInt(failedRes.rows[0].count || 0)
+    };
+  },
+
+  // Invites
+  async createInvite(invite) {
+    const tenantId = invite.tenant_id || invite.tenantId || invite.gymId;
+    const res = await pool.query(
+      'INSERT INTO invites (id, tenant_id, email, token, inviter_id, inviter_name, status, created_at, expires_at, accepted_at) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING *',
+      [
+        invite.id || uuidv4(),
+        tenantId,
+        invite.email,
+        invite.token,
+        invite.inviter_id || invite.inviterId,
+        invite.inviter_name || invite.inviterName,
+        'pending',
+        new Date(),
+        invite.expires_at || invite.expiresAt,
+        null
+      ]
+    );
+    return res.rows[0];
+  },
+
+  async getInvites(filters = {}) {
+    let query = 'SELECT * FROM invites WHERE 1=1';
+    const params = [];
+    let idx = 1;
+
+    if (filters.tenantId) {
+      query += ` AND tenant_id = $${idx}`;
+      params.push(filters.tenantId);
+      idx++;
+    }
+    if (filters.email) {
+      query += ` AND email = $${idx}`;
+      params.push(filters.email);
+      idx++;
+    }
+    if (filters.status) {
+      query += ` AND status = $${idx}`;
+      params.push(filters.status);
+      idx++;
+    }
+    if (filters.token) {
+      query += ` AND token = $${idx}`;
+      params.push(filters.token);
+      idx++;
+    }
+
+    query += ' ORDER BY created_at DESC';
+    const res = await pool.query(query, params);
+    return res.rows;
+  },
+
+  async getInviteByToken(token) {
+    const res = await pool.query("SELECT * FROM invites WHERE token = $1 AND status = 'pending'", [token]);
+    return res.rows[0] || null;
+  },
+
+  async verifyInvite(token) {
+    return this.getInviteByToken(token);
+  },
+
+  async updateInvite(id, updates) {
+    const fields = [];
+    const values = [];
+    let idx = 1;
+
+    for (const [key, value] of Object.entries(updates)) {
+      if (['email', 'token', 'status', 'expires_at', 'accepted_at'].includes(key) || key === 'expiresAt' || key === 'acceptedAt') {
+        const col = key === 'expiresAt' ? 'expires_at' : (key === 'acceptedAt' ? 'accepted_at' : key);
+        fields.push(`${col} = $${idx}`);
+        values.push(value);
+        idx++;
+      }
+    }
+
+    if (fields.length === 0) return null;
+    values.push(id);
+
+    const res = await pool.query(
+      `UPDATE invites SET ${fields.join(', ')} WHERE id = $${idx} RETURNING *`,
+      values
+    );
+    return res.rows[0] || null;
+  },
+
+  async acceptInvite(token, userId) {
+    const res = await pool.query(
+      "UPDATE invites SET status = 'accepted', accepted_at = CURRENT_TIMESTAMP WHERE token = $1 RETURNING *",
+      [token]
+    );
+    return res.rows[0] || null;
+  },
+
+  async deleteInvite(id) {
+    const res = await pool.query('DELETE FROM invites WHERE id = $1', [id]);
     return (res.rowCount || 0) > 0;
   },
 

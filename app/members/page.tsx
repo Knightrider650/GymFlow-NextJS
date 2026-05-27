@@ -655,29 +655,28 @@ export default function MembersPage() {
                   <UploadCloud className="h-4 w-4" />
                   Import Excel
                 </Button>
-                <Dialog open={isDialogOpen} onOpenChange={(open) => {
-                  setIsDialogOpen(open)
-                  if (!open) resetForm()
-                }}>
-                  <DialogTrigger asChild>
-                    <div className="flex gap-2">
-                      <Select value={selectedBranch} onValueChange={setSelectedBranch}>
-                        <SelectTrigger className="w-[180px] h-10 shadow-sm bg-card border-muted-foreground/20">
-                          <SelectValue placeholder="All Branches" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="all">All Branches</SelectItem>
-                          {branches.map(b => (
-                            <SelectItem key={b.id} value={b.id}>{b.name}</SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
+                <div className="flex gap-2">
+                  <Select value={selectedBranch} onValueChange={setSelectedBranch}>
+                    <SelectTrigger className="w-[180px] h-10 shadow-sm bg-card border-muted-foreground/20">
+                      <SelectValue placeholder="All Branches" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Branches</SelectItem>
+                      {branches.map(b => (
+                        <SelectItem key={b.id} value={b.id}>{b.name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <Dialog open={isDialogOpen} onOpenChange={(open) => {
+                    setIsDialogOpen(open)
+                    if (!open) resetForm()
+                  }}>
+                    <DialogTrigger asChild>
                       <Button className="gap-2 shadow-lg shadow-primary/20">
                         <Plus className="h-4 w-4" />
                         Add New Member
                       </Button>
-                    </div>
-                  </DialogTrigger>
+                    </DialogTrigger>
                   <DialogContent className="sm:max-w-[600px]">
                     <DialogHeader>
                       <DialogTitle>{editingMember ? 'Edit Member' : 'Add New Member'}</DialogTitle>
@@ -843,7 +842,8 @@ export default function MembersPage() {
                       </DialogFooter>
                     </form>
                   </DialogContent>
-                </Dialog>
+                  </Dialog>
+                </div>
               </>
             )}
           </div>

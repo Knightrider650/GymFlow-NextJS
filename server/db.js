@@ -979,6 +979,20 @@ const db = {
     return (data.invites || []).find(i => i.token === token && i.status === 'pending');
   },
 
+  async verifyInvite(token) {
+    return this.getInviteByToken(token);
+  },
+
+  async updateInvite(id, updates) {
+    const invite = (data.invites || []).find(i => i.id === id);
+    if (invite) {
+      Object.assign(invite, updates);
+      await this.save();
+      return invite;
+    }
+    return null;
+  },
+
   async acceptInvite(token, userId) {
     const invite = (data.invites || []).find(i => i.token === token);
     if (!invite) return null;

@@ -168,7 +168,17 @@ export default function ClassesPage() {
     <ProtectedLayout>
       <div className="p-6 lg:p-8 space-y-8 min-h-screen">
         {/* Header */}
-          <div className="flex items-center gap-4">
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+          <div>
+            <h1 className="text-3xl font-bold tracking-tight bg-gradient-to-r from-primary to-indigo-600 bg-clip-text text-transparent flex items-center gap-3">
+              <Calendar className="h-8 w-8 text-primary" />
+              Classes & Booking
+            </h1>
+            <p className="text-sm text-muted-foreground mt-1">
+              Manage class schedules, trainers, enrollment capacity, and member bookings
+            </p>
+          </div>
+          <div className="flex flex-wrap items-center gap-3">
             <div className="flex items-center gap-2 bg-muted/50 px-3 py-1.5 rounded-lg border">
               <Filter className="h-4 w-4 text-muted-foreground" />
               <Select value={selectedBranch} onValueChange={setSelectedBranch}>
@@ -183,14 +193,14 @@ export default function ClassesPage() {
                 </SelectContent>
               </Select>
             </div>
-          {canAddClass && (
-            <Dialog open={isAddDialogOpen} onOpenChange={(open) => {
-              setIsAddDialogOpen(open)
-              if (!open) {
-                setEditingClassId(null)
-                setFormData({ name: '', instructorName: '', instructorId: '', maxCapacity: '', description: '', time: '10:00 AM', days: 'Mon, Wed, Fri', branchId: '' })
-              }
-            }}>
+            {canAddClass && (
+              <Dialog open={isAddDialogOpen} onOpenChange={(open) => {
+                setIsAddDialogOpen(open)
+                if (!open) {
+                  setEditingClassId(null)
+                  setFormData({ name: '', instructorName: '', instructorId: '', maxCapacity: '', description: '', time: '10:00 AM', days: 'Mon, Wed, Fri', branchId: '' })
+                }
+              }}>
               <DialogTrigger asChild>
                 <Button 
                   onClick={() => {
@@ -385,13 +395,14 @@ export default function ClassesPage() {
                     placeholder="Brief overview of class goals..." 
                   />
                 </div>
-                 <DialogFooter className="pt-4">
-                   <Button type="submit" className="w-full font-bold h-11 text-lg">{editingClassId ? 'Save Changes' : 'Save Class Schedule'}</Button>
-                 </DialogFooter>
-              </form>
-            </DialogContent>
-          </Dialog>
-          )}
+                  <DialogFooter className="pt-4">
+                    <Button type="submit" className="w-full font-bold h-11 text-lg">{editingClassId ? 'Save Changes' : 'Save Class Schedule'}</Button>
+                  </DialogFooter>
+               </form>
+             </DialogContent>
+           </Dialog>
+           )}
+          </div>
         </div>
 
         {/* Classes Grid */}

@@ -10,6 +10,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Badge } from '@/components/ui/badge'
 import { Plus, Mail, Copy, Send, Trash2, Clock, CheckCircle2, UserPlus } from 'lucide-react'
 import { apiClient } from '@/lib/api-client'
+import { formatDate } from '@/utils/format'
 
 interface Invite {
   id: string
@@ -175,7 +176,7 @@ export default function InvitesPage() {
                         <TableCell>{invite.role}</TableCell>
                         <TableCell>{getStatusBadge(invite.status)}</TableCell>
                         <TableCell className="text-xs text-muted-foreground">
-                          {new Date(invite.sentAt).toLocaleDateString()}
+                          {formatDate(invite.sentAt)}
                         </TableCell>
                         <TableCell className="text-right">
                           <Button variant="ghost" size="icon" className="text-rose-500 hover:text-rose-600 hover:bg-rose-500/10" onClick={() => handleDeleteInvite(invite.id)}>
