@@ -26,7 +26,7 @@ export function ProtectedLayout({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     if (!isLoading && !isAuthenticated) {
-      router.push('/login')
+      router.replace('/login')
     }
   }, [isAuthenticated, isLoading, router])
 
@@ -38,7 +38,7 @@ export function ProtectedLayout({ children }: { children: React.ReactNode }) {
     if (!isLoading && isAuthenticated && user) {
       const allowedRoles = ROUTE_PERMISSIONS[pathname]
       if (allowedRoles && !allowedRoles.includes(user.role as UserRole)) {
-        router.push('/dashboard')
+        router.replace('/dashboard')
       }
     }
   }, [pathname, user, isLoading, isAuthenticated, router])
