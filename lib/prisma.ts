@@ -93,32 +93,67 @@ const MODEL_MAPPING: Record<string, string> = {
   reminder: 'reminders'
 }
 
+// Helper to save fallback JSON database
+function saveJsonData(data: any) {
+  try {
+    const filePath = path.join(process.cwd(), 'server', 'data.json')
+    fs.writeFileSync(filePath, JSON.stringify(data, null, 2), 'utf-8')
+  } catch (err) {
+    console.error('Failed to write to fallback JSON database:', err)
+  }
+}
+
 // Wrap prismaInstance in a Proxy to fallback gracefully to JSON database on query failures
 const prisma = new Proxy(prismaInstance, {
   get(target, prop) {
     const modelName = prop as string;
     const jsonKey = MODEL_MAPPING[modelName];
-    
-    if (jsonKey && (target as any)[prop]) {
-      return new Proxy((target as any)[prop], {
-        get(modelTarget, methodProp) {
-          const methodName = methodProp as string;
-          const originalMethod = modelTarget[methodProp];
-          
-          if (typeof originalMethod !== 'function') {
-            return originalMethod;
+
+    if (prop === '$transaction') {
+      return async function (arg: any) {
+        try {
+          if (typeof target.$transaction === 'function') {
+            return await target.$transaction(arg);
           }
-          
+        } catch (dbError: any) {
+          console.warn("Prisma transaction failed, falling back to simulated transaction:", dbError.message);
+        }
+
+        if (typeof arg === 'function') {
+          return await arg(prisma);
+        } else if (Array.isArray(arg)) {
+          return await Promise.all(arg);
+        }
+        return null;
+      };
+    }
+
+    if (prop === '$connect' || prop === '$disconnect') {
+      return typeof (target as any)[prop] === 'function'
+        ? (target as any)[prop]
+        : async () => {};
+    }
+
+    if (jsonKey) {
+      const modelTarget = (target as any)[prop] || {};
+      return new Proxy(modelTarget, {
+        get(mTarget, methodProp) {
+          const methodName = methodProp as string;
+          const originalMethod = typeof mTarget[methodProp] === 'function' ? mTarget[methodProp] : null;
+
           return async function (...args: any[]) {
             try {
-              return await originalMethod.apply(modelTarget, args);
+              if (originalMethod) {
+                return await originalMethod.apply(mTarget, args);
+              }
+              throw new Error(`Method ${methodName} not implemented on model ${modelName} (fallback mode)`);
             } catch (dbError: any) {
-              console.warn(`Prisma query failed on ${modelName}.${methodName}, falling back to local JSON database:`, dbError.message);
-              
+              console.warn(`Prisma query fallback on ${modelName}.${methodName}:`, dbError.message);
+
               const jsonData = getJsonData();
               const items = jsonData[jsonKey] || [];
               const where = args[0]?.where;
-              
+
               if (methodName === 'findMany') {
                 let filtered = items.filter((item: any) => matchesFilter(item, where));
                 const orderBy = args[0]?.orderBy;
@@ -129,7 +164,7 @@ const prisma = new Proxy(prismaInstance, {
                     filtered.sort((a: any, b: any) => {
                       const valA = a[field] ?? '';
                       const valB = b[field] ?? '';
-                      return direction === 'asc' 
+                      return direction === 'asc'
                         ? String(valA).localeCompare(String(valB))
                         : String(valB).localeCompare(String(valA));
                     });
@@ -141,30 +176,73 @@ const prisma = new Proxy(prismaInstance, {
                 }
                 return filtered;
               }
-              
+
               if (methodName === 'findFirst' || methodName === 'findUnique') {
                 return items.find((item: any) => matchesFilter(item, where)) || null;
               }
-              
+
               if (methodName === 'count') {
                 return items.filter((item: any) => matchesFilter(item, where)).length;
               }
-              
+
               if (methodName === 'create') {
                 const data = args[0]?.data || {};
-                return { id: Math.random().toString(), ...data, createdAt: new Date(), updatedAt: new Date() };
+                const newItem = {
+                  id: data.id || Math.random().toString(),
+                  ...data,
+                  createdAt: new Date(),
+                  updatedAt: new Date()
+                };
+                if (!jsonData[jsonKey]) jsonData[jsonKey] = [];
+                jsonData[jsonKey].push(newItem);
+                saveJsonData(jsonData);
+                return newItem;
               }
-              
+
               if (methodName === 'update' || methodName === 'updateMany') {
                 const data = args[0]?.data || {};
-                const match = items.find((item: any) => matchesFilter(item, where)) || {};
-                return { ...match, ...data, updatedAt: new Date() };
+                const updatedItems: any[] = [];
+                let matchFound = false;
+                const newItems = items.map((item: any) => {
+                  if (matchesFilter(item, where)) {
+                    matchFound = true;
+                    const updated = { ...item, ...data, updatedAt: new Date() };
+                    updatedItems.push(updated);
+                    return updated;
+                  }
+                  return item;
+                });
+
+                if (matchFound) {
+                  jsonData[jsonKey] = newItems;
+                  saveJsonData(jsonData);
+                  return methodName === 'update' ? updatedItems[0] : { count: updatedItems.length };
+                }
+
+                return methodName === 'update'
+                  ? { ...data, id: where?.id || 'unknown', updatedAt: new Date() }
+                  : { count: 0 };
               }
-              
+
               if (methodName === 'delete' || methodName === 'deleteMany') {
-                return items.find((item: any) => matchesFilter(item, where)) || { id: 'deleted' };
+                const deletedItems: any[] = [];
+                const remainingItems = items.filter((item: any) => {
+                  if (matchesFilter(item, where)) {
+                    deletedItems.push(item);
+                    return false;
+                  }
+                  return true;
+                });
+
+                if (deletedItems.length > 0) {
+                  jsonData[jsonKey] = remainingItems;
+                  saveJsonData(jsonData);
+                  return methodName === 'delete' ? deletedItems[0] : { count: deletedItems.length };
+                }
+
+                return methodName === 'delete' ? { id: 'deleted' } : { count: 0 };
               }
-              
+
               if (methodName === 'aggregate') {
                 const sumField = args[0]?._sum;
                 if (sumField) {
@@ -176,14 +254,14 @@ const prisma = new Proxy(prismaInstance, {
                 }
                 return { _sum: {} };
               }
-              
+
               throw dbError;
             }
           };
         }
       });
     }
-    
+
     return (target as any)[prop];
   }
 });
