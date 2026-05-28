@@ -10,7 +10,7 @@ const { Server } = require('socket.io');
 const { v4: uuidv4 } = require('uuid');
 
 // Use PostgreSQL if DATABASE_URL is provided, else fallback to JSON file
-const db = process.env.DATABASE_URL ? require('./db-postgres') : require('./db');
+let db = process.env.DATABASE_URL ? require('./db-postgres') : require('./db');
 console.log('✓ Database module loaded');
 const { authMiddleware, generateToken, generateRefreshToken, authorizeRoles, authorizePlatform } = require('./middleware/auth');
 
@@ -1069,7 +1069,7 @@ app.post('/api/settings', authMiddleware, authorizeRoles(['admin', 'ceo', 'cto']
 app.get('/api/branches', authMiddleware, async (req, res) => {
   try {
     const tenantId = getTenantContextId(req);
-    const data = await db.getBranches(req.user.id, tenantId);
+    const data = await db.getBranches(tenantId);
     res.json({ success: true, data });
   } catch (err) {
     res.status(500).json({ error: 'Failed to fetch branches' });
@@ -1120,32 +1120,224 @@ app.get('/api/reports/:type', authMiddleware, authorizeRoles(['admin', 'ceo', 'c
     let data;
     
     switch(type) {
-      case 'member-summary':
-      case 'expiring-members':
-        data = await db.getMembers(tenantId, trainerId);
+      case 'member-summary': {
+        const membersList = await db.getMembers(tenantId, trainerId);
+        const active = membersList.filter(m => m.status === 'active').length;
+        const expired = membersList.filter(m => m.status === 'expired').length;
+        const pending = membersList.filter(m => m.status === 'pending').length;
+        const total = membersList.length;
+
+        // Sort by join date descending
+        const sortedByJoinDate = [...membersList].sort((a, b) => {
+          const ad = a.join_date || a.joinDate || '';
+          const bd = b.join_date || b.joinDate || '';
+          return bd.localeCompare(ad);
+        });
+        const recentMembers = sortedByJoinDate.slice(0, 10).map(m => ({
+          name: m.name,
+          email: m.email,
+          membershipType: m.membership_type || m.membershipType || '',
+          status: m.status,
+          joinDate: m.join_date || m.joinDate || ''
+        }));
+
+        // Monthly registration trend (last 6 months)
+        const registrationTrend = [];
+        for (let i = 5; i >= 0; i--) {
+          const d = new Date();
+          d.setMonth(d.getMonth() - i);
+          const monthName = d.toLocaleString('en-US', { month: 'short' });
+          const year = d.getFullYear();
+          const month = d.getMonth();
+
+          const count = membersList.filter(m => {
+            const jDateStr = m.join_date || m.joinDate;
+            if (!jDateStr) return false;
+            const jd = new Date(jDateStr);
+            return jd.getFullYear() === year && jd.getMonth() === month;
+          }).length;
+
+          registrationTrend.push({
+            name: monthName,
+            members: count
+          });
+        }
+
+        data = { active, expired, pending, total, recentMembers, registrationTrend };
         break;
-      case 'revenue':
-        // Double check permissions for revenue report
+      }
+
+      case 'expiring-members': {
+        const membersList = await db.getMembers(tenantId, trainerId);
+        const now = new Date();
+        const thirtyDaysFromNow = new Date();
+        thirtyDaysFromNow.setDate(thirtyDaysFromNow.getDate() + 30);
+
+        const expiringList = membersList.filter(m => {
+          if (m.status !== 'active') return false;
+          const expDateStr = m.expiry_date || m.expiryDate;
+          if (!expDateStr) return false;
+          const ed = new Date(expDateStr);
+          return ed >= now && ed <= thirtyDaysFromNow;
+        });
+
+        expiringList.sort((a, b) => {
+          const ad = a.expiry_date || a.expiryDate || '';
+          const bd = b.expiry_date || b.expiryDate || '';
+          return ad.localeCompare(bd);
+        });
+
+        const expiring = expiringList.map(m => ({
+          id: m.id,
+          name: m.name,
+          email: m.email,
+          phone: m.phone,
+          expiryDate: m.expiry_date || m.expiryDate || '',
+          membershipType: m.membership_type || m.membershipType || ''
+        }));
+
+        data = { expiring };
+        break;
+      }
+
+      case 'revenue': {
         if (req.user.role === 'trainer') return res.status(403).json({ error: 'Access denied' });
-        data = await db.getInvoices(tenantId);
+        const invoicesList = await db.getInvoices(tenantId);
+        const paidInvoices = invoicesList.filter(inv => inv.status === 'paid');
+        const totalRevenue = paidInvoices.reduce((sum, inv) => sum + parseFloat(inv.amount || 0), 0);
+        const pendingInvoicesCount = invoicesList.filter(inv => inv.status === 'pending').length;
+
+        const revenueTrend = [];
+        for (let i = 4; i >= 0; i--) {
+          const d = new Date();
+          d.setMonth(d.getMonth() - i);
+          const monthName = d.toLocaleString('en-US', { month: 'short' });
+          const year = d.getFullYear();
+          const month = d.getMonth();
+
+          const sum = paidInvoices.filter(inv => {
+            const pDateStr = inv.payment_date || inv.paymentDate;
+            if (!pDateStr) return false;
+            const pd = new Date(pDateStr);
+            return pd.getFullYear() === year && pd.getMonth() === month;
+          }).reduce((sum, inv) => sum + parseFloat(inv.amount || 0), 0);
+
+          revenueTrend.push({
+            name: monthName,
+            amount: sum
+          });
+        }
+
+        data = { totalRevenue, pendingInvoicesCount, revenueTrend };
         break;
-      case 'attendance':
-        data = await db.getAttendance({}, tenantId, trainerId);
+      }
+
+      case 'attendance': {
+        const attendanceLogs = await db.getAttendance({}, tenantId, trainerId);
+        const thirtyDaysAgo = new Date();
+        thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+
+        const last30DaysLogs = attendanceLogs.filter(log => {
+          const timeStr = log.check_in_time || log.checkInTime || log.checkOutTime || log.recordedDate;
+          if (!timeStr) return false;
+          return new Date(timeStr) >= thirtyDaysAgo;
+        });
+
+        const weekdayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+        const dayCounts = Array(7).fill(0);
+        const hourCounts = Array(24).fill(0);
+
+        last30DaysLogs.forEach(log => {
+          const timeStr = log.check_in_time || log.checkInTime;
+          if (timeStr) {
+            const d = new Date(timeStr);
+            if (!isNaN(d.getTime())) {
+              dayCounts[d.getDay()]++;
+              hourCounts[d.getHours()]++;
+            }
+          }
+        });
+
+        const weekdayDistribution = weekdayNames.map((name, index) => ({
+          name,
+          visits: dayCounts[index]
+        }));
+
+        const hourDistribution = Array.from({ length: 14 }, (_, i) => {
+          const hour = i + 6;
+          return {
+            name: `${hour > 12 ? hour - 12 : hour}${hour >= 12 ? 'PM' : 'AM'}`,
+            visits: hourCounts[hour] || 0
+          };
+        });
+
+        data = { weekdayDistribution, hourDistribution, totalVisits: last30DaysLogs.length };
         break;
-      case 'class-utilization':
-        data = await db.getClasses(tenantId, trainerId);
+      }
+
+      case 'class-utilization': {
+        const classes = await db.getClasses(tenantId, trainerId);
+        const formatted = classes.map(c => {
+          const maxCapacity = c.max_capacity ?? c.maxCapacity ?? 0;
+          const currentEnrollment = c.current_enrollment ?? c.currentEnrollment ?? 0;
+          const instructorName = c.instructor_name ?? c.instructorName ?? 'TBD';
+          return {
+            name: c.name,
+            enrollment: currentEnrollment,
+            capacity: maxCapacity,
+            occupancyRate: maxCapacity > 0 ? Math.round((currentEnrollment / maxCapacity) * 100) : 0,
+            instructor: instructorName
+          };
+        });
+        data = { classes: formatted };
         break;
-      case 'equipment-status':
-        data = await db.getInventory(tenantId);
+      }
+
+      case 'equipment-status': {
+        const items = await db.getInventory(tenantId);
+        const totalItems = items.reduce((sum, item) => sum + parseInt(item.quantity || 0), 0);
+        const lowStock = items.filter(item => {
+          const qty = parseInt(item.quantity || 0);
+          const minT = parseInt(item.min_threshold ?? item.minThreshold ?? 5);
+          return qty <= minT;
+        }).length;
+        const totalValue = items.reduce((sum, item) => sum + (parseInt(item.quantity || 0) * parseFloat(item.cost_per_unit ?? item.costPerUnit ?? 0)), 0);
+
+        data = { items: items.map(mapInventoryItem), totalItems, lowStock, totalValue };
         break;
-      case 'leads-conversion':
+      }
+
+      case 'leads-conversion': {
         if (req.user.role === 'trainer') return res.status(403).json({ error: 'Access denied' });
-        data = await db.getLeads(tenantId);
+        const leads = await db.getLeads(tenantId);
+        const counts = { 'New': 0, 'Contacted': 0, 'Converted': 0, 'Lost': 0 };
+        
+        leads.forEach(l => {
+          if (counts[l.status] !== undefined) {
+            counts[l.status]++;
+          }
+        });
+
+        const distribution = Object.keys(counts).map(key => ({
+          name: key,
+          value: counts[key]
+        }));
+
+        data = { distribution, totalLeads: leads.length };
         break;
-      case 'staff-performance':
+      }
+
+      case 'staff-performance': {
         if (req.user.role === 'trainer') return res.status(403).json({ error: 'Access denied' });
-        data = await db.getStaff(tenantId);
+        const staff = await db.getStaff(tenantId);
+        const totalStaff = staff.length;
+        const activeStaff = staff.filter(s => s.status === 'active').length;
+        const monthlyPayroll = staff.reduce((sum, s) => sum + parseFloat(s.salary || 0), 0);
+
+        data = { totalStaff, activeStaff, monthlyPayroll, staffList: staff.map(mapStaff) };
         break;
+      }
+
       default:
         data = await db.getDashboardStats(tenantId, trainerId);
     }
@@ -1153,7 +1345,7 @@ app.get('/api/reports/:type', authMiddleware, authorizeRoles(['admin', 'ceo', 'c
     res.json({ success: true, data });
   } catch (err) {
     console.error(err);
-    res.status(500).json({ error: 'Report generation failed' });
+    res.status(500).json({ error: 'Report compilation failed' });
   }
 });
 
@@ -1243,7 +1435,7 @@ app.get('/api/feedback', authMiddleware, async (req, res) => {
 // ACTIVITY LOG API
 // ============================================================================
 
-app.post('/api/activity-logs', authMiddleware, async (req, res) => {
+app.post(['/api/activity-logs', '/api/activity-log'], authMiddleware, async (req, res) => {
   try {
     const { action, entityType, entityId, entityName, details } = req.body;
     
@@ -1269,7 +1461,7 @@ app.post('/api/activity-logs', authMiddleware, async (req, res) => {
   }
 });
 
-app.get('/api/activity-logs', authMiddleware, async (req, res) => {
+app.get(['/api/activity-logs', '/api/activity-log'], authMiddleware, async (req, res) => {
   try {
     const filters = {
       action: req.query.action,
@@ -1294,7 +1486,7 @@ app.get('/api/activity-logs', authMiddleware, async (req, res) => {
 // TEAM MANAGEMENT API
 // ============================================================================
 
-app.get('/api/team/members', authMiddleware, authorizeRoles(['admin', 'ceo', 'cto']), async (req, res) => {
+app.get(['/api/team/members', '/api/users'], authMiddleware, authorizeRoles(['admin', 'ceo', 'cto']), async (req, res) => {
   try {
     const response = await db.getUsers();
     res.json({ success: true, data: response || [] });
@@ -1304,7 +1496,7 @@ app.get('/api/team/members', authMiddleware, authorizeRoles(['admin', 'ceo', 'ct
   }
 });
 
-app.post('/api/team/members', authMiddleware, authorizeRoles(['admin', 'ceo', 'cto']), async (req, res) => {
+app.post(['/api/team/members', '/api/users'], authMiddleware, authorizeRoles(['admin', 'ceo', 'cto']), async (req, res) => {
   try {
     const { email, name, password, role } = req.body;
     
@@ -1352,7 +1544,7 @@ app.post('/api/team/members', authMiddleware, authorizeRoles(['admin', 'ceo', 'c
   }
 });
 
-app.put('/api/team/members/:id', authMiddleware, authorizeRoles(['admin', 'ceo', 'cto']), async (req, res) => {
+const handleUpdateMember = async (req, res) => {
   try {
     const { id } = req.params;
     const { role } = req.body;
@@ -1362,6 +1554,9 @@ app.put('/api/team/members/:id', authMiddleware, authorizeRoles(['admin', 'ceo',
     }
 
     const updatedUser = await db.updateUser(id, { role });
+    if (!updatedUser) {
+      return res.status(404).json({ error: 'User not found' });
+    }
     
     await db.logActivity(
       req.user.id,
@@ -1387,9 +1582,12 @@ app.put('/api/team/members/:id', authMiddleware, authorizeRoles(['admin', 'ceo',
     console.error('Update team member error:', err);
     res.status(500).json({ error: 'Failed to update team member' });
   }
-});
+};
 
-app.delete('/api/team/members/:id', authMiddleware, authorizeRoles(['admin', 'ceo', 'cto']), async (req, res) => {
+app.put(['/api/team/members/:id', '/api/users/:id'], authMiddleware, authorizeRoles(['admin', 'ceo', 'cto']), handleUpdateMember);
+app.patch(['/api/team/members/:id', '/api/users/:id'], authMiddleware, authorizeRoles(['admin', 'ceo', 'cto']), handleUpdateMember);
+
+app.delete(['/api/team/members/:id', '/api/users/:id'], authMiddleware, authorizeRoles(['admin', 'ceo', 'cto']), async (req, res) => {
   try {
     const { id } = req.params;
 
@@ -1422,6 +1620,41 @@ app.delete('/api/team/members/:id', authMiddleware, authorizeRoles(['admin', 'ce
   } catch (err) {
     console.error('Delete team member error:', err);
     res.status(500).json({ error: 'Failed to delete team member' });
+  }
+});
+
+app.post('/api/users/:id/reset-password', authMiddleware, authorizeRoles(['admin', 'ceo', 'cto']), async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { newPassword } = req.body;
+
+    if (!newPassword || newPassword.length < 8) {
+      return res.status(400).json({ error: 'Password must be at least 8 characters' });
+    }
+
+    const bcrypt = require('bcrypt');
+    const salt = await bcrypt.genSalt(10);
+    const hash = await bcrypt.hash(newPassword, salt);
+
+    const updatedUser = await db.updateUser(id, { password_hash: hash });
+    if (!updatedUser) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    await db.logActivity(
+      req.user.id,
+      req.user.name || req.user.email,
+      'update',
+      'user',
+      id,
+      updatedUser.name,
+      `Reset password for user: ${updatedUser.email}`
+    );
+
+    res.json({ success: true, message: 'Password reset successfully' });
+  } catch (err) {
+    console.error('Reset password error:', err);
+    res.status(500).json({ error: 'Failed to reset password' });
   }
 });
 
@@ -1547,6 +1780,17 @@ app.get('/api/reminders', authMiddleware, authorizeRoles(['admin', 'ceo', 'cto',
   } catch (err) {
     console.error('Fetch reminders error:', err);
     res.status(500).json({ error: 'Failed to fetch reminders' });
+  }
+});
+
+app.get('/api/communications/logs', authMiddleware, authorizeRoles(['admin', 'ceo', 'cto', 'owner', 'manager']), async (req, res) => {
+  try {
+    const tenantId = getTenantContextId(req);
+    const reminders = await db.getReminders(tenantId);
+    res.json({ success: true, data: reminders || [] });
+  } catch (err) {
+    console.error('Fetch communication logs error:', err);
+    res.status(500).json({ error: 'Failed to fetch communication logs' });
   }
 });
 
@@ -1738,8 +1982,17 @@ app.delete('/api/invites/:id', authMiddleware, authorizeRoles(['admin']), async 
 // Start server
 async function startServer() {
   console.log('🚀 Starting server...');
-  if (db.init) await db.init();
-  console.log('✓ Database initialized');
+  if (db.init) {
+    try {
+      await db.init();
+      console.log('✓ Database initialized');
+    } catch (err) {
+      console.error('✗ Database initialization failed, falling back to local JSON database:', err.message);
+      db = require('./db');
+      if (db.init) await db.init();
+      console.log('✓ Local JSON database initialized as fallback');
+    }
+  }
 
   const AUTO_EXPIRY_INTERVAL = 60 * 60 * 1000; // 1 hour
   const runAutoExpiryJob = async () => {

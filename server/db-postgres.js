@@ -274,6 +274,41 @@ const db = {
     return res.rows[0];
   },
 
+  async getUsers() {
+    const res = await pool.query('SELECT id, email, name, role, created_at FROM users');
+    return res.rows;
+  },
+
+  async updateUser(id, updates) {
+    const fields = [];
+    const values = [];
+    let idx = 1;
+
+    for (const [key, value] of Object.entries(updates)) {
+      let dbKey = key;
+      if (key === 'password_hash') {
+        dbKey = 'password_hash';
+      }
+      fields.push(`${dbKey} = $${idx}`);
+      values.push(value);
+      idx++;
+    }
+
+    if (fields.length === 0) return null;
+    values.push(id);
+
+    const res = await pool.query(
+      `UPDATE users SET ${fields.join(', ')} WHERE id = $${idx} RETURNING *`,
+      values
+    );
+    return res.rows[0] || null;
+  },
+
+  async deleteUser(id) {
+    const res = await pool.query('DELETE FROM users WHERE id = $1', [id]);
+    return (res.rowCount || 0) > 0;
+  },
+
   // Member Methods
   async getMembers(ownerId, trainerId = null) {
     let query = 'SELECT * FROM members WHERE owner_id = $1';

@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import React, { useState, useEffect } from 'react'
 import { ProtectedLayout } from '@/components/layout/protected-layout'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -36,7 +36,11 @@ import {
   Grid,
   Filter,
   Trash2,
-  Bell
+  Bell,
+  FileCode,
+  Folder,
+  File,
+  ArrowLeft
 } from 'lucide-react'
 import { apiClient } from '@/lib/api-client'
 import { useAuthStore } from '@/lib/store'
@@ -94,7 +98,7 @@ interface JobQueueItem {
 }
 
 export default function SuperDashboard() {
-  const [activeTab, setActiveTab] = useState<'overview' | 'tenants' | 'plans' | 'flags' | 'logs'>('overview')
+  const [activeTab, setActiveTab] = useState<'overview' | 'tenants' | 'plans' | 'flags' | 'logs' | 'editor'>('overview')
   const [loading, setLoading] = useState(true)
   const [stats, setStats] = useState<SuperStats>({
     totalGyms: 5,
@@ -207,6 +211,21 @@ export default function SuperDashboard() {
 
   const [isDeleteOpen, setIsDeleteOpen] = useState(false)
   const [deleteTargetIds, setDeleteTargetIds] = useState<string[]>([])
+
+  const [currentPath, setCurrentPath] = useState<string>('.')
+  const [explorerFiles, setExplorerFiles] = useState<any[]>([])
+  const [explorerLoading, setExplorerLoading] = useState<boolean>(false)
+  const [selectedFile, setSelectedFile] = useState<string | null>(null)
+  
+  const [newItemName, setNewItemName] = useState<string>('')
+  const [newItemIsFolder, setNewItemIsFolder] = useState<boolean>(false)
+  const [isNewItemModalOpen, setIsNewItemModalOpen] = useState<boolean>(false)
+
+  const [editorContent, setEditorContent] = useState<string>('')
+  const [editorLoading, setEditorLoading] = useState<boolean>(false)
+  const [editorSaving, setEditorSaving] = useState<boolean>(false)
+  const [editorSuccess, setEditorSuccess] = useState<string>('')
+  const [editorError, setEditorError] = useState<string>('')
 
   const switchGym = useAuthStore(state => state.switchGym)
   const router = useRouter()
@@ -341,6 +360,145 @@ export default function SuperDashboard() {
     }
   }
 
+  const fetchDirectory = async (dirPath: string) => {
+    try {
+      setExplorerLoading(true)
+      const res = await fetch(`/api/super-admin/files?path=${encodeURIComponent(dirPath)}`)
+      if (res.ok) {
+        const result = await res.json()
+        if (result.success && result.isDirectory) {
+          setExplorerFiles(result.files)
+          setCurrentPath(dirPath)
+        }
+      }
+    } catch (err) {
+      console.error('Fetch directory error:', err)
+    } finally {
+      setExplorerLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    if (activeTab === 'editor') {
+      fetchDirectory(currentPath || '.')
+    }
+  }, [activeTab])
+
+  const handleSelectItem = async (item: { name: string; isDirectory: boolean; path: string }) => {
+    if (item.isDirectory) {
+      fetchDirectory(item.path)
+    } else {
+      setSelectedFile(item.path)
+      try {
+        setEditorLoading(true)
+        setEditorError('')
+        setEditorSuccess('')
+        const res = await fetch(`/api/super-admin/files?path=${encodeURIComponent(item.path)}`)
+        if (res.ok) {
+          const result = await res.json()
+          if (result.success && !result.isDirectory) {
+            setEditorContent(result.content || '')
+          } else {
+            setEditorError(result.error || 'Failed to read file')
+          }
+        } else {
+          setEditorError('Failed to read file')
+        }
+      } catch (err) {
+        console.error(err)
+        setEditorError('Failed to connect to API')
+      } finally {
+        setEditorLoading(false)
+      }
+    }
+  }
+
+  const handleSaveFileContent = async () => {
+    if (!selectedFile) return
+    try {
+      setEditorSaving(true)
+      setEditorError('')
+      setEditorSuccess('')
+      const response = await fetch('/api/super-admin/files', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'write', path: selectedFile, content: editorContent })
+      })
+      if (response.ok) {
+        const result = await response.json()
+        if (result.success) {
+          setEditorSuccess('File saved successfully!')
+          setTimeout(() => setEditorSuccess(''), 3000)
+        } else {
+          setEditorError(result.error || 'Failed to save file')
+        }
+      } else {
+        setEditorError('Failed to save file')
+      }
+    } catch (err) {
+      console.error('File save error:', err)
+      setEditorError('Failed to connect to files API')
+    } finally {
+      setEditorSaving(false)
+    }
+  }
+
+  const handleCreateNewItem = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!newItemName.trim()) return
+    const newPath = currentPath === '.' ? newItemName : `${currentPath}/${newItemName}`
+    try {
+      setEditorSaving(true)
+      const res = await fetch('/api/super-admin/files', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'create', path: newPath, isFolder: newItemIsFolder })
+      })
+      if (res.ok) {
+        const result = await res.json()
+        if (result.success) {
+          setIsNewItemModalOpen(false)
+          setNewItemName('')
+          fetchDirectory(currentPath)
+        } else {
+          alert(result.error || 'Failed to create item')
+        }
+      }
+    } catch (err) {
+      console.error(err)
+    } finally {
+      setEditorSaving(false)
+    }
+  }
+
+  const handleDeleteItem = async (itemPath: string) => {
+    if (!confirm(`Are you sure you want to delete ${itemPath}? This action is irreversible.`)) return
+    try {
+      setEditorSaving(true)
+      const res = await fetch('/api/super-admin/files', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'delete', path: itemPath })
+      })
+      if (res.ok) {
+        const result = await res.json()
+        if (result.success) {
+          if (selectedFile === itemPath) {
+            setSelectedFile(null)
+            setEditorContent('')
+          }
+          fetchDirectory(currentPath)
+        } else {
+          alert(result.error || 'Failed to delete item')
+        }
+      }
+    } catch (err) {
+      console.error(err)
+    } finally {
+      setEditorSaving(false)
+    }
+  }
+
   const handleRetryJob = (jobId: string) => {
     setJobs(jobs.map(j => {
       if (j.id === jobId) {
@@ -426,6 +584,14 @@ export default function SuperDashboard() {
             >
               <Database className="h-4 w-4" />
               Telemetry Logs
+            </Button>
+            <Button 
+              variant={activeTab === 'editor' ? 'default' : 'outline'} 
+              onClick={() => setActiveTab('editor')}
+              className="gap-2 font-semibold"
+            >
+              <FileCode className="h-4 w-4" />
+              System Editor
             </Button>
           </div>
         </div>
@@ -1176,6 +1342,232 @@ export default function SuperDashboard() {
                 ))}
               </div>
             </div>
+
+          </div>
+        )}
+
+        {/* ──────── TAB 6: SYSTEM EDITOR ──────── */}
+        {activeTab === 'editor' && (
+          <div className="space-y-6 animate-in fade-in duration-300">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+              <div>
+                <h2 className="text-xl font-extrabold text-slate-100 flex items-center gap-2">
+                  <FileCode className="h-5 w-5 text-indigo-500" />
+                  System Configuration Code Workspace
+                </h2>
+                <p className="text-xs text-slate-400">Inspect and directly modify system configurations and source code files live from the browser.</p>
+              </div>
+              <div className="flex items-center gap-2">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => {
+                    setNewItemIsFolder(false)
+                    setIsNewItemModalOpen(true)
+                  }}
+                  className="h-8 border-slate-800 text-xs font-semibold"
+                >
+                  <Plus className="h-3.5 w-3.5 mr-1" /> New File
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => {
+                    setNewItemIsFolder(true)
+                    setIsNewItemModalOpen(true)
+                  }}
+                  className="h-8 border-slate-800 text-xs font-semibold"
+                >
+                  <Plus className="h-3.5 w-3.5 mr-1" /> New Folder
+                </Button>
+              </div>
+            </div>
+
+            <div className="bg-red-950/20 border border-red-500/20 rounded-xl p-4 flex items-start gap-3">
+              <AlertTriangle className="h-5 w-5 text-red-400 shrink-0 mt-0.5" />
+              <div className="text-xs text-slate-300">
+                <span className="font-extrabold text-white block mb-0.5">WARNING: High-Risk Support Override Console</span>
+                Modifying environment parameters, server code, or bundler configs can cause immediate platform crashes or database connection drops. Ensure syntax validation before saving.
+              </div>
+            </div>
+
+            {/* Path Breadcrumbs */}
+            <div className="flex items-center gap-2 bg-slate-900/60 p-3 rounded-lg border border-slate-800 text-xs font-mono">
+              <span className="text-slate-500 font-bold">Location:</span>
+              <button 
+                onClick={() => fetchDirectory('.')}
+                className="text-indigo-400 hover:underline"
+              >
+                root
+              </button>
+              {currentPath !== '.' && currentPath.split('/').map((segment, idx, arr) => {
+                const stepPath = arr.slice(0, idx + 1).join('/')
+                return (
+                  <React.Fragment key={idx}>
+                    <span className="text-slate-600">/</span>
+                    <button 
+                      onClick={() => fetchDirectory(stepPath)}
+                      className="text-indigo-400 hover:underline"
+                    >
+                      {segment}
+                    </button>
+                  </React.Fragment>
+                )
+              })}
+            </div>
+
+            <div className="grid gap-6 md:grid-cols-4">
+              
+              {/* File Selector Sidebar */}
+              <Card className="border-none bg-slate-900/40 p-4 flex flex-col gap-3 min-h-[500px]">
+                <div className="flex items-center justify-between border-b border-slate-800 pb-2">
+                  <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400">File Explorer</h3>
+                  {currentPath !== '.' && (
+                    <button
+                      onClick={() => {
+                        const parts = currentPath.split('/')
+                        parts.pop()
+                        fetchDirectory(parts.join('/') || '.')
+                      }}
+                      className="text-[10px] text-slate-400 hover:text-white flex items-center gap-1 font-bold"
+                    >
+                      <ArrowLeft className="h-3 w-3" /> Back
+                    </button>
+                  )}
+                </div>
+
+                <div className="flex flex-col gap-1 overflow-y-auto max-h-[600px] flex-1">
+                  {explorerLoading ? (
+                    <div className="text-xs text-slate-500 text-center py-8">Loading folder...</div>
+                  ) : explorerFiles.length === 0 ? (
+                    <div className="text-xs text-slate-500 text-center py-8">Empty directory</div>
+                  ) : (
+                    explorerFiles.map(f => (
+                      <div
+                        key={f.path}
+                        className={`flex items-center justify-between px-2 py-1.5 rounded-lg text-xs font-mono font-bold transition-all group ${
+                          selectedFile === f.path 
+                            ? 'bg-violet-600/20 text-violet-300 border border-violet-500/30' 
+                            : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/40'
+                        }`}
+                      >
+                        <button
+                          onClick={() => handleSelectItem(f)}
+                          className="flex-1 flex items-center gap-2 text-left"
+                        >
+                          {f.isDirectory ? (
+                            <Folder className="h-3.5 w-3.5 text-yellow-500 fill-yellow-500/20 shrink-0" />
+                          ) : (
+                            <File className="h-3.5 w-3.5 text-blue-400 shrink-0" />
+                          )}
+                          <span className="truncate">{f.name}</span>
+                        </button>
+
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            handleDeleteItem(f.path)
+                          }}
+                          className="opacity-0 group-hover:opacity-100 text-slate-500 hover:text-red-400 p-0.5 transition-opacity"
+                          title={`Delete ${f.name}`}
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </button>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </Card>
+
+              {/* Editor Workspace */}
+              <div className="md:col-span-3 flex flex-col gap-4">
+                <Card className="border-none bg-slate-950 overflow-hidden flex flex-col flex-1 shadow-2xl min-h-[500px]">
+                  <div className="bg-slate-900 px-4 py-3 border-b border-slate-800 flex items-center justify-between">
+                    <span className="font-mono text-xs font-bold text-violet-400 truncate max-w-[300px]">
+                      {selectedFile ? selectedFile : 'No file selected'}
+                    </span>
+                    <div className="flex items-center gap-3">
+                      {editorSuccess && <span className="text-xs text-emerald-400 font-bold animate-pulse">{editorSuccess}</span>}
+                      {editorError && <span className="text-xs text-rose-400 font-bold">{editorError}</span>}
+                      {selectedFile && (
+                        <Button
+                          size="sm"
+                          disabled={editorLoading || editorSaving}
+                          onClick={handleSaveFileContent}
+                          className="h-8 font-bold bg-violet-600 hover:bg-violet-500 text-slate-50 text-xs gap-1.5"
+                        >
+                          {editorSaving ? (
+                            <RefreshCw className="h-3 w-3 animate-spin" />
+                          ) : (
+                            <CheckCircle className="h-3 w-3" />
+                          )}
+                          {editorSaving ? 'Saving...' : 'Save File'}
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="relative flex-1 min-h-[500px]">
+                    {editorLoading ? (
+                      <div className="absolute inset-0 flex items-center justify-center bg-slate-950/80">
+                        <RefreshCw className="h-8 w-8 text-violet-500 animate-spin" />
+                      </div>
+                    ) : !selectedFile ? (
+                      <div className="absolute inset-0 flex flex-col items-center justify-center bg-slate-950 text-slate-500 gap-2">
+                        <File className="h-10 w-10 opacity-30" />
+                        <p className="text-xs font-mono">Select a file from the explorer sidebar to modify it</p>
+                      </div>
+                    ) : (
+                      <textarea
+                        value={editorContent}
+                        onChange={(e) => setEditorContent(e.target.value)}
+                        spellCheck="false"
+                        className="w-full h-full min-h-[500px] p-6 font-mono text-xs text-slate-300 bg-slate-950 focus:outline-none resize-none leading-relaxed border-none focus:ring-0"
+                        style={{ fontFamily: 'Fira Code, JetBrains Mono, source-code-pro, Menlo, Monaco, Consolas, Courier New, monospace' }}
+                      />
+                    )}
+                  </div>
+                </Card>
+              </div>
+
+            </div>
+
+            {/* Creation Modal */}
+            {isNewItemModalOpen && (
+              <div className="fixed inset-0 bg-slate-950/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+                <div className="bg-slate-900 border border-slate-800 shadow-2xl rounded-2xl w-full max-w-sm overflow-hidden animate-in zoom-in-95 duration-200">
+                  <div className="p-4 bg-slate-900 border-b border-slate-800 flex items-center justify-between">
+                    <h3 className="text-sm font-bold text-slate-100">
+                      Create New {newItemIsFolder ? 'Folder' : 'File'}
+                    </h3>
+                    <button onClick={() => setIsNewItemModalOpen(false)} className="text-slate-400 hover:text-white">
+                      <X className="h-4 w-4" />
+                    </button>
+                  </div>
+                  <form onSubmit={handleCreateNewItem} className="p-4 space-y-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="itemName">Name</Label>
+                      <Input
+                        id="itemName"
+                        required
+                        value={newItemName}
+                        onChange={(e) => setNewItemName(e.target.value)}
+                        placeholder={newItemIsFolder ? 'my-folder' : 'script.js'}
+                        className="bg-slate-950 border-slate-800 font-mono text-xs"
+                      />
+                    </div>
+                    <div className="flex justify-end gap-2 pt-2">
+                      <Button type="button" variant="ghost" onClick={() => setIsNewItemModalOpen(false)} className="text-xs h-8">
+                        Cancel
+                      </Button>
+                      <Button type="submit" className="text-xs h-8 bg-violet-600 hover:bg-violet-500">
+                        Create
+                      </Button>
+                    </div>
+                  </form>
+                </div>
+              </div>
+            )}
 
           </div>
         )}
