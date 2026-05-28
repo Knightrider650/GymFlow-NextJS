@@ -3,7 +3,11 @@ const bcrypt = require('bcrypt');
 const { v4: uuidv4 } = require('uuid');
 
 const pool = new Pool({
-  connectionString: process.env.DATABASE_URL,
+  connectionString: (() => {
+    const url = process.env.DATABASE_URL;
+    if (!url) return url;
+    return url.replace(/sslmode=(require|prefer|verify-ca)/g, 'sslmode=verify-full');
+  })(),
   ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false
 });
 
