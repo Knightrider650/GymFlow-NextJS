@@ -275,9 +275,14 @@ sudo -u postgres psql -c "ALTER USER gymflow_user WITH SUPERUSER;"
 
 ## Pre-Deployment Checklist
 
+⚠️ **IMPORTANT**: See [PRODUCTION_MIGRATION.md](./PRODUCTION_MIGRATION.md) for required database schema updates.
+
 - [ ] All environment variables configured
 - [ ] Database created and migrated
-- [ ] Database migration applied: `ALTER TABLE "Plan" ADD COLUMN "durationDays" INT DEFAULT NULL;`
+- [ ] **Database Migration Applied** (CRITICAL):
+  - [ ] Plan.durationDays column added
+  - [ ] Member.planId column added
+  - [ ] See [PRODUCTION_MIGRATION.md](./PRODUCTION_MIGRATION.md) for exact SQL commands
 - [ ] Build completes without errors (`npm run build`)
 - [ ] Type checking passes (`npm run type-check`)
 - [ ] Security: Remove any hardcoded secrets

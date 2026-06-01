@@ -29,16 +29,30 @@ try {
 
 if (process.env.NODE_ENV !== "production") (global as any).prisma = prismaInstance;
 
-// Helper to read fallback JSON database
+// Helper to read fallback JSON database (tries primary, then fallback on /tmp)
 function getJsonData() {
+  const primaryPath = path.join(process.cwd(), 'server', 'data.json')
+  const fallbackPath = process.env.GYMFLOW_JSON_DB_FILE || '/tmp/gymflow-data.json'
+  
+  // Try primary path first
   try {
-    const filePath = path.join(process.cwd(), 'server', 'data.json')
-    if (fs.existsSync(filePath)) {
-      return JSON.parse(fs.readFileSync(filePath, 'utf-8'))
+    if (fs.existsSync(primaryPath)) {
+      return JSON.parse(fs.readFileSync(primaryPath, 'utf-8'))
     }
   } catch (err) {
-    console.error('Failed to read fallback JSON database:', err)
+    console.warn('Failed to read primary JSON database:', err)
   }
+  
+  // Try fallback path
+  try {
+    if (fs.existsSync(fallbackPath)) {
+      console.log(`✓ Reading from fallback database: ${fallbackPath}`)
+      return JSON.parse(fs.readFileSync(fallbackPath, 'utf-8'))
+    }
+  } catch (err) {
+    console.warn('Failed to read fallback JSON database:', err)
+  }
+  
   return {}
 }
 
@@ -93,13 +107,32 @@ const MODEL_MAPPING: Record<string, string> = {
   reminder: 'reminders'
 }
 
-// Helper to save fallback JSON database
+// Helper to save fallback JSON database (with Vercel/serverless fallback to /tmp)
 function saveJsonData(data: any) {
+  const primaryPath = path.join(process.cwd(), 'server', 'data.json')
+  const fallbackPath = process.env.GYMFLOW_JSON_DB_FILE || '/tmp/gymflow-data.json'
+  
   try {
-    const filePath = path.join(process.cwd(), 'server', 'data.json')
-    fs.writeFileSync(filePath, JSON.stringify(data, null, 2), 'utf-8')
-  } catch (err) {
-    console.error('Failed to write to fallback JSON database:', err)
+    fs.writeFileSync(primaryPath, JSON.stringify(data, null, 2), 'utf-8')
+    return
+  } catch (err: any) {
+    // Check for read-only filesystem errors
+    if (err.code === 'EROFS' || err.code === 'EPERM') {
+      try {
+        // Ensure /tmp directory exists
+        const dir = path.dirname(fallbackPath)
+        if (!fs.existsSync(dir)) {
+          fs.mkdirSync(dir, { recursive: true })
+        }
+        fs.writeFileSync(fallbackPath, JSON.stringify(data, null, 2), 'utf-8')
+        console.log(`✓ Saved to fallback database: ${fallbackPath}`)
+        return
+      } catch (fallbackErr) {
+        console.error('Failed to write to both primary and fallback JSON databases:', fallbackErr)
+      }
+    } else {
+      console.error('Failed to write to fallback JSON database:', err)
+    }
   }
 }
 
