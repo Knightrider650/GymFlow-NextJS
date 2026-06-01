@@ -43,7 +43,8 @@ const memberSchema = z.object({
   email: z.string().email('Invalid email address'),
   phone: z.string().min(10, 'Phone number is required'),
   address: z.string().optional(),
-  membershipType: z.string().min(1, 'Membership type is required'),
+  planId: z.string().optional().nullable(), // Link to plan instead of free-text type
+  membershipType: z.string().optional(), // Optional fallback for backward compatibility
   status: z.enum(['active', 'pending', 'expired', 'cancelled']),
   joinDate: z.string(),
   expiryDate: z.string(),
@@ -252,7 +253,7 @@ export default function MembersPage() {
             <h3 class="name">\${selectedPassMember.name}</h3>
             <p class="id">ID: \${selectedPassMember.id}</p>
             <div>
-              <span class="badge badge-type">\${selectedPassMember.membershipType}</span>
+              <span class="badge badge-type">\${plans.find((p: any) => p.id === (selectedPassMember as any).planId)?.name || selectedPassMember.membershipType || 'Standard'}</span>
               <span class="badge badge-status" style="background: \${selectedPassMember.status === 'active' ? '#10b981' : '#ef4444'}">\${selectedPassMember.status}</span>
             </div>
             <div class="details-grid">
@@ -349,7 +350,7 @@ export default function MembersPage() {
       ctx.fillText(`ID: \${selectedPassMember.id}`, 200, 385)
 
       // Badges
-      const typeText = selectedPassMember.membershipType.toUpperCase()
+      const typeText = (plans.find((p: any) => p.id === (selectedPassMember as any).planId)?.name || selectedPassMember.membershipType || 'STANDARD').toUpperCase()
       ctx.font = 'bold 10px system-ui, -apple-system, sans-serif'
       const typeWidth = ctx.measureText(typeText).width + 20
       
@@ -442,6 +443,7 @@ export default function MembersPage() {
     email: '',
     phone: '',
     address: '',
+    planId: '',
     membershipType: '',
     status: 'active',
     joinDate: new Date().toISOString().split('T')[0],
@@ -466,31 +468,31 @@ export default function MembersPage() {
     formState: { errors, isSubmitting },
   } = form
 
-  const watchedMembershipType = watch('membershipType')
+  const watchedPlanId = watch('planId')
   const watchedJoinDate = watch('joinDate')
 
-  const lastMembershipTypeRef = useRef<string>('')
+  const lastPlanIdRef = useRef<string>('')
   const lastJoinDateRef = useRef<string>('')
 
   useEffect(() => {
     if (!isDialogOpen) return
     if (editingMember) {
-      lastMembershipTypeRef.current = editingMember.membershipType || ''
+      lastPlanIdRef.current = (editingMember as any).planId || ''
       lastJoinDateRef.current = editingMember.joinDate ? editingMember.joinDate.split('T')[0] : ''
     } else {
-      lastMembershipTypeRef.current = ''
+      lastPlanIdRef.current = ''
       lastJoinDateRef.current = new Date().toISOString().split('T')[0]
     }
   }, [isDialogOpen, editingMember])
 
   useEffect(() => {
     if (!isDialogOpen) return
-    if (!watchedMembershipType || !watchedJoinDate) return
+    if (!watchedPlanId || !watchedJoinDate) return
     
-    const hasChanged = watchedMembershipType !== lastMembershipTypeRef.current || watchedJoinDate !== lastJoinDateRef.current
+    const hasChanged = watchedPlanId !== lastPlanIdRef.current || watchedJoinDate !== lastJoinDateRef.current
     if (!hasChanged) return
 
-    const selectedPlan = plans.find((p: any) => p.name === watchedMembershipType)
+    const selectedPlan = plans.find((p: any) => p.id === watchedPlanId)
     if (!selectedPlan) return
 
     const baseDate = new Date(watchedJoinDate)
@@ -505,7 +507,7 @@ export default function MembersPage() {
     }
     
     setValue('expiryDate', baseDate.toISOString().split('T')[0])
-  }, [watchedMembershipType, watchedJoinDate, plans, setValue, isDialogOpen])
+  }, [watchedPlanId, watchedJoinDate, plans, setValue, isDialogOpen])
 
   useEffect(() => {
     fetchMembers()
@@ -534,6 +536,7 @@ export default function MembersPage() {
       email: '',
       phone: '',
       address: '',
+      planId: '',
       membershipType: '',
       status: 'active',
       joinDate: new Date().toISOString().split('T')[0],
@@ -553,6 +556,7 @@ export default function MembersPage() {
         email: editingMember.email,
         phone: editingMember.phone,
         address: editingMember.address || '',
+        planId: (editingMember as any).planId || '',
         membershipType: editingMember.membershipType as any,
         status: editingMember.status as any,
         joinDate: editingMember.joinDate.split('T')[0],
@@ -596,8 +600,8 @@ export default function MembersPage() {
       const jsonData = xlsx.utils.sheet_to_json(worksheet)
 
       const formattedMembers: Array<Omit<Member, 'id' | 'createdAt' | 'updatedAt'>> = jsonData.map((item: any) => {
-        const mType = item.Type || item.membershipType || 'Basic'
-        const selectedPlan = plans.find((p: any) => p.name === mType)
+        const planName = item.Type || item.membershipType || item.Plan || 'Basic'
+        const selectedPlan = plans.find((p: any) => p.name === planName)
         const join = new Date()
         const expiry = new Date()
         
@@ -615,7 +619,8 @@ export default function MembersPage() {
           name: item.Name || item.name || '',
           email: item.Email || item.email || '',
           phone: String(item.Phone || item.phone || ''),
-          membershipType: mType,
+          planId: selectedPlan?.id || null,
+          membershipType: planName,
           status: 'active',
           joinDate: join.toISOString().split('T')[0],
           expiryDate: expiry.toISOString().split('T')[0],
@@ -733,27 +738,24 @@ export default function MembersPage() {
 
                       <div className="grid grid-cols-2 gap-4">
                         <div className="space-y-2">
-                          <Label htmlFor="membershipType">Membership Type *</Label>
+                          <Label htmlFor="planId">Select Membership Plan</Label>
                           <select
-                            id="membershipType"
-                            {...register('membershipType')}
+                            id="planId"
+                            {...register('planId')}
                             className="w-full h-10 px-3 rounded-md border border-input text-sm bg-background"
                           >
-                            <option value="None">None</option>
                             <option value="">Select a plan</option>
-                            {plans.length > 0 ? (
+                            {plans && plans.length > 0 ? (
                               plans.map((plan: any) => (
-                                <option key={plan.id} value={plan.name}>{plan.name}</option>
+                                <option key={plan.id} value={plan.id}>
+                                  {plan.name} - ₹{plan.price.toFixed(2)} ({plan.durationMonths ? `${plan.durationMonths} months` : `${plan.durationDays} days`})
+                                </option>
                               ))
                             ) : (
-                              <>
-                                <option value="Basic">Basic</option>
-                                <option value="Premium">Premium</option>
-                                <option value="Elite">Elite</option>
-                              </>
+                              <option disabled value="">No plans available</option>
                             )}
                           </select>
-                          {errors.membershipType && <p className="text-xs text-red-500">{errors.membershipType.message}</p>}
+                          {errors.planId && <p className="text-xs text-red-500">{errors.planId.message}</p>}
                         </div>
                         <div className="space-y-2">
                           <Label htmlFor="status">Status *</Label>
@@ -957,8 +959,10 @@ export default function MembersPage() {
                           </div>
                         </TableCell>
                         <TableCell>
-                          <Badge variant="outline" className={getMembershipColor(member.membershipType)}>
-                            {member.membershipType}
+                          <Badge variant="outline" className={getMembershipColor((member as any).planId ? plans.find((p: any) => p.id === (member as any).planId)?.name : member.membershipType)}>
+                            {(member as any).planId 
+                              ? plans.find((p: any) => p.id === (member as any).planId)?.name 
+                              : (member.membershipType || 'N/A')}
                           </Badge>
                         </TableCell>
                         <TableCell>

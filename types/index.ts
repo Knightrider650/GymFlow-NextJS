@@ -38,7 +38,8 @@ export interface Member {
   dob?: string | null
   address?: string
   branchId?: string
-  membershipType: string
+  planId?: string  // Link to membership plan
+  membershipType?: string  // Optional fallback for backward compatibility
   status: 'active' | 'expired' | 'pending' | 'cancelled'
   joinDate: string
   expiryDate: string
@@ -53,6 +54,19 @@ export interface MemberFilters {
   membershipType?: Member['membershipType']
   searchTerm?: string
   sortBy?: 'name' | 'joinDate' | 'expiryDate'
+}
+
+// Plan Types
+export interface Plan {
+  id: string
+  name: string
+  price: number
+  durationMonths?: number
+  durationDays?: number
+  features?: string
+  gymId: string
+  createdAt: string
+  updatedAt: string
 }
 
 // Attendance Types

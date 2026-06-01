@@ -69,13 +69,31 @@ export async function POST(req: NextRequest) {
       delete rest.dob
     }
 
+    // Validate planId if provided
+    if (rest.planId) {
+      const plan = await prisma.plan.findFirst({
+        where: {
+          id: rest.planId,
+          gymId: gymId
+        }
+      })
+      
+      if (!plan) {
+        return NextResponse.json({ success: false, error: 'Invalid plan selected' }, { status: 400 })
+      }
+    }
+
     const newMember = await prisma.member.create({
       data: {
         ...rest,
         gymId: gymId,
         branchId: targetBranchId,
         joinDate: new Date(data.joinDate || Date.now()),
-        expiryDate: new Date(data.expiryDate || Date.now() + 30 * 24 * 60 * 60 * 1000)
+        expiryDate: new Date(data.expiryDate || Date.now() + 30 * 24 * 60 * 60 * 1000),
+        planId: rest.planId || null
+      },
+      include: {
+        plan: true
       }
     })
 
@@ -83,7 +101,7 @@ export async function POST(req: NextRequest) {
     await prisma.activityLog.create({
       data: {
         action: 'Add Member',
-        details: `Added new member: ${newMember.name}`,
+        details: `Added new member: ${newMember.name}${newMember.planId ? ` with plan ${rest.planId}` : ''}`,
         entityType: 'Member',
         entityId: newMember.id,
         userName: user.email,
