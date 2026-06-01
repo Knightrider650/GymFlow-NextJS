@@ -91,9 +91,6 @@ export async function POST(req: NextRequest) {
         joinDate: new Date(data.joinDate || Date.now()),
         expiryDate: new Date(data.expiryDate || Date.now() + 30 * 24 * 60 * 60 * 1000),
         planId: rest.planId || null
-      },
-      include: {
-        plan: true
       }
     })
 
@@ -101,7 +98,7 @@ export async function POST(req: NextRequest) {
     await prisma.activityLog.create({
       data: {
         action: 'Add Member',
-        details: `Added new member: ${newMember.name}${newMember.planId ? ` with plan ${rest.planId}` : ''}`,
+        details: `Added new member: ${newMember.name}${(newMember as any).planId ? ` with plan` : ''}`,
         entityType: 'Member',
         entityId: newMember.id,
         userName: user.email,

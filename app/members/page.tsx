@@ -599,7 +599,7 @@ export default function MembersPage() {
       const worksheet = workbook.Sheets[sheetName]
       const jsonData = xlsx.utils.sheet_to_json(worksheet)
 
-      const formattedMembers: Array<Omit<Member, 'id' | 'createdAt' | 'updatedAt'>> = jsonData.map((item: any) => {
+      const formattedMembers: Array<any> = jsonData.map((item: any) => {
         const planName = item.Type || item.membershipType || item.Plan || 'Basic'
         const selectedPlan = plans.find((p: any) => p.name === planName)
         const join = new Date()

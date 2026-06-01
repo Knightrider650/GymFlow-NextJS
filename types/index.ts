@@ -36,15 +36,15 @@ export interface Member {
   email: string
   phone: string
   dob?: string | null
-  address?: string
-  branchId?: string
-  planId?: string  // Link to membership plan
-  membershipType?: string  // Optional fallback for backward compatibility
+  address?: string | null
+  branchId?: string | null
+  planId?: string | null  // Link to membership plan
+  membershipType?: string | null  // Optional fallback for backward compatibility
   status: 'active' | 'expired' | 'pending' | 'cancelled'
   joinDate: string
   expiryDate: string
-  emergencyContact?: string
-  emergencyPhone?: string
+  emergencyContact?: string | null
+  emergencyPhone?: string | null
   createdAt: string
   updatedAt: string
 }
