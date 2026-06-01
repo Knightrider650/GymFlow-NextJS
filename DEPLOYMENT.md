@@ -37,6 +37,11 @@ git push -u origin main
 
 Your frontend will now be live at `yourapp.vercel.app`
 
+**Note:** GymFlow includes optimizations for serverless deployments:
+- Auth checks are consolidated (single-flight pattern)
+- User redirects are scope-aware (no 307 bounces)
+- JSON fallback database safely uses `/tmp` on Vercel
+
 ### Option 2: Deploy Backend & Frontend Together
 
 #### Backend Deployment (Node.js on Heroku/Railway/Render)
@@ -167,6 +172,46 @@ sudo certbot --nginx -d your_domain.com
 
 ---
 
+## Production Improvements
+
+### 1. Scope-Aware Dashboard Routing
+
+**What it does:** Authenticated users are now redirected directly to their correct dashboard based on their account scope, eliminating unnecessary 307 redirects.
+
+**Benefits:**
+- Platform users (admin/CEO/CTO) → `/super-dashboard`
+- Tenant users → `/dashboard`
+- Faster login experience with no redirect bounces
+- Implemented in `lib/permissions.ts`, `hooks/index.ts`, and `app/page.tsx`
+
+### 2. Single-Flight Auth Bootstrap
+
+**What it does:** Auth checks during page load are now consolidated into a single request, preventing multiple concurrent calls to `/api/auth/me`.
+
+**Benefits:**
+- Reduces redundant backend requests (was 5+ simultaneous calls, now 1)
+- Faster auth state initialization
+- Lower server load during peak traffic
+- Implemented in `lib/store.ts` with promise caching
+
+### 3. Serverless-Safe JSON Fallback Database
+
+**What it does:** When Prisma fails, the JSON fallback database now writes to `/tmp` instead of the read-only filesystem on Vercel/serverless platforms.
+
+**Benefits:**
+- Prevents `EROFS` errors on Vercel deployments
+- Graceful fallback for database failures
+- Automatic path detection: `server/data.json` → `/tmp/gymflow-data.json`
+- Implemented in `server/db.js`
+
+**Configuration:**
+```env
+# Optional: Override fallback database path (defaults to /tmp/gymflow-data.json)
+GMYFLOW_JSON_DB_FILE=/custom/path/gymflow-data.json
+```
+
+---
+
 ## Environment Variables Setup
 
 Create `.env.production` with:
@@ -183,6 +228,9 @@ NODE_ENV=production
 JWT_SECRET=your_production_secret_key
 CORS_ORIGIN=https://yourdomain.com
 PORT=5000
+
+# Optional: JSON fallback database path (Vercel uses /tmp by default)
+GMYFLOW_JSON_DB_FILE=/tmp/gymflow-data.json
 ```
 
 ---
@@ -229,6 +277,7 @@ sudo -u postgres psql -c "ALTER USER gymflow_user WITH SUPERUSER;"
 
 - [ ] All environment variables configured
 - [ ] Database created and migrated
+- [ ] Database migration applied: `ALTER TABLE "Plan" ADD COLUMN "durationDays" INT DEFAULT NULL;`
 - [ ] Build completes without errors (`npm run build`)
 - [ ] Type checking passes (`npm run type-check`)
 - [ ] Security: Remove any hardcoded secrets
@@ -249,12 +298,17 @@ sudo -u postgres psql -c "ALTER USER gymflow_user WITH SUPERUSER;"
    - Login with test account
    - Test key features
 
-2. **Test API**
+2. **Verify Production Improvements**
+   - **Auth Performance:** Check browser DevTools Network tab - should see only 1-2 auth requests during login, not multiple 401s
+   - **Dashboard Redirect:** Platform users should land on `/super-dashboard`, tenant users on `/dashboard` (no 307 bounces)
+   - **JSON Fallback:** Test creating/updating plans - verify no EROFS errors in logs
+
+3. **Test API**
    ```bash
    curl https://api.yourdomain.com/api/health
    ```
 
-3. **Check Logs**
+4. **Check Logs**
    ```bash
    # Vercel
    vercel logs
