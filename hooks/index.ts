@@ -3,6 +3,7 @@
 import { useState, useCallback, useEffect } from 'react'
 import { useAuthStore, useGymStore } from '@/lib/store'
 import { useRouter } from 'next/navigation'
+import { getDashboardRoute } from '@/lib/permissions'
 
 // Hook for handling async operations
 export const useAsync = <T, E = string>(
@@ -46,7 +47,7 @@ export const useAuth = () => {
     async (email: string, password: string) => {
       await login(email, password)
       if (useAuthStore.getState().isAuthenticated) {
-        router.push('/dashboard')
+        router.push(getDashboardRoute(useAuthStore.getState().user?.scope))
       }
     },
     [login, router],

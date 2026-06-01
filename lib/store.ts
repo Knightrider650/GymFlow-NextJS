@@ -3,6 +3,8 @@ import { devtools, persist } from 'zustand/middleware'
 import { User, Member, Attendance, Invoice, FitnessClass, InventoryItem, Staff, Notification, AppSettings, Branch } from '../types'
 import { apiClient } from './api-client'
 
+let authCheckPromise: Promise<void> | null = null
+
 interface AuthState {
   user: User | null
   isLoading: boolean
@@ -174,32 +176,41 @@ export const useAuthStore = create<AuthState>()(
 
 
         checkAuth: async () => {
-          set({ isLoading: true })
-          try {
-            const hasAccessToken = typeof window !== 'undefined' && !!localStorage.getItem('accessToken')
-            const hasRefreshToken = typeof window !== 'undefined' && !!localStorage.getItem('refreshToken')
-            const hasCookieToken = typeof document !== 'undefined' && document.cookie.includes('token=')
+          if (authCheckPromise) {
+            return authCheckPromise
+          }
 
-            if (!hasAccessToken && !hasRefreshToken && !hasCookieToken) {
-              set({ user: null, isAuthenticated: false })
-              return
-            }
+          authCheckPromise = (async () => {
+            set({ isLoading: true })
+            try {
+              const hasAccessToken = typeof window !== 'undefined' && !!localStorage.getItem('accessToken')
+              const hasRefreshToken = typeof window !== 'undefined' && !!localStorage.getItem('refreshToken')
+              const hasCookieToken = typeof document !== 'undefined' && document.cookie.includes('token=')
 
-            const response = await apiClient.get('/api/auth/me')
-            if (response.success && response.data) {
-              set({ user: response.data, isAuthenticated: true })
-            } else {
+              if (!hasAccessToken && !hasRefreshToken && !hasCookieToken) {
+                set({ user: null, isAuthenticated: false })
+                return
+              }
+
+              const response = await apiClient.get('/api/auth/me')
+              if (response.success && response.data) {
+                set({ user: response.data, isAuthenticated: true })
+              } else {
+                localStorage.clear()
+                document.cookie = 'token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT'
+                set({ user: null, isAuthenticated: false })
+              }
+            } catch (error) {
               localStorage.clear()
               document.cookie = 'token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT'
               set({ user: null, isAuthenticated: false })
+            } finally {
+              set({ isLoading: false })
+              authCheckPromise = null
             }
-          } catch (error) {
-            localStorage.clear()
-            document.cookie = 'token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT'
-            set({ user: null, isAuthenticated: false })
-          } finally {
-            set({ isLoading: false })
-          }
+          })()
+
+          return authCheckPromise
         },
         switchGym: async (gymId: string) => {
           set({ isLoading: true, error: null })

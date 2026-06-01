@@ -3,18 +3,19 @@
 import { useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { useAuthStore } from '@/lib/store'
+import { getDashboardRoute } from '@/lib/permissions'
 
 export default function Home() {
   const router = useRouter()
-  const { isAuthenticated } = useAuthStore()
+  const { isAuthenticated, user } = useAuthStore()
 
   useEffect(() => {
     if (isAuthenticated) {
-      router.replace('/dashboard')
+      router.replace(getDashboardRoute(user?.scope))
     } else {
       router.replace('/login')
     }
-  }, [isAuthenticated, router])
+  }, [isAuthenticated, router, user?.scope])
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900">

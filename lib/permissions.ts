@@ -212,3 +212,8 @@ export function asUserRole(role?: string | null): UserRole | undefined {
   return keys.includes(normalized) ? normalized : undefined
 }
 
+/** Returns the default dashboard route for the supplied auth scope. */
+export function getDashboardRoute(scope?: 'platform' | 'tenant' | null): '/super-dashboard' | '/dashboard' {
+  return scope === 'platform' ? '/super-dashboard' : '/dashboard'
+}
+

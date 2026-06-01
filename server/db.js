@@ -3,7 +3,9 @@ const path = require('path');
 const { v4: uuidv4 } = require('uuid');
 const bcrypt = require('bcrypt');
 
-const DATA_FILE = path.join(__dirname, 'data.json');
+const DEFAULT_DATA_FILE = path.join(__dirname, 'data.json');
+const RUNTIME_DATA_FILE = path.join('/tmp', 'gymflow-data.json');
+let DATA_FILE = process.env.GYMFLOW_JSON_DB_FILE || DEFAULT_DATA_FILE;
 const DEFAULT_TENANT_ID = 'gym-001';
 const PLATFORM_ROLES = new Set(['cto', 'ceo', 'admin']);
 
@@ -185,11 +187,25 @@ const db = {
 
   async init() {
     try {
-      const fileData = await fs.readFile(DATA_FILE, 'utf8');
-      data = JSON.parse(fileData);
-      normalizeDataModel();
-      console.log('✓ Local JSON database loaded');
-    } catch (err) {
+      const candidates = Array.from(new Set([
+        DATA_FILE,
+        process.env.VERCEL ? RUNTIME_DATA_FILE : DEFAULT_DATA_FILE,
+        process.env.VERCEL ? DEFAULT_DATA_FILE : RUNTIME_DATA_FILE,
+      ]));
+
+      for (const candidate of candidates) {
+        try {
+          const fileData = await fs.readFile(candidate, 'utf8');
+          data = JSON.parse(fileData);
+          DATA_FILE = candidate;
+          normalizeDataModel();
+          console.log('✓ Local JSON database loaded');
+          return;
+        } catch (readError) {
+          // Try the next candidate.
+        }
+      }
+
       console.log('ℹ Initializing new JSON database...');
       // Hash default admin password
       const salt = await bcrypt.genSalt(10);
@@ -197,11 +213,27 @@ const db = {
       data = { ...INITIAL_DATA };
       normalizeDataModel();
       await this.save();
+    } catch (err) {
+      console.error('Failed to initialize JSON database:', err);
     }
   },
 
   async save() {
-    await fs.writeFile(DATA_FILE, JSON.stringify(data, null, 2));
+    const payload = JSON.stringify(data, null, 2);
+
+    try {
+      await fs.writeFile(DATA_FILE, payload);
+      return;
+    } catch (err) {
+      const isReadOnlyTarget = err && (err.code === 'EROFS' || err.code === 'EPERM')
+      if (!isReadOnlyTarget) {
+        throw err;
+      }
+
+      DATA_FILE = process.env.GYMFLOW_JSON_DB_FILE || RUNTIME_DATA_FILE;
+      await fs.mkdir(path.dirname(DATA_FILE), { recursive: true });
+      await fs.writeFile(DATA_FILE, payload);
+    }
   },
 
   // Auth Methods
