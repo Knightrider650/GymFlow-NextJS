@@ -63,6 +63,13 @@ function toSnakeCase(str: string): string {
 function matchesFilter(item: any, where: any): boolean {
   if (!where) return true;
   for (const [key, value] of Object.entries(where)) {
+    // Support OR queries
+    if (key === 'OR' && Array.isArray(value)) {
+      const matchedAny = value.some((subFilter: any) => matchesFilter(item, subFilter));
+      if (!matchedAny) return false;
+      continue;
+    }
+
     // Check key in item, falling back to snake_case equivalent
     let itemVal = item[key] !== undefined ? item[key] : item[toSnakeCase(key)];
     
@@ -71,6 +78,24 @@ function matchesFilter(item: any, where: any): boolean {
       itemVal = item['tenantId'] !== undefined ? item['tenantId'] : item['tenant_id'];
     }
     
+    // Relation filter support (e.g. member: { gymId: ... })
+    if (value && typeof value === 'object' && !('equals' in value || 'in' in value || 'gte' in value || 'lte' in value || 'contains' in value || 'mode' in value)) {
+      let relationItems: any[] = [];
+      let foreignKey = '';
+      if (key === 'member') {
+        relationItems = getJsonData().members || [];
+        foreignKey = 'memberId';
+      }
+      if (relationItems.length > 0) {
+        const foreignKeyValue = item[foreignKey] || item[toSnakeCase(foreignKey)];
+        const relatedItem = relationItems.find((r: any) => r.id === foreignKeyValue);
+        if (!relatedItem || !matchesFilter(relatedItem, value)) {
+          return false;
+        }
+        continue;
+      }
+    }
+
     if (value && typeof value === 'object') {
       const valAny = value as any;
       if ('equals' in valAny) {
@@ -84,6 +109,15 @@ function matchesFilter(item: any, where: any): boolean {
       }
       if ('lte' in valAny) {
         if (!itemVal || itemVal > valAny.lte) return false;
+      }
+      if ('contains' in valAny) {
+        const needle = String(valAny.contains);
+        const haystack = String(itemVal || '');
+        if (valAny.mode === 'insensitive') {
+          if (!haystack.toLowerCase().includes(needle.toLowerCase())) return false;
+        } else {
+          if (!haystack.includes(needle)) return false;
+        }
       }
     } else {
       if (itemVal !== value) return false;
@@ -107,6 +141,109 @@ function normalizeGymId(item: any): any {
       tenant_id: gymId
     };
   }
+  return item;
+}
+
+function resolveRelations(modelName: string, itemOrItems: any, include: any, jsonData: any): any {
+  if (!itemOrItems || !include) return itemOrItems;
+
+  if (Array.isArray(itemOrItems)) {
+    return itemOrItems.map(item => resolveRelations(modelName, item, include, jsonData));
+  }
+
+  const item = { ...itemOrItems };
+
+  for (const [relationKey, relationValue] of Object.entries(include)) {
+    if (!relationValue) continue;
+
+    // Determine target entity type and foreign keys
+    let targetJsonKey: string | undefined;
+    let foreignKeyField: string | undefined;
+    let isMany = false;
+
+    if (modelName === 'attendance' && relationKey === 'member') {
+      targetJsonKey = 'members';
+      foreignKeyField = 'memberId';
+    } else if (modelName === 'invoice' && relationKey === 'member') {
+      targetJsonKey = 'members';
+      foreignKeyField = 'memberId';
+    } else if (modelName === 'member' && relationKey === 'gym') {
+      targetJsonKey = 'tenants';
+      foreignKeyField = 'gymId';
+    } else if (modelName === 'user' && relationKey === 'gym') {
+      targetJsonKey = 'tenants';
+      foreignKeyField = 'gymId';
+    } else if (modelName === 'plan' && relationKey === 'gym') {
+      targetJsonKey = 'tenants';
+      foreignKeyField = 'gymId';
+    } else if (modelName === 'member' && relationKey === 'plan') {
+      targetJsonKey = 'plans';
+      foreignKeyField = 'planId';
+    } else if (modelName === 'gym' && relationKey === 'members') {
+      targetJsonKey = 'members';
+      isMany = true;
+    } else if (modelName === 'member' && relationKey === 'attendance') {
+      targetJsonKey = 'attendance';
+      isMany = true;
+    } else if (modelName === 'member' && relationKey === 'invoices') {
+      targetJsonKey = 'billing';
+      isMany = true;
+    } else if (modelName === 'invoice' && relationKey === 'payments') {
+      targetJsonKey = 'payments';
+      isMany = true;
+    } else if (modelName === 'gym' && relationKey === '_count') {
+      const select = (relationValue as any).select || {};
+      const counts: any = {};
+      for (const [countKey, countVal] of Object.entries(select)) {
+        if (countVal) {
+          const rawKey = countKey.replace(/s$/, '');
+          const targetKey = MODEL_MAPPING[rawKey] || countKey;
+          const targetItems = jsonData[targetKey] || [];
+          counts[countKey] = targetItems.filter((t: any) => {
+            const val = t.gymId || t.gym_id || t.tenantId || t.tenant_id;
+            return val === item.id;
+          }).length;
+        }
+      }
+      item['_count'] = counts;
+      continue;
+    }
+
+    if (!targetJsonKey) continue;
+
+    const targetItems = jsonData[targetJsonKey] || [];
+
+    if (isMany) {
+      let matchField = 'memberId';
+      if (modelName === 'gym') matchField = 'gymId';
+      if (modelName === 'invoice') matchField = 'invoiceId';
+
+      const related = targetItems.filter((t: any) => {
+        const val = t[matchField] || t[toSnakeCase(matchField)] || t['gym_id'] || t['tenantId'] || t['tenant_id'];
+        return val === item.id;
+      });
+      item[relationKey] = normalizeGymId(related);
+    } else {
+      const foreignKeyValue = item[foreignKeyField!] || item[toSnakeCase(foreignKeyField!)];
+      let related = targetItems.find((t: any) => t.id === foreignKeyValue) || null;
+
+      if (related) {
+        related = normalizeGymId(related);
+        if (typeof relationValue === 'object' && (relationValue as any).select) {
+          const selectFields = (relationValue as any).select;
+          const filteredRelated: any = {};
+          for (const [sf, sv] of Object.entries(selectFields)) {
+            if (sv) {
+              filteredRelated[sf] = related[sf];
+            }
+          }
+          related = filteredRelated;
+        }
+      }
+      item[relationKey] = related;
+    }
+  }
+
   return item;
 }
 
@@ -231,11 +368,14 @@ const prisma = new Proxy(prismaInstance, {
                 if (typeof take === 'number') {
                   filtered = filtered.slice(0, take);
                 }
-                return normalizeGymId(filtered);
+                const normalized = normalizeGymId(filtered);
+                return resolveRelations(modelName, normalized, args[0]?.include, jsonData);
               }
 
               if (methodName === 'findFirst' || methodName === 'findUnique') {
-                return normalizeGymId(items.find((item: any) => matchesFilter(item, where)) || null);
+                const item = items.find((item: any) => matchesFilter(item, where)) || null;
+                const normalized = normalizeGymId(item);
+                return resolveRelations(modelName, normalized, args[0]?.include, jsonData);
               }
 
               if (methodName === 'count') {
@@ -253,7 +393,7 @@ const prisma = new Proxy(prismaInstance, {
                 if (!jsonData[jsonKey]) jsonData[jsonKey] = [];
                 jsonData[jsonKey].push(newItem);
                 saveJsonData(jsonData);
-                return newItem;
+                return resolveRelations(modelName, newItem, args[0]?.include, jsonData);
               }
 
               if (methodName === 'update' || methodName === 'updateMany') {
@@ -273,11 +413,13 @@ const prisma = new Proxy(prismaInstance, {
                 if (matchFound) {
                   jsonData[jsonKey] = newItems;
                   saveJsonData(jsonData);
-                  return methodName === 'update' ? updatedItems[0] : { count: updatedItems.length };
+                  return methodName === 'update' 
+                    ? resolveRelations(modelName, updatedItems[0], args[0]?.include, jsonData) 
+                    : { count: updatedItems.length };
                 }
 
                 return methodName === 'update'
-                  ? normalizeGymId({ ...data, id: where?.id || 'unknown', updatedAt: new Date() })
+                  ? resolveRelations(modelName, normalizeGymId({ ...data, id: where?.id || 'unknown', updatedAt: new Date() }), args[0]?.include, jsonData)
                   : { count: 0 };
               }
 
@@ -294,10 +436,10 @@ const prisma = new Proxy(prismaInstance, {
                 if (deletedItems.length > 0) {
                   jsonData[jsonKey] = remainingItems;
                   saveJsonData(jsonData);
-                  return methodName === 'delete' ? normalizeGymId(deletedItems[0]) : { count: deletedItems.length };
+                  return methodName === 'delete' ? resolveRelations(modelName, normalizeGymId(deletedItems[0]), args[0]?.include, jsonData) : { count: deletedItems.length };
                 }
 
-                return methodName === 'delete' ? normalizeGymId({ id: 'deleted' }) : { count: 0 };
+                return methodName === 'delete' ? resolveRelations(modelName, normalizeGymId({ id: 'deleted' }), args[0]?.include, jsonData) : { count: 0 };
               }
 
               if (methodName === 'aggregate') {
