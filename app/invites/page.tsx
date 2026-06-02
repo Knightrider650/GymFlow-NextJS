@@ -27,7 +27,7 @@ export default function InvitesPage() {
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [formData, setFormData] = useState({
     email: '',
-    role: 'member'
+    role: 'staff'
   })
 
   const fetchInvites = async () => {
@@ -129,10 +129,11 @@ export default function InvitesPage() {
                      value={formData.role}
                      onChange={(e) => setFormData({...formData, role: e.target.value})}
                   >
-                    <option value="member">Member</option>
                     <option value="trainer">Trainer</option>
+                    <option value="staff">Staff</option>
                     <option value="manager">Manager</option>
                     <option value="admin">Admin</option>
+                    <option value="owner">Gym Owner</option>
                   </select>
                 </div>
               </CardContent>

@@ -17,16 +17,19 @@ import {
   DialogTrigger,
 } from '@/components/ui/dialog'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
-import { useAttendance, useMembers, useBranches } from '@/hooks'
+import { useAttendance, useMembers, useBranches, usePagination } from '@/hooks'
 import { formatDateTime, calculateDuration, formatDuration } from '@/utils/format'
 import { Plus, LogOut, Search, Filter, MapPin, Camera, CheckCircle, AlertTriangle, Volume2 } from 'lucide-react'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { apiClient } from '@/lib/api-client'
+import { useGymStore } from '@/lib/store'
 
 export default function AttendancePage() {
   const { attendance, isLoading, fetchAttendance, checkInMember, checkOutMember } = useAttendance()
   const { members, fetchMembers } = useMembers()
   const { branches, fetchBranches } = useBranches()
+  const settings = useGymStore(state => state.settings)
+  const fetchSettings = useGymStore(state => state.fetchSettings)
   const [isDialogOpen, setIsDialogOpen] = useState(false)
   const [selectedMemberId, setSelectedMemberId] = useState('')
   const [notes, setNotes] = useState('')
@@ -187,7 +190,8 @@ export default function AttendancePage() {
     fetchAttendance()
     fetchMembers()
     fetchBranches()
-  }, [fetchAttendance, fetchMembers, fetchBranches])
+    fetchSettings()
+  }, [fetchAttendance, fetchMembers, fetchBranches, fetchSettings])
 
   const handleCheckIn = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -205,12 +209,26 @@ export default function AttendancePage() {
     await fetchAttendance()
   }
 
-  const filteredAttendance = attendance.filter(record =>
-    record.memberName.toLowerCase().includes(searchTerm.toLowerCase())
-  )
+  const filteredAttendance = attendance.filter(record => {
+    const matchesSearch = record.memberName.toLowerCase().includes(searchTerm.toLowerCase())
+    const matchesBranch = selectedBranch === 'all' || (record as any).branchId === selectedBranch
+    return matchesSearch && matchesBranch
+  })
+
+  const {
+    currentPage,
+    totalPages,
+    currentItems: paginatedAttendance,
+    goToPage,
+    nextPage,
+    prevPage,
+    hasNextPage,
+    hasPrevPage,
+  } = usePagination(filteredAttendance, 10)
 
   const todayAttendance = filteredAttendance.filter(record => {
-    const today = new Date().toISOString().split('T')[0]
+    const timeZone = settings?.timeZone || 'UTC'
+    const today = new Intl.DateTimeFormat('en-CA', { timeZone, year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date())
     return record.recordedDate.startsWith(today)
   })
 
@@ -364,14 +382,14 @@ export default function AttendancePage() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {filteredAttendance.length === 0 ? (
+                  {paginatedAttendance.length === 0 ? (
                     <TableRow>
                       <TableCell colSpan={7} className="text-center py-8">
                         {isLoading ? 'Loading records...' : 'No attendance records found'}
                       </TableCell>
                     </TableRow>
                   ) : (
-                    filteredAttendance.map((record) => (
+                    paginatedAttendance.map((record) => (
                       <TableRow key={record.id}>
                         <TableCell className="font-medium">{record.memberName}</TableCell>
                         <TableCell>{record.recordedDate}</TableCell>
@@ -408,6 +426,57 @@ export default function AttendancePage() {
                 </TableBody>
               </Table>
             </div>
+            {/* Pagination Controls */}
+            {totalPages > 1 && (
+              <div className="flex items-center justify-between p-4 border-t border-muted">
+                <div className="text-xs text-muted-foreground font-semibold">
+                  Showing {Math.min((currentPage - 1) * 10 + 1, filteredAttendance.length)} to {Math.min(currentPage * 10, filteredAttendance.length)} of {filteredAttendance.length} records
+                </div>
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={prevPage}
+                    disabled={!hasPrevPage}
+                    className="text-xs"
+                  >
+                    Previous
+                  </Button>
+                  {Array.from({ length: totalPages }).map((_, idx) => {
+                    const pageNum = idx + 1
+                    if (pageNum === 1 || pageNum === totalPages || Math.abs(pageNum - currentPage) <= 1) {
+                      return (
+                        <Button
+                          key={pageNum}
+                          variant={currentPage === pageNum ? "default" : "outline"}
+                          size="sm"
+                          onClick={() => goToPage(pageNum)}
+                          className="w-8 h-8 text-xs p-0"
+                        >
+                          {pageNum}
+                        </Button>
+                      )
+                    }
+                    if (pageNum === 2 && currentPage > 3) {
+                      return <span key="ellipsis-start" className="text-muted-foreground px-1 text-xs">...</span>
+                    }
+                    if (pageNum === totalPages - 1 && currentPage < totalPages - 2) {
+                      return <span key="ellipsis-end" className="text-muted-foreground px-1 text-xs">...</span>
+                    }
+                    return null
+                  })}
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={nextPage}
+                    disabled={!hasNextPage}
+                    className="text-xs"
+                  >
+                    Next
+                  </Button>
+                </div>
+              </div>
+            )}
           </CardContent>
         </Card>
 

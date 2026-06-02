@@ -34,7 +34,7 @@ export default function RegisterPage() {
     setIsLoading(true)
     try {
       const response = await apiClient.post('/api/auth/register', {
-        name: formData.name,
+        fullname: formData.name,
         email: formData.email,
         password: formData.password
       })
@@ -42,7 +42,12 @@ export default function RegisterPage() {
       if (response.success) {
         // Automatically sign them in
         await login(formData.email, formData.password)
-        router.push('/dashboard')
+        const userScope = useAuthStore.getState().user?.scope
+        if (userScope === 'platform') {
+          router.push('/super-dashboard')
+        } else {
+          router.push('/dashboard')
+        }
       } else {
         setFormError(response.error || 'Registration failed')
       }

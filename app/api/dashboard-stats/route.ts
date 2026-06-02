@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import prisma from '@/lib/prisma'
 import { getAuthUser, getGymIdContext } from '@/lib/auth'
 import { isTrainer as checkIsTrainer } from '@/lib/permissions'
-import { startOfDay, endOfDay, startOfMonth, subDays, format } from 'date-fns'
+import { startOfDay, endOfDay, startOfMonth, subDays, subMonths, format } from 'date-fns'
 
 export async function GET(req: NextRequest) {
   try {
@@ -12,13 +12,22 @@ export async function GET(req: NextRequest) {
     }
 
     const gymId = getGymIdContext(user, req)
+    
+    let timeZone = 'UTC'
+    if (gymId && gymId !== 'all') {
+      const gym = await prisma.gym.findUnique({ where: { id: gymId } })
+      if (gym?.timeZone) {
+        timeZone = gym.timeZone
+      }
+    }
+
     const now = new Date()
     const todayStart = startOfDay(now)
     const todayEnd = endOfDay(now)
     const monthStart = startOfMonth(now)
     
     // Standardize today string to YYYY-MM-DD in local-relative time for consistency with check-ins
-    const todayStr = now.toISOString().split('T')[0]
+    const todayStr = new Intl.DateTimeFormat('en-CA', { timeZone, year: 'numeric', month: '2-digit', day: '2-digit' }).format(now)
 
     // Role-based filters
     const isTrainer = checkIsTrainer(user.role)
@@ -34,7 +43,7 @@ export async function GET(req: NextRequest) {
     }
 
     // 1. Basic counts
-    const [activeMembers, totalMembers, pendingPayments, todayVisits] = await Promise.all([
+    const [activeMembers, totalMembers, pendingPayments, todayVisits, active30DaysAgo] = await Promise.all([
       prisma.member.count({ where: { ...memberFilter, status: 'active' } }),
       prisma.member.count({ where: memberFilter }),
       prisma.invoice.count({ where: { ...invoiceFilter, status: 'pending' } }),
@@ -43,15 +52,31 @@ export async function GET(req: NextRequest) {
           recordedDate: todayStr,
           ...attendanceFilter
         } 
+      }),
+      prisma.member.count({
+        where: {
+          ...memberFilter,
+          status: 'active',
+          joinDate: { lt: subDays(now, 30) }
+        }
       })
     ])
+
+    const activeMembersTrend = active30DaysAgo > 0 ? Math.round(((activeMembers - active30DaysAgo) / active30DaysAgo) * 100) : 0
 
     // 2. Revenue calculations (Hide or filter for trainers)
     let todayRevenue = 0
     let monthlyRevenue = 0
+    let todayRevenueTrend = 0
+    let monthlyRevenueTrend = 0
 
     if (!isTrainer) {
-      const [todayRevenueData, monthlyRevenueData] = await Promise.all([
+      const yesterdayStart = startOfDay(subDays(now, 1))
+      const yesterdayEnd = endOfDay(subDays(now, 1))
+      const prevMonthStart = startOfMonth(subMonths(now, 1))
+      const prevMonthSameTime = subMonths(now, 1)
+
+      const [todayRevenueData, monthlyRevenueData, yesterdayRevenueData, lastMonthRevenueData] = await Promise.all([
         prisma.payment.aggregate({
           where: {
             paymentDate: { gte: todayStart, lte: todayEnd },
@@ -65,10 +90,29 @@ export async function GET(req: NextRequest) {
             invoice: gymId ? { gymId } : {}
           },
           _sum: { amount: true }
+        }),
+        prisma.payment.aggregate({
+          where: {
+            paymentDate: { gte: yesterdayStart, lte: yesterdayEnd },
+            invoice: gymId ? { gymId } : {}
+          },
+          _sum: { amount: true }
+        }),
+        prisma.payment.aggregate({
+          where: {
+            paymentDate: { gte: prevMonthStart, lte: prevMonthSameTime },
+            invoice: gymId ? { gymId } : {}
+          },
+          _sum: { amount: true }
         })
       ])
       todayRevenue = todayRevenueData._sum.amount || 0
       monthlyRevenue = monthlyRevenueData._sum.amount || 0
+      const yesterdayRevenue = yesterdayRevenueData._sum.amount || 0
+      const lastMonthRevenue = lastMonthRevenueData._sum.amount || 0
+
+      todayRevenueTrend = yesterdayRevenue > 0 ? Math.round(((todayRevenue - yesterdayRevenue) / yesterdayRevenue) * 100) : 0
+      monthlyRevenueTrend = lastMonthRevenue > 0 ? Math.round(((monthlyRevenue - lastMonthRevenue) / lastMonthRevenue) * 100) : 0
     }
 
     // 3. Trends (Last 7 days)
@@ -123,6 +167,9 @@ export async function GET(req: NextRequest) {
         pendingPayments,
         revenueTrend,
         attendanceTrend,
+        activeMembersTrend,
+        todayRevenueTrend,
+        monthlyRevenueTrend,
         retention: '98%'
       }
     })

@@ -38,7 +38,7 @@ export function ProtectedLayout({ children }: { children: React.ReactNode }) {
     if (!isLoading && isAuthenticated && user) {
       const allowedRoles = ROUTE_PERMISSIONS[pathname]
       if (allowedRoles && !allowedRoles.includes(user.role as UserRole)) {
-        router.replace('/dashboard')
+        router.replace('/403')
       }
     }
   }, [pathname, user, isLoading, isAuthenticated, router])

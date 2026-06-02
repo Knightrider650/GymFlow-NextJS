@@ -28,6 +28,7 @@ const StatCard = ({
   icon: Icon,
   description,
   trend,
+  trendLabel = 'vs last month',
   gradient,
 }: {
   title: string
@@ -35,6 +36,7 @@ const StatCard = ({
   icon: any
   description?: string
   trend?: number
+  trendLabel?: string
   gradient?: string
 }) => (
   <Card className={`overflow-hidden border-none shadow-lg relative ${gradient || 'bg-card text-card-foreground'}`}>
@@ -53,7 +55,7 @@ const StatCard = ({
       {trend !== undefined && (
         <div className="flex items-center gap-1 mt-2">
           <TrendingUp className="h-3 w-3" />
-          <span className="text-xs font-semibold">{trend}% vs last month</span>
+          <span className="text-xs font-semibold">{trend}% {trendLabel}</span>
         </div>
       )}
     </CardContent>
@@ -133,7 +135,8 @@ export default function DashboardPage() {
             value={stats?.activeMembers || 0}
             icon={Users}
             description={`of ${stats?.totalMembers || 0} total members`}
-            trend={12}
+            trend={stats?.activeMembersTrend}
+            trendLabel="vs last month"
             gradient="bg-blue-600 text-white"
           />
           {!isTrainer(user?.role) && (
@@ -143,7 +146,8 @@ export default function DashboardPage() {
                 value={formatCurrency(stats?.todayRevenue || 0, settings?.currency)}
                 icon={DollarSign}
                 description="Paid invoices today"
-                trend={8}
+                trend={stats?.todayRevenueTrend}
+                trendLabel="vs yesterday"
                 gradient="bg-emerald-600 text-white"
               />
               <StatCard
@@ -151,7 +155,8 @@ export default function DashboardPage() {
                 value={formatCurrency(stats?.monthlyRevenue || 0, settings?.currency)}
                 icon={TrendingUp}
                 description="Total this month"
-                trend={15}
+                trend={stats?.monthlyRevenueTrend}
+                trendLabel="vs last month"
                 gradient="bg-purple-600 text-white"
               />
             </>
@@ -173,10 +178,10 @@ export default function DashboardPage() {
             />
           )}
           <StatCard
-            title="Data Consistency"
+            title="Member Retention"
             value={stats?.retention || '100%'}
             icon={Activity}
-            description="System database integrity"
+            description="Year-to-date retention rate"
             gradient="bg-slate-700 text-white"
           />
         </div>
@@ -326,14 +331,14 @@ export default function DashboardPage() {
             </div>
             <CardHeader className="flex flex-row items-center justify-between pb-2">
               <div>
-                <CardTitle className="text-lg font-bold text-slate-800">Live Scan Alerts</CardTitle>
+                <CardTitle className="text-lg font-bold">Live Scan Alerts</CardTitle>
                 <CardDescription>Real-time check-in warnings & failures</CardDescription>
               </div>
               {scanErrors.length > 0 && (
                 <Button 
                   variant="ghost" 
                   size="sm" 
-                  className="text-xs text-muted-foreground hover:text-red-500 hover:bg-red-50/50" 
+                  className="text-xs text-muted-foreground hover:text-red-500 hover:bg-red-500/10" 
                   onClick={clearScanErrors}
                 >
                   Clear Logs
@@ -346,7 +351,7 @@ export default function DashboardPage() {
                   <div className="flex flex-col items-center justify-center py-8 text-muted-foreground text-center">
                     <CheckCircle2 className="h-10 w-10 text-emerald-500/30 mb-2" />
                     <p className="text-xs font-semibold">No recent scanner issues</p>
-                    <p className="text-[10px] text-slate-400">Scan events are normal</p>
+                    <p className="text-[10px] text-muted-foreground">Scan events are normal</p>
                   </div>
                 ) : (
                   scanErrors.map((err) => (
@@ -355,14 +360,14 @@ export default function DashboardPage() {
                       className="flex items-start justify-between p-2.5 rounded-lg bg-red-500/5 border border-red-500/10 animate-in fade-in slide-in-from-top-2 duration-300"
                     >
                       <div className="space-y-0.5">
-                        <p className="font-bold text-xs text-slate-700">
+                        <p className="font-bold text-xs text-foreground">
                           {err.memberName || 'Unknown Member'}
                         </p>
-                        <p className="text-[10px] text-red-600 font-semibold flex items-center gap-1">
+                        <p className="text-[10px] text-red-500 font-semibold flex items-center gap-1">
                           <AlertCircle className="h-3 w-3 flex-shrink-0" />
                           {err.error || 'Check-in blocked'}
                         </p>
-                        <span className="text-[9px] text-slate-400 font-mono block">
+                        <span className="text-[9px] text-muted-foreground font-mono block">
                           ID: {err.memberId?.substring(0, 8)}...
                         </span>
                       </div>

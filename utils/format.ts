@@ -139,7 +139,8 @@ export const getStatusBadgeColor = (status: string): string => {
   }
 }
 
-export const getMembershipColor = (type: string): string => {
+export const getMembershipColor = (type?: string | null): string => {
+  if (!type) return 'bg-gray-100 text-gray-800'
   switch (type.toLowerCase()) {
     case 'basic':
       return 'bg-blue-100 text-blue-800'

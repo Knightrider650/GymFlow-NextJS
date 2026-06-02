@@ -17,7 +17,7 @@ import {
   DialogTrigger,
 } from '@/components/ui/dialog'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
-import { useBilling, useMembers, usePlans, useSettings } from '@/hooks'
+import { useBilling, useMembers, usePlans, useSettings, usePagination } from '@/hooks'
 import { formatCurrency, formatDate, getStatusBadgeColor } from '@/utils/format'
 import { Plus, DollarSign, Search, CreditCard, Receipt, Clock, CheckCircle2 } from 'lucide-react'
 import { useAuthStore } from '@/lib/store'
@@ -61,11 +61,16 @@ export default function BillingPage() {
   const handleMemberSelect = (memberId: string) => {
     setInvoiceForm(prev => ({ ...prev, memberId }))
     const member = members.find(m => m.id === memberId)
-    if (member && member.membershipType) {
-      const memberType = member.membershipType.toLowerCase()
-      // Exact match first, then fuzzy (contains) match
-      const plan = plans.find((p: any) => p.name.toLowerCase() === memberType)
-        || plans.find((p: any) => p.name.toLowerCase().includes(memberType) || memberType.includes(p.name.toLowerCase()))
+    if (member) {
+      let plan = null
+      if (member.planId) {
+        plan = plans.find((p: any) => p.id === member.planId)
+      }
+      if (!plan && member.membershipType) {
+        const memberType = member.membershipType.toLowerCase()
+        plan = plans.find((p: any) => p.name.toLowerCase() === memberType)
+          || plans.find((p: any) => p.name.toLowerCase().includes(memberType) || memberType.includes(p.name.toLowerCase()))
+      }
       if (plan) {
         setInvoiceForm(prev => ({
           ...prev,
@@ -80,29 +85,30 @@ export default function BillingPage() {
   const handleCreateInvoice = async (e: React.FormEvent) => {
     e.preventDefault()
     
-    console.log('Attempting to create invoice:', invoiceForm);
     if (!invoiceForm.memberId || !invoiceForm.amount) {
-      console.warn('Missing required fields for invoice');
       return;
     }
-
+ 
     const selectedMember = members.find(m => m.id === invoiceForm.memberId)
     if (selectedMember) {
-      console.log('Selected member found:', selectedMember);
       try {
+        const subtotal = parseFloat(invoiceForm.amount)
+        const taxRate = settings?.billing?.defaultTaxRate || 0
+        const taxAmount = (subtotal * taxRate) / 100
+        const totalAmount = subtotal + taxAmount
+
         await createInvoice({
           invoiceNumber: `${settings?.invoicePrefix || 'INV'}-${Date.now()}`,
           memberId: invoiceForm.memberId,
           memberName: selectedMember.name,
-          amount: parseFloat(invoiceForm.amount),
-          subtotal: parseFloat(invoiceForm.amount),
-          taxAmount: 0,
+          amount: totalAmount,
+          subtotal: subtotal,
+          taxAmount: taxAmount,
           description: invoiceForm.description || 'Membership Fee',
           status: 'pending',
           invoiceDate: new Date().toISOString().split('T')[0],
           dueDate: invoiceForm.dueDate,
         })
-        console.log('Invoice creation dispatch triggered');
         setIsInvoiceDialogOpen(false)
         setInvoiceForm({
           memberId: '',
@@ -113,18 +119,14 @@ export default function BillingPage() {
       } catch (err) {
         console.error('Error in handleCreateInvoice:', err);
       }
-    } else {
-      console.error('Member NOT found for ID:', invoiceForm.memberId);
     }
   }
 
   const handleRecordPayment = async (e: React.FormEvent) => {
     e.preventDefault()
     if (selectedInvoiceId && paymentForm.amount) {
-      console.log(`Recording payment for invoice ${selectedInvoiceId}:`, paymentForm);
       try {
         await recordPayment(selectedInvoiceId, parseFloat(paymentForm.amount), paymentForm.method)
-        console.log('Payment recording dispatch triggered');
         setIsPaymentDialogOpen(false)
         setPaymentForm({ amount: '', method: 'cash' })
         setSelectedInvoiceId('')
@@ -138,6 +140,17 @@ export default function BillingPage() {
     invoice.memberName.toLowerCase().includes(searchTerm.toLowerCase()) ||
     invoice.invoiceNumber.toLowerCase().includes(searchTerm.toLowerCase())
   )
+
+  const {
+    currentPage,
+    totalPages,
+    currentItems: paginatedInvoices,
+    goToPage,
+    nextPage,
+    prevPage,
+    hasNextPage,
+    hasPrevPage,
+  } = usePagination(filteredInvoices, 10)
 
   const now = new Date()
   const currentMonth = now.getMonth()
@@ -345,14 +358,14 @@ export default function BillingPage() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                  {filteredInvoices.length === 0 ? (
+                  {paginatedInvoices.length === 0 ? (
                     <TableRow>
                       <TableCell colSpan={8} className="h-24 text-center text-muted-foreground">
                         No invoices found matching your criteria.
                       </TableCell>
                     </TableRow>
                   ) : (
-                    filteredInvoices.map((invoice) => (
+                    paginatedInvoices.map((invoice) => (
                       <TableRow key={invoice.id} className="hover:bg-muted/30 transition-colors group">
                         <TableCell className="font-mono text-sm text-primary font-bold">{invoice.invoiceNumber}</TableCell>
                         <TableCell className="font-medium">{invoice.memberName}</TableCell>
@@ -404,6 +417,57 @@ export default function BillingPage() {
                 </TableBody>
               </Table>
             </div>
+            {/* Pagination Controls */}
+            {totalPages > 1 && (
+              <div className="flex items-center justify-between p-4 border-t border-muted">
+                <div className="text-xs text-muted-foreground font-semibold">
+                  Showing {Math.min((currentPage - 1) * 10 + 1, filteredInvoices.length)} to {Math.min(currentPage * 10, filteredInvoices.length)} of {filteredInvoices.length} invoices
+                </div>
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={prevPage}
+                    disabled={!hasPrevPage}
+                    className="text-xs"
+                  >
+                    Previous
+                  </Button>
+                  {Array.from({ length: totalPages }).map((_, idx) => {
+                    const pageNum = idx + 1
+                    if (pageNum === 1 || pageNum === totalPages || Math.abs(pageNum - currentPage) <= 1) {
+                      return (
+                        <Button
+                          key={pageNum}
+                          variant={currentPage === pageNum ? "default" : "outline"}
+                          size="sm"
+                          onClick={() => goToPage(pageNum)}
+                          className="w-8 h-8 text-xs p-0"
+                        >
+                          {pageNum}
+                        </Button>
+                      )
+                    }
+                    if (pageNum === 2 && currentPage > 3) {
+                      return <span key="ellipsis-start" className="text-muted-foreground px-1 text-xs">...</span>
+                    }
+                    if (pageNum === totalPages - 1 && currentPage < totalPages - 2) {
+                      return <span key="ellipsis-end" className="text-muted-foreground px-1 text-xs">...</span>
+                    }
+                    return null
+                  })}
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={nextPage}
+                    disabled={!hasNextPage}
+                    className="text-xs"
+                  >
+                    Next
+                  </Button>
+                </div>
+              </div>
+            )}
             </CardContent>
           </Card>
         </div>

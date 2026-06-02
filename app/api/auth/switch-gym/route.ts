@@ -3,7 +3,7 @@ import jwt from 'jsonwebtoken'
 import prisma from '@/lib/prisma'
 import { getAuthUser } from '@/lib/auth'
 
-const JWT_SECRET = process.env.JWT_SECRET || process.env.NEXT_PUBLIC_JWT_SECRET || 'fallback_secret'
+const JWT_SECRET = process.env.JWT_SECRET || 'fallback_secret'
 
 async function tryBackendSwitchGym(req: Request, gymId: string) {
   const backendUrl = process.env.API_FALLBACK_URL || process.env.NEXT_PUBLIC_API_URL

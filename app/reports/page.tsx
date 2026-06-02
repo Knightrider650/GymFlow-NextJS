@@ -647,14 +647,14 @@ export default function ReportsPage() {
 
   const reportOptions = useMemo(() => {
     return [
-      { value: 'member-summary', label: 'Member Growth & Summary', icon: Users, roles: ['cto', 'ceo', 'admin', 'manager', 'staff', 'trainer'] },
-      { value: 'expiring-members', label: 'Membership Retention Alerts', icon: UserCheck, roles: ['cto', 'ceo', 'admin', 'manager', 'staff'] },
-      { value: 'revenue', label: 'Financial Revenue Trends', icon: DollarSign, roles: ['cto', 'ceo', 'admin', 'manager'] },
-      { value: 'attendance', label: 'Traffic & Attendance Patterns', icon: Activity, roles: ['cto', 'ceo', 'admin', 'manager', 'staff', 'trainer'] },
-      { value: 'class-utilization', label: 'Class Enrollment Metrics', icon: Calendar, roles: ['cto', 'ceo', 'admin', 'manager', 'staff', 'trainer'] },
-      { value: 'equipment-status', label: 'Equipment Maintenance Log', icon: Package, roles: ['cto', 'ceo', 'admin', 'manager', 'staff'] },
-      { value: 'leads-conversion', label: 'Lead Conversion Pipeline', icon: Zap, roles: ['cto', 'ceo', 'admin', 'manager'] },
-      { value: 'staff-performance', label: 'Trainer & Staff Performance', icon: TrendingUp, roles: ['cto', 'ceo', 'admin', 'manager'] },
+      { value: 'member-summary', label: 'Member Growth & Summary', icon: Users, roles: ['cto', 'ceo', 'admin', 'owner', 'manager', 'staff', 'trainer'] },
+      { value: 'expiring-members', label: 'Membership Retention Alerts', icon: UserCheck, roles: ['cto', 'ceo', 'admin', 'owner', 'manager', 'staff'] },
+      { value: 'revenue', label: 'Financial Revenue Trends', icon: DollarSign, roles: ['cto', 'ceo', 'admin', 'owner', 'manager'] },
+      { value: 'attendance', label: 'Traffic & Attendance Patterns', icon: Activity, roles: ['cto', 'ceo', 'admin', 'owner', 'manager', 'staff', 'trainer'] },
+      { value: 'class-utilization', label: 'Class Enrollment Metrics', icon: Calendar, roles: ['cto', 'ceo', 'admin', 'owner', 'manager', 'staff', 'trainer'] },
+      { value: 'equipment-status', label: 'Equipment Maintenance Log', icon: Package, roles: ['cto', 'ceo', 'admin', 'owner', 'manager', 'staff'] },
+      { value: 'leads-conversion', label: 'Lead Conversion Pipeline', icon: Zap, roles: ['cto', 'ceo', 'admin', 'owner', 'manager'] },
+      { value: 'staff-performance', label: 'Trainer & Staff Performance', icon: TrendingUp, roles: ['cto', 'ceo', 'admin', 'owner', 'manager'] },
     ].filter(opt => opt.roles.includes(actorRole))
   }, [actorRole])
 
@@ -667,7 +667,7 @@ export default function ReportsPage() {
 
   return (
     <ProtectedLayout>
-      <div className="p-6 lg:p-8 space-y-8 min-h-screen bg-slate-50/50">
+      <div className="p-6 lg:p-8 space-y-8 min-h-screen">
         {/* Header */}
         <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
           <div>
@@ -677,11 +677,11 @@ export default function ReportsPage() {
             </p>
           </div>
           <div className="flex items-center gap-2">
-            <Button variant="outline" size="sm" onClick={() => handleExport('csv')} className="gap-2 shadow-sm bg-white">
+            <Button variant="outline" size="sm" onClick={() => handleExport('csv')} className="gap-2 shadow-sm">
               <TableIcon className="h-4 w-4" />
               Export CSV
             </Button>
-            <Button variant="outline" size="sm" onClick={() => handleExport('pdf')} className="gap-2 shadow-sm bg-white">
+            <Button variant="outline" size="sm" onClick={() => handleExport('pdf')} className="gap-2 shadow-sm">
               <FileText className="h-4 w-4" />
               Export PDF
             </Button>
@@ -691,7 +691,7 @@ export default function ReportsPage() {
         <div className="grid gap-6 lg:grid-cols-4">
           {/* Controls Sidebar */}
           <div className="lg:col-span-1 space-y-4">
-            <Card className="border-none shadow-xl bg-white/80 backdrop-blur-md">
+            <Card className="border-none shadow-xl bg-card/85 backdrop-blur-md">
               <CardHeader className="pb-3">
                 <CardTitle className="text-lg">Control Panel</CardTitle>
                 <CardDescription>Select metric layer</CardDescription>
@@ -700,7 +700,7 @@ export default function ReportsPage() {
                 <div className="space-y-1.5">
                   <label className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Report Category</label>
                   <Select value={reportType} onValueChange={(val: string) => setReportType(val as ReportType)}>
-                    <SelectTrigger className="w-full bg-slate-50 border-slate-100 h-11 focus:ring-primary/20">
+                    <SelectTrigger className="w-full h-11 focus:ring-primary/20">
                       <SelectValue placeholder="Select Report" />
                     </SelectTrigger>
                     <SelectContent>
@@ -716,7 +716,7 @@ export default function ReportsPage() {
                   </Select>
                 </div>
                 
-                <div className="pt-4 border-t border-slate-100">
+                <div className="pt-4 border-t border-muted">
                   <p className="text-[11px] text-muted-foreground italic mb-2 leading-tight">
                     * Advanced filtering by date and gym location available in Franchise Tier.
                   </p>
@@ -730,8 +730,8 @@ export default function ReportsPage() {
 
           {/* Main Visual Content */}
           <div className="lg:col-span-3">
-            <Card className="border-none shadow-2xl min-h-[600px] overflow-hidden bg-white/60 backdrop-blur-xl">
-              <CardHeader className="bg-slate-50/30 border-b border-slate-100 pb-6">
+            <Card className="border-none shadow-2xl min-h-[600px] overflow-hidden bg-card/65 backdrop-blur-xl">
+              <CardHeader className="border-b border-muted pb-6">
                 <div className="flex items-center justify-between">
                   <div>
                     <CardTitle className="text-xl font-bold flex items-center gap-3">
@@ -742,7 +742,7 @@ export default function ReportsPage() {
                       Targeted analytical view of business performance datasets
                     </CardDescription>
                   </div>
-                  <Badge variant="outline" className="bg-white/50 animate-pulse border-primary/20 text-primary font-mono">LIVE FEED</Badge>
+                  <Badge variant="outline" className="bg-primary/5 animate-pulse border-primary/20 text-primary font-mono">LIVE FEED</Badge>
                 </div>
               </CardHeader>
               <CardContent className="p-8">

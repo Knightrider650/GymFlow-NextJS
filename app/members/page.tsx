@@ -2,10 +2,10 @@
 
 import { useEffect, useState, useRef } from 'react'
 import { ProtectedLayout } from '@/components/layout/protected-layout'
-import { useMembers, usePlans, useDebouncedSearch, useBranches } from '@/hooks'
+import { useMembers, usePlans, useDebouncedSearch, useBranches, usePagination } from '@/hooks'
 import { useAuthStore, useGymStore } from '@/lib/store'
 import { isTrainer } from '@/lib/permissions'
-import { Plus, Search, Edit, Trash2, Calendar, AlertTriangle, UploadCloud, FileSpreadsheet, CheckCircle2, MoreHorizontal, Mail, Phone, MapPin, Download, Shield, QrCode, Printer, MessageSquare, Check } from 'lucide-react'
+import { Plus, Search, Edit, Trash2, Calendar, AlertTriangle, UploadCloud, FileSpreadsheet, CheckCircle2, MoreHorizontal, Mail, Phone, MapPin, Download, Shield, QrCode, Printer, MessageSquare, Check, Loader2 } from 'lucide-react'
 import { QRCodeSVG } from 'qrcode.react'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
@@ -36,7 +36,7 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import * as z from 'zod'
 import * as xlsx from 'xlsx'
 import { Member } from '@/types'
-import { formatDate, getMembershipColor, getStatusBadgeColor } from '@/utils/format'
+import { formatDate, getMembershipColor, getStatusBadgeColor, formatCurrency } from '@/utils/format'
 
 const memberSchema = z.object({
   name: z.string().min(2, 'Name is required'),
@@ -73,6 +73,7 @@ export default function MembersPage() {
   const [isPassModalOpen, setIsPassModalOpen] = useState(false)
 
   const sendMessageToMembers = useGymStore(state => state.sendMessageToMembers)
+  const settings = useGymStore(state => state.settings)
   
   // Messaging Selection states
   const [selectedMembers, setSelectedMembers] = useState<string[]>([])
@@ -438,6 +439,17 @@ export default function MembersPage() {
     return matchesSearch && matchesBranch
   })
 
+  const {
+    currentPage,
+    totalPages,
+    currentItems: paginatedMembers,
+    goToPage,
+    nextPage,
+    prevPage,
+    hasNextPage,
+    hasPrevPage,
+  } = usePagination(filteredMembers, 10)
+
   const defaultMemberValues: MemberFormValues = {
     name: '',
     email: '',
@@ -517,10 +529,15 @@ export default function MembersPage() {
 
   const onFormSubmit = async (data: MemberFormValues) => {
     try {
+      const formattedData = {
+        ...data,
+        branchId: data.branchId === 'none' || data.branchId === '' ? null : data.branchId,
+        planId: data.planId === '' ? null : data.planId,
+      }
       if (editingMember) {
-        await updateMember(editingMember.id, data)
+        await updateMember(editingMember.id, formattedData as any)
       } else {
-        await createMember(data)
+        await createMember(formattedData as any)
       }
       
       setIsDialogOpen(false)
@@ -628,8 +645,21 @@ export default function MembersPage() {
         }
       })
 
-      await bulkCreateMembers(formattedMembers)
-      await fetchMembers()
+      try {
+        const res = await bulkCreateMembers(formattedMembers)
+        if (res?.success) {
+          alert(`Successfully imported ${formattedMembers.length} members!`)
+        } else {
+          alert(`Import failed: ${res?.error || 'Unknown error'}`)
+        }
+      } catch (err: any) {
+        alert(`Import error: ${err?.message || 'Unknown error occurred'}`)
+      } finally {
+        await fetchMembers()
+        if (fileInputRef.current) {
+          fileInputRef.current.value = ''
+        }
+      }
     }
     reader.readAsArrayBuffer(file)
   }
@@ -748,7 +778,7 @@ export default function MembersPage() {
                             {plans && plans.length > 0 ? (
                               plans.map((plan: any) => (
                                 <option key={plan.id} value={plan.id}>
-                                  {plan.name} - ₹{plan.price.toFixed(2)} ({plan.durationMonths ? `${plan.durationMonths} months` : `${plan.durationDays} days`})
+                                  {plan.name} - {formatCurrency(plan.price, settings?.currency)} ({plan.durationMonths ? `${plan.durationMonths} months` : `${plan.durationDays} days`})
                                 </option>
                               ))
                             ) : (
@@ -921,19 +951,19 @@ export default function MembersPage() {
                     <TableRow>
                       <TableCell colSpan={6} className="h-24 text-center">
                         <div className="flex items-center justify-center gap-2 text-muted-foreground">
-                          <Plus className="h-4 w-4 animate-spin" />
+                          <Loader2 className="h-4 w-4 animate-spin text-primary" />
                           Synchronizing member database...
                         </div>
                       </TableCell>
                     </TableRow>
-                  ) : filteredMembers.length === 0 ? (
+                  ) : paginatedMembers.length === 0 ? (
                     <TableRow>
                       <TableCell colSpan={6} className="h-24 text-center text-muted-foreground">
                         No members found matching your search.
                       </TableCell>
                     </TableRow>
                   ) : (
-                    filteredMembers.map((member) => (
+                    paginatedMembers.map((member) => (
                       <TableRow key={member.id} className="group hover:bg-muted/30 transition-colors">
                         <TableCell className="w-12 text-center">
                           <input
@@ -946,13 +976,13 @@ export default function MembersPage() {
                         </TableCell>
                         <TableCell>
                           <div className="flex flex-col">
-                            <span className="font-bold text-slate-700">{member.name}</span>
+                            <span className="font-bold text-foreground">{member.name}</span>
                             <span className="text-xs text-muted-foreground flex items-center gap-1 mt-0.5">
                               <MapPin className="h-2.5 w-2.5 text-primary" />
                               {branches.find(b => b.id === member.branchId)?.name || 'Default Branch'}
                             </span>
                             {member.dob && (
-                              <span className="text-xs text-slate-500 mt-0.5">
+                              <span className="text-xs text-muted-foreground mt-0.5">
                                 DOB: {formatDate(member.dob)}
                               </span>
                             )}
@@ -975,7 +1005,7 @@ export default function MembersPage() {
                             <span className="text-muted-foreground flex items-center gap-1">
                               <Calendar className="h-3 w-3" /> Joined: {formatDate(member.joinDate)}
                             </span>
-                            <span className="mt-1 text-slate-600 font-bold">
+                            <span className="mt-1 text-muted-foreground font-bold">
                               Expires: {formatDate(member.expiryDate)}
                             </span>
                           </div>
@@ -1013,6 +1043,57 @@ export default function MembersPage() {
                 </TableBody>
               </Table>
             </div>
+            {/* Pagination Controls */}
+            {totalPages > 1 && (
+              <div className="flex items-center justify-between p-4 border-t border-muted">
+                <div className="text-xs text-muted-foreground font-semibold">
+                  Showing {Math.min((currentPage - 1) * 10 + 1, filteredMembers.length)} to {Math.min(currentPage * 10, filteredMembers.length)} of {filteredMembers.length} members
+                </div>
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={prevPage}
+                    disabled={!hasPrevPage}
+                    className="text-xs"
+                  >
+                    Previous
+                  </Button>
+                  {Array.from({ length: totalPages }).map((_, idx) => {
+                    const pageNum = idx + 1
+                    if (pageNum === 1 || pageNum === totalPages || Math.abs(pageNum - currentPage) <= 1) {
+                      return (
+                        <Button
+                          key={pageNum}
+                          variant={currentPage === pageNum ? "default" : "outline"}
+                          size="sm"
+                          onClick={() => goToPage(pageNum)}
+                          className="w-8 h-8 text-xs p-0"
+                        >
+                          {pageNum}
+                        </Button>
+                      )
+                    }
+                    if (pageNum === 2 && currentPage > 3) {
+                      return <span key="ellipsis-start" className="text-muted-foreground px-1 text-xs">...</span>
+                    }
+                    if (pageNum === totalPages - 1 && currentPage < totalPages - 2) {
+                      return <span key="ellipsis-end" className="text-muted-foreground px-1 text-xs">...</span>
+                    }
+                    return null
+                  })}
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={nextPage}
+                    disabled={!hasNextPage}
+                    className="text-xs"
+                  >
+                    Next
+                  </Button>
+                </div>
+              </div>
+            )}
           </CardContent>
         </Card>
 
@@ -1073,7 +1154,7 @@ export default function MembersPage() {
                   <p className="text-xs text-slate-400 font-mono tracking-widest uppercase">ID: {selectedPassMember?.id}</p>
                   <div className="flex justify-center gap-2 mt-2">
                     <Badge variant="outline" className="border-indigo-500/50 text-indigo-300 bg-indigo-500/10 px-2 py-0.5 text-xs font-semibold uppercase">
-                      {selectedPassMember?.membershipType}
+                      {plans.find((p: any) => p.id === (selectedPassMember as any)?.planId)?.name || selectedPassMember?.membershipType || 'Standard'}
                     </Badge>
                     <Badge className={`px-2 py-0.5 text-xs font-semibold uppercase border-none ${selectedPassMember?.status === 'active' ? 'bg-emerald-500 text-white' : 'bg-red-500 text-white'}`}>
                       {selectedPassMember?.status}

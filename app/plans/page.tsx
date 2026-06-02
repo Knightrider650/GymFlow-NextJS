@@ -43,6 +43,8 @@ export default function PlansPage() {
   const settings = useGymStore(state => state.settings)
   const fetchSettings = useGymStore(state => state.fetchSettings)
   const plansLoading = useGymStore(state => state.plansLoading)
+  const storeError = useGymStore(state => state.error)
+  const setError = useGymStore(state => state.setError)
 
   const [isDialogOpen, setIsDialogOpen] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
@@ -116,6 +118,14 @@ export default function PlansPage() {
   return (
     <ProtectedLayout>
       <div className="p-6 lg:p-8 space-y-8">
+        {storeError && (
+          <div className="bg-red-500/10 border border-red-500/20 text-red-400 p-4 rounded-md flex items-center justify-between">
+            <span>{storeError}</span>
+            <Button variant="ghost" size="sm" onClick={() => setError(null)} className="text-red-400 hover:text-red-300">
+              Dismiss
+            </Button>
+          </div>
+        )}
         <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
           <div>
             <h1 className="text-3xl font-bold tracking-tight bg-gradient-to-r from-primary to-indigo-600 bg-clip-text text-transparent">Membership Plans</h1>

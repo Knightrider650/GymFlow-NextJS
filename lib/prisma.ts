@@ -64,7 +64,12 @@ function matchesFilter(item: any, where: any): boolean {
   if (!where) return true;
   for (const [key, value] of Object.entries(where)) {
     // Check key in item, falling back to snake_case equivalent
-    const itemVal = item[key] !== undefined ? item[key] : item[toSnakeCase(key)];
+    let itemVal = item[key] !== undefined ? item[key] : item[toSnakeCase(key)];
+    
+    // Fallback for gymId / gym_id to tenantId / tenant_id
+    if (itemVal === undefined && (key === 'gymId' || key === 'gym_id')) {
+      itemVal = item['tenantId'] !== undefined ? item['tenantId'] : item['tenant_id'];
+    }
     
     if (value && typeof value === 'object') {
       const valAny = value as any;
@@ -92,6 +97,7 @@ const MODEL_MAPPING: Record<string, string> = {
   plan: 'plans',
   member: 'members',
   user: 'users',
+  attendance: 'attendance',
   fitnessClass: 'classes',
   inventoryItem: 'inventory',
   staff: 'staff',

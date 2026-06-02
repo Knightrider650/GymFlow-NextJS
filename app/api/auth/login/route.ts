@@ -4,7 +4,7 @@ import jwt from 'jsonwebtoken'
 import prisma from '@/lib/prisma'
 import { ADMIN_ROLES } from '@/lib/permissions'
 
-const JWT_SECRET = process.env.JWT_SECRET || process.env.NEXT_PUBLIC_JWT_SECRET || 'fallback_secret'
+const JWT_SECRET = process.env.JWT_SECRET || 'fallback_secret'
 
 function isDatabaseUnavailable(error: any): boolean {
   const message = String(error?.message || '')

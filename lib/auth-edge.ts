@@ -2,7 +2,7 @@ import { jwtVerify } from 'jose'
 import { NextRequest } from 'next/server'
 
 const JWT_SECRET = new TextEncoder().encode(
-  process.env.JWT_SECRET || process.env.NEXT_PUBLIC_JWT_SECRET || 'fallback_secret'
+  process.env.JWT_SECRET || 'fallback_secret'
 )
 
 export interface AuthUser {

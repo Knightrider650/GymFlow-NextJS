@@ -70,16 +70,16 @@ export default function SettingsPage() {
         return <AccountSettings />
       default:
         return (
-          <div className="flex flex-col items-center justify-center py-20 border-2 border-dashed rounded-2xl bg-slate-50/50">
+          <div className="flex flex-col items-center justify-center py-20 border-2 border-dashed rounded-2xl bg-muted/20 border-muted">
             <Zap className="h-12 w-12 text-primary/20 mb-4" />
-            <h3 className="text-xl font-bold text-slate-400 capitalize">{String(activeSection).replace('-', ' ')} Settings</h3>
-            <p className="text-sm text-slate-400 mt-2">Integrating logic for this configuration module...</p>
+            <h3 className="text-xl font-bold text-muted-foreground capitalize">{String(activeSection).replace('-', ' ')} Settings</h3>
+            <p className="text-sm text-muted-foreground mt-2">Integrating logic for this configuration module...</p>
           </div>
         )
     }
   }
 
-  if (isInitialLoading) {
+  if (isInitialLoading || !settings) {
     return (
       <ProtectedLayout>
         <div className="flex items-center justify-center min-h-[600px]">
@@ -91,7 +91,7 @@ export default function SettingsPage() {
 
   return (
     <ProtectedLayout>
-      <div className="p-6 lg:p-8 space-y-8 bg-slate-50/30 min-h-screen">
+      <div className="p-6 lg:p-8 space-y-8 min-h-screen">
         {/* Header */}
         <div className="flex flex-col gap-2">
           <h1 className="text-3xl font-bold tracking-tight bg-gradient-to-r from-primary to-blue-600 bg-clip-text text-transparent">

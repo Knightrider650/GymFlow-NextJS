@@ -3,7 +3,7 @@ export interface User {
   id: string
   email: string
   fullname: string
-  role: 'cto' | 'ceo' | 'admin' | 'manager' | 'trainer' | 'staff'
+  role: 'owner' | 'cto' | 'ceo' | 'admin' | 'manager' | 'trainer' | 'staff'
   scope?: 'platform' | 'tenant'
   gymId?: string
   tenantId?: string
@@ -336,9 +336,13 @@ export interface AppSettings {
     enablePosModule: boolean
   }
 
-  // 14. System & UI
+  // 14. System & UI Settings Block
   system: {
-    // Legacy/alias support: some components use `timezone` lowercase
+    /**
+     * Nested Timezone preferences.
+     * Supported in both camelCase (timeZone) and lowercase alias (timezone) to prevent page crashes 
+     * on components referencing lowercase formats during API responses.
+     */
     timeZone?: string
     timezone?: string
     weekStartDay: 'Monday' | 'Sunday'
@@ -352,9 +356,13 @@ export interface AppSettings {
     fontSize?: 'small' | 'medium' | 'large'
   }
 
-  // Legacy fields (kept for compatibility during migration)
+  // Legacy fields (kept for compatibility during database migration and older route references)
   currency: string
   dateFormat: string
+  /**
+   * Top-level timezone property. Used widely across pages (e.g. attendance calendar computations,
+   * dashboards, and scheduler) as the authoritative gym local timezone reference.
+   */
   timeZone: string
   invoicePrefix: string
   nextInvoiceNumber: number

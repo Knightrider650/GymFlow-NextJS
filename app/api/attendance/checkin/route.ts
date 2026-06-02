@@ -19,6 +19,9 @@ export async function POST(req: NextRequest) {
       where: { 
         id: memberId,
         ...(gymId ? { gymId } : {})
+      },
+      include: {
+        gym: true
       }
     })
  
@@ -26,7 +29,8 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ success: false, error: 'Member not found' }, { status: 404 })
     }
  
-    const today = new Date().toISOString().split('T')[0]
+    const timeZone = member.gym?.timeZone || 'UTC'
+    const today = new Intl.DateTimeFormat('en-CA', { timeZone, year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date())
  
     // Check if already checked in today without checking out
     const activeCheckin = await prisma.attendance.findFirst({

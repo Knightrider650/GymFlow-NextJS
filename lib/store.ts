@@ -22,7 +22,7 @@ interface GymState {
   membersLoading: boolean
   fetchMembers: (filters?: import('../types').MemberFilters, force?: boolean) => Promise<void>
   createMember: (member: Omit<Member, 'id' | 'createdAt' | 'updatedAt'>) => Promise<void>
-  bulkCreateMembers: (members: any[]) => Promise<void>
+  bulkCreateMembers: (members: any[]) => Promise<any>
   updateMember: (id: string, member: Partial<Member>) => Promise<void>
   deleteMember: (id: string) => Promise<void>
   sendMessageToMembers: (payload: { memberIds: string[], channel: string, subject?: string, message: string }) => Promise<{ success: boolean; message?: string; error?: string }>
@@ -89,6 +89,8 @@ interface GymState {
   classesLoaded: boolean
   inventoryLoaded: boolean
   staffLoaded: boolean
+  leadsLoaded: boolean
+  plansLoaded: boolean
 
   // Global UI State
   error: string | null
@@ -167,7 +169,9 @@ export const useAuthStore = create<AuthState>()(
           } catch (error) {
             console.error('Logout error:', error)
           } finally {
-            localStorage.clear()
+            localStorage.removeItem('accessToken')
+            localStorage.removeItem('refreshToken')
+            localStorage.removeItem('auth-storage')
             document.cookie = 'token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT'
             set({ user: null, isAuthenticated: false })
           }
@@ -196,12 +200,16 @@ export const useAuthStore = create<AuthState>()(
               if (response.success && response.data) {
                 set({ user: response.data, isAuthenticated: true })
               } else {
-                localStorage.clear()
+                localStorage.removeItem('accessToken')
+                localStorage.removeItem('refreshToken')
+                localStorage.removeItem('auth-storage')
                 document.cookie = 'token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT'
                 set({ user: null, isAuthenticated: false })
               }
             } catch (error) {
-              localStorage.clear()
+              localStorage.removeItem('accessToken')
+              localStorage.removeItem('refreshToken')
+              localStorage.removeItem('auth-storage')
               document.cookie = 'token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT'
               set({ user: null, isAuthenticated: false })
             } finally {
@@ -264,6 +272,8 @@ export const useGymStore = create<GymState>()((set, get) => ({
   classesLoaded: false,
   inventoryLoaded: false,
   staffLoaded: false,
+  leadsLoaded: false,
+  plansLoaded: false,
   stats: null,
   statsLoading: false,
 
@@ -291,9 +301,13 @@ export const useGymStore = create<GymState>()((set, get) => ({
       const response = await apiClient.post('/api/members', member)
       if (response.success) {
         await get().fetchMembers(undefined, true)
+      } else {
+        throw new Error(response.error || 'Failed to create member')
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error creating member:', error)
+      set({ error: error.message || 'Failed to create member' })
+      throw error
     }
   },
 
@@ -302,9 +316,14 @@ export const useGymStore = create<GymState>()((set, get) => ({
       const response = await apiClient.post('/api/members/bulk', { members })
       if (response.success) {
         await get().fetchMembers(undefined, true)
+      } else {
+        throw new Error(response.error || 'Failed to bulk create members')
       }
-    } catch (error) {
+      return response
+    } catch (error: any) {
       console.error('Error bulk creating members:', error)
+      set({ error: error.message || 'Failed to bulk create members' })
+      throw error
     }
   },
 
@@ -313,9 +332,13 @@ export const useGymStore = create<GymState>()((set, get) => ({
       const response = await apiClient.put(`/api/members/${id}`, member)
       if (response.success) {
         await get().fetchMembers(undefined, true)
+      } else {
+        throw new Error(response.error || 'Failed to update member')
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error updating member:', error)
+      set({ error: error.message || 'Failed to update member' })
+      throw error
     }
   },
 
@@ -324,10 +347,13 @@ export const useGymStore = create<GymState>()((set, get) => ({
       const response = await apiClient.delete(`/api/members/${id}`)
       if (response.success) {
         await get().fetchMembers(undefined, true)
+      } else {
+        throw new Error(response.error || 'Failed to delete member')
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error deleting member:', error)
-      set({ error: 'Failed to delete member' })
+      set({ error: error.message || 'Failed to delete member' })
+      throw error
     }
   },
 
@@ -369,9 +395,13 @@ export const useGymStore = create<GymState>()((set, get) => ({
       if (response.success) {
         await get().fetchAttendance(undefined, true)
         await get().fetchStats(true)
+      } else {
+        throw new Error(response.error || 'Failed to check in member')
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error checking in member:', error)
+      set({ error: error.message || 'Failed to check in member' })
+      throw error
     }
   },
 
@@ -381,9 +411,13 @@ export const useGymStore = create<GymState>()((set, get) => ({
       if (response.success) {
         await get().fetchAttendance(undefined, true)
         await get().fetchStats(true)
+      } else {
+        throw new Error(response.error || 'Failed to check out member')
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error checking out member:', error)
+      set({ error: error.message || 'Failed to check out member' })
+      throw error
     }
   },
 
@@ -410,9 +444,13 @@ export const useGymStore = create<GymState>()((set, get) => ({
       const response = await apiClient.post('/api/billing', invoice)
       if (response.success) {
         await get().fetchInvoices(undefined, true)
+      } else {
+        throw new Error(response.error || 'Failed to create invoice')
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error creating invoice:', error)
+      set({ error: error.message || 'Failed to create invoice' })
+      throw error
     }
   },
 
@@ -421,9 +459,13 @@ export const useGymStore = create<GymState>()((set, get) => ({
       const response = await apiClient.put(`/api/billing/${id}`, invoice)
       if (response.success) {
         await get().fetchInvoices(undefined, true)
+      } else {
+        throw new Error(response.error || 'Failed to update invoice')
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error updating invoice:', error)
+      set({ error: error.message || 'Failed to update invoice' })
+      throw error
     }
   },
 
@@ -433,9 +475,13 @@ export const useGymStore = create<GymState>()((set, get) => ({
       if (response.success) {
         await get().fetchInvoices(undefined, true)
         await get().fetchStats(true)
+      } else {
+        throw new Error(response.error || 'Failed to record payment')
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error recording payment:', error)
+      set({ error: error.message || 'Failed to record payment' })
+      throw error
     }
   },
 
@@ -462,9 +508,13 @@ export const useGymStore = create<GymState>()((set, get) => ({
       const response = await apiClient.post('/api/classes', classData)
       if (response.success) {
         await get().fetchClasses(true)
+      } else {
+        throw new Error(response.error || 'Failed to create class')
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error creating class:', error)
+      set({ error: error.message || 'Failed to create class' })
+      throw error
     }
   },
 
@@ -473,9 +523,13 @@ export const useGymStore = create<GymState>()((set, get) => ({
       const response = await apiClient.put(`/api/classes/${id}`, classData)
       if (response.success) {
         await get().fetchClasses(true)
+      } else {
+        throw new Error(response.error || 'Failed to update class')
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error updating class:', error)
+      set({ error: error.message || 'Failed to update class' })
+      throw error
     }
   },
 
@@ -484,9 +538,13 @@ export const useGymStore = create<GymState>()((set, get) => ({
       const response = await apiClient.delete(`/api/classes/${id}`)
       if (response.success) {
         await get().fetchClasses(true)
+      } else {
+        throw new Error(response.error || 'Failed to delete class')
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error deleting class:', error)
+      set({ error: error.message || 'Failed to delete class' })
+      throw error
     }
   },
 
@@ -513,9 +571,13 @@ export const useGymStore = create<GymState>()((set, get) => ({
       const response = await apiClient.post('/api/inventory', item)
       if (response.success) {
         await get().fetchInventory(undefined, true)
+      } else {
+        throw new Error(response.error || 'Failed to add inventory item')
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error adding inventory item:', error)
+      set({ error: error.message || 'Failed to add inventory item' })
+      throw error
     }
   },
 
@@ -524,9 +586,13 @@ export const useGymStore = create<GymState>()((set, get) => ({
       const response = await apiClient.put(`/api/inventory/${id}`, item)
       if (response.success) {
         await get().fetchInventory(undefined, true)
+      } else {
+        throw new Error(response.error || 'Failed to update inventory item')
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error updating inventory item:', error)
+      set({ error: error.message || 'Failed to update inventory item' })
+      throw error
     }
   },
 
@@ -535,9 +601,13 @@ export const useGymStore = create<GymState>()((set, get) => ({
       const response = await apiClient.delete(`/api/inventory/${id}`)
       if (response.success) {
         await get().fetchInventory(undefined, true)
+      } else {
+        throw new Error(response.error || 'Failed to delete inventory item')
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error deleting inventory item:', error)
+      set({ error: error.message || 'Failed to delete inventory item' })
+      throw error
     }
   },
 
@@ -563,9 +633,13 @@ export const useGymStore = create<GymState>()((set, get) => ({
       const response = await apiClient.post('/api/staff', staffData)
       if (response.success) {
         await get().fetchStaff()
+      } else {
+        throw new Error(response.error || 'Failed to add staff member')
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error adding staff member:', error)
+      set({ error: error.message || 'Failed to add staff member' })
+      throw error
     }
   },
 
@@ -574,9 +648,13 @@ export const useGymStore = create<GymState>()((set, get) => ({
       const response = await apiClient.put(`/api/staff/${id}`, staffData)
       if (response.success) {
         await get().fetchStaff()
+      } else {
+        throw new Error(response.error || 'Failed to update staff member')
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error updating staff member:', error)
+      set({ error: error.message || 'Failed to update staff member' })
+      throw error
     }
   },
 
@@ -585,9 +663,13 @@ export const useGymStore = create<GymState>()((set, get) => ({
       const response = await apiClient.delete(`/api/staff/${id}`)
       if (response.success) {
         await get().fetchStaff()
+      } else {
+        throw new Error(response.error || 'Failed to delete staff member')
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error deleting staff member:', error)
+      set({ error: error.message || 'Failed to delete staff member' })
+      throw error
     }
   },
 
@@ -665,9 +747,13 @@ export const useGymStore = create<GymState>()((set, get) => ({
       const response = await apiClient.post('/api/branches', branchData)
       if (response.success) {
         await get().fetchBranches()
+      } else {
+        throw new Error(response.error || 'Failed to add branch')
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error adding branch:', error)
+      set({ error: error.message || 'Failed to add branch' })
+      throw error
     }
   },
 
@@ -676,9 +762,13 @@ export const useGymStore = create<GymState>()((set, get) => ({
       const response = await apiClient.put(`/api/branches/${id}`, branchData)
       if (response.success) {
         await get().fetchBranches()
+      } else {
+        throw new Error(response.error || 'Failed to update branch')
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error updating branch:', error)
+      set({ error: error.message || 'Failed to update branch' })
+      throw error
     }
   },
 
@@ -687,9 +777,13 @@ export const useGymStore = create<GymState>()((set, get) => ({
       const response = await apiClient.delete(`/api/branches/${id}`)
       if (response.success) {
         await get().fetchBranches()
+      } else {
+        throw new Error(response.error || 'Failed to delete branch')
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error deleting branch:', error)
+      set({ error: error.message || 'Failed to delete branch' })
+      throw error
     }
   },
 
@@ -712,55 +806,140 @@ export const useGymStore = create<GymState>()((set, get) => ({
   leads: [],
   leadsLoading: false,
   fetchLeads: async (force = false) => {
-    if (get().leads.length > 0 && !force) return
-    set({ leadsLoading: true })
+    if (get().leadsLoaded && !force) return
+    set({ leadsLoading: true, error: null })
     try {
       const response = await apiClient.get('/api/leads')
-      if (response.success) set({ leads: response.data || [] })
-    } catch (error) { console.error(error) } finally { set({ leadsLoading: false }) }
+      if (response.success) {
+        set({ leads: response.data || [], leadsLoaded: true })
+      } else {
+        throw new Error(response.error || 'Failed to fetch leads')
+      }
+    } catch (error: any) {
+      console.error('Error fetching leads:', error)
+      set({ error: error.message || 'Failed to fetch leads' })
+    } finally {
+      set({ leadsLoading: false })
+    }
   },
   createLead: async (lead: any) => {
-    const res = await apiClient.post('/api/leads', lead)
-    if (res.success) await get().fetchLeads(true)
+    try {
+      const res = await apiClient.post('/api/leads', lead)
+      if (res.success) {
+        await get().fetchLeads(true)
+      } else {
+        throw new Error(res.error || 'Failed to create lead')
+      }
+    } catch (error: any) {
+      console.error('Error creating lead:', error)
+      set({ error: error.message || 'Failed to create lead' })
+      throw error
+    }
   },
   updateLead: async (id: string, lead: any) => {
-    const res = await apiClient.put(`/api/leads/${id}`, lead)
-    if (res.success) await get().fetchLeads(true)
+    try {
+      const res = await apiClient.put(`/api/leads/${id}`, lead)
+      if (res.success) {
+        await get().fetchLeads(true)
+      } else {
+        throw new Error(res.error || 'Failed to update lead')
+      }
+    } catch (error: any) {
+      console.error('Error updating lead:', error)
+      set({ error: error.message || 'Failed to update lead' })
+      throw error
+    }
   },
   deleteLead: async (id: string) => {
-    const res = await apiClient.delete(`/api/leads/${id}`)
-    if (res.success) await get().fetchLeads(true)
+    try {
+      const res = await apiClient.delete(`/api/leads/${id}`)
+      if (res.success) {
+        await get().fetchLeads(true)
+      } else {
+        throw new Error(res.error || 'Failed to delete lead')
+      }
+    } catch (error: any) {
+      console.error('Error deleting lead:', error)
+      set({ error: error.message || 'Failed to delete lead' })
+      throw error
+    }
   },
   convertLead: async (id: string, memberData: any) => {
-    const res = await apiClient.post(`/api/leads/${id}/convert`, memberData)
-    if (res.success) {
-      await get().fetchLeads(true)
-      await get().fetchMembers(undefined, true)
+    try {
+      const res = await apiClient.post(`/api/leads/${id}/convert`, memberData)
+      if (res.success) {
+        await get().fetchLeads(true)
+        await get().fetchMembers(undefined, true)
+      } else {
+        throw new Error(res.error || 'Failed to convert lead')
+      }
+    } catch (error: any) {
+      console.error('Error converting lead:', error)
+      set({ error: error.message || 'Failed to convert lead' })
+      throw error
     }
   },
 
-  // Membership Plans
   plans: [],
   plansLoading: false,
   fetchPlans: async (force = false) => {
-    if (get().plans.length > 0 && !force) return
-    set({ plansLoading: true })
+    if (get().plansLoaded && !force) return
+    set({ plansLoading: true, error: null })
     try {
       const response = await apiClient.get('/api/plans')
-      if (response.success) set({ plans: response.data || [] })
-    } catch (error) { console.error(error) } finally { set({ plansLoading: false }) }
+      if (response.success) {
+        set({ plans: response.data || [], plansLoaded: true })
+      } else {
+        throw new Error(response.error || 'Failed to fetch plans')
+      }
+    } catch (error: any) {
+      console.error('Error fetching plans:', error)
+      set({ error: error.message || 'Failed to fetch plans' })
+    } finally {
+      set({ plansLoading: false })
+    }
   },
   createPlan: async (plan: any) => {
-    const res = await apiClient.post('/api/plans', plan)
-    if (res.success) await get().fetchPlans(true)
+    try {
+      const res = await apiClient.post('/api/plans', plan)
+      if (res.success) {
+        await get().fetchPlans(true)
+      } else {
+        throw new Error(res.error || 'Failed to create plan')
+      }
+    } catch (error: any) {
+      console.error('Error creating plan:', error)
+      set({ error: error.message || 'Failed to create plan' })
+      throw error
+    }
   },
   updatePlan: async (id: string, plan: any) => {
-    const res = await apiClient.put(`/api/plans/${id}`, plan)
-    if (res.success) await get().fetchPlans(true)
+    try {
+      const res = await apiClient.put(`/api/plans/${id}`, plan)
+      if (res.success) {
+        await get().fetchPlans(true)
+      } else {
+        throw new Error(res.error || 'Failed to update plan')
+      }
+    } catch (error: any) {
+      console.error('Error updating plan:', error)
+      set({ error: error.message || 'Failed to update plan' })
+      throw error
+    }
   },
   deletePlan: async (id: string) => {
-    const res = await apiClient.delete(`/api/plans/${id}`)
-    if (res.success) await get().fetchPlans(true)
+    try {
+      const res = await apiClient.delete(`/api/plans/${id}`)
+      if (res.success) {
+        await get().fetchPlans(true)
+      } else {
+        throw new Error(res.error || 'Failed to delete plan')
+      }
+    } catch (error: any) {
+      console.error('Error deleting plan:', error)
+      set({ error: error.message || 'Failed to delete plan' })
+      throw error
+    }
   },
 
   // Activity Logs
@@ -803,7 +982,7 @@ export const useGymStore = create<GymState>()((set, get) => ({
   // Real-time SSE
   initStream: () => {
     if (typeof window === 'undefined') return () => {};
-    const url = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
+    const url = process.env.NEXT_PUBLIC_API_URL || (typeof window !== 'undefined' ? window.location.origin : '');
     const evtSource = new EventSource(`${url}/api/sync/stream`);
     
     evtSource.onmessage = (event) => {
