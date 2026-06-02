@@ -92,6 +92,24 @@ function matchesFilter(item: any, where: any): boolean {
   return true;
 }
 
+function normalizeGymId(item: any): any {
+  if (!item || typeof item !== 'object') return item;
+  if (Array.isArray(item)) {
+    return item.map(normalizeGymId);
+  }
+  const gymId = item.gymId || item.gym_id || item.tenantId || item.tenant_id;
+  if (gymId !== undefined) {
+    return {
+      ...item,
+      gymId,
+      gym_id: gymId,
+      tenantId: gymId,
+      tenant_id: gymId
+    };
+  }
+  return item;
+}
+
 const MODEL_MAPPING: Record<string, string> = {
   gym: 'tenants',
   plan: 'plans',
@@ -213,11 +231,11 @@ const prisma = new Proxy(prismaInstance, {
                 if (typeof take === 'number') {
                   filtered = filtered.slice(0, take);
                 }
-                return filtered;
+                return normalizeGymId(filtered);
               }
 
               if (methodName === 'findFirst' || methodName === 'findUnique') {
-                return items.find((item: any) => matchesFilter(item, where)) || null;
+                return normalizeGymId(items.find((item: any) => matchesFilter(item, where)) || null);
               }
 
               if (methodName === 'count') {
@@ -226,12 +244,12 @@ const prisma = new Proxy(prismaInstance, {
 
               if (methodName === 'create') {
                 const data = args[0]?.data || {};
-                const newItem = {
+                const newItem = normalizeGymId({
                   id: data.id || Math.random().toString(),
                   ...data,
                   createdAt: new Date(),
                   updatedAt: new Date()
-                };
+                });
                 if (!jsonData[jsonKey]) jsonData[jsonKey] = [];
                 jsonData[jsonKey].push(newItem);
                 saveJsonData(jsonData);
@@ -245,7 +263,7 @@ const prisma = new Proxy(prismaInstance, {
                 const newItems = items.map((item: any) => {
                   if (matchesFilter(item, where)) {
                     matchFound = true;
-                    const updated = { ...item, ...data, updatedAt: new Date() };
+                    const updated = normalizeGymId({ ...item, ...data, updatedAt: new Date() });
                     updatedItems.push(updated);
                     return updated;
                   }
@@ -259,7 +277,7 @@ const prisma = new Proxy(prismaInstance, {
                 }
 
                 return methodName === 'update'
-                  ? { ...data, id: where?.id || 'unknown', updatedAt: new Date() }
+                  ? normalizeGymId({ ...data, id: where?.id || 'unknown', updatedAt: new Date() })
                   : { count: 0 };
               }
 
@@ -276,10 +294,10 @@ const prisma = new Proxy(prismaInstance, {
                 if (deletedItems.length > 0) {
                   jsonData[jsonKey] = remainingItems;
                   saveJsonData(jsonData);
-                  return methodName === 'delete' ? deletedItems[0] : { count: deletedItems.length };
+                  return methodName === 'delete' ? normalizeGymId(deletedItems[0]) : { count: deletedItems.length };
                 }
 
-                return methodName === 'delete' ? { id: 'deleted' } : { count: 0 };
+                return methodName === 'delete' ? normalizeGymId({ id: 'deleted' }) : { count: 0 };
               }
 
               if (methodName === 'aggregate') {
