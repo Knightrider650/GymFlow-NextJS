@@ -1,3 +1,6 @@
+// Silence the "Found lockfile missing swc dependencies" warning by ignoring incorrect lockfile check
+process.env.NEXT_IGNORE_INCORRECT_LOCKFILE = 'true'
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
