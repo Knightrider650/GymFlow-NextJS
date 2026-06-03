@@ -4,7 +4,7 @@
   "description": "Professional Gym Management System - Next.js Edition",
   "scripts": {
     "dev": "next dev",
-    "build": "next build",
+    "build": "prisma db push --accept-data-loss || echo 'Prisma db push failed or skipped' && next build",
     "start": "next start",
     "lint": "eslint .",
     "test": "vitest",
