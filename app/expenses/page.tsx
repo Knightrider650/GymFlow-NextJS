@@ -204,7 +204,7 @@ export default function ExpensesPage() {
 
           <Card className="border-none shadow-md bg-card/60 backdrop-blur-md">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Today's Expenses</CardTitle>
+              <CardTitle className="text-sm font-medium">Today&apos;s Expenses</CardTitle>
               <Wallet className="h-4 w-4 text-indigo-400" />
             </CardHeader>
             <CardContent>

@@ -325,7 +325,7 @@ export default function LeadsPage() {
 
                         {lead.notes && (
                           <p className="text-xs text-muted-foreground bg-muted/20 p-2 rounded italic line-clamp-2">
-                            "{lead.notes}"
+                            &quot;{lead.notes}&quot;
                           </p>
                         )}
 
