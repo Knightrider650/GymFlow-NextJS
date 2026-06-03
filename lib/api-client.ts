@@ -105,7 +105,10 @@ class ApiClient {
       (response) => response,
       async (error: AxiosError) => {
         const originalRequest = error.config as any
-        if (error.response?.status === 401 && !originalRequest._retry) {
+        const url = originalRequest?.url || ''
+        const isAuthRoute = url.includes('/api/auth/login') || url.includes('/api/auth/register') || url.includes('/api/auth/refresh')
+
+        if (error.response?.status === 401 && !originalRequest._retry && !isAuthRoute) {
           if (isRefreshing) {
             return new Promise((resolve, reject) => {
               failedQueue.push({ resolve, reject })

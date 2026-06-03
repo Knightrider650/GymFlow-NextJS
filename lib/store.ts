@@ -198,7 +198,15 @@ export const useAuthStore = create<AuthState>()(
             try {
               const hasAccessToken = typeof window !== 'undefined' && !!localStorage.getItem('accessToken')
               const hasRefreshToken = typeof window !== 'undefined' && !!localStorage.getItem('refreshToken')
-              const hasCookieToken = typeof document !== 'undefined' && document.cookie.includes('token=')
+              
+              const getCookie = (name: string) => {
+                if (typeof document === 'undefined') return null
+                const value = `; ${document.cookie}`
+                const parts = value.split(`; ${name}=`)
+                if (parts.length === 2) return parts.pop()?.split(';').shift() || null
+                return null
+              }
+              const hasCookieToken = typeof document !== 'undefined' && !!getCookie('token')
 
               if (!hasAccessToken && !hasRefreshToken && !hasCookieToken) {
                 set({ user: null, isAuthenticated: false })
