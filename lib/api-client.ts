@@ -159,7 +159,9 @@ class ApiClient {
               localStorage.removeItem('refreshToken')
               localStorage.removeItem('auth-storage')
               document.cookie = 'token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT'
-              window.location.href = '/login'
+              if (window.location.pathname !== '/login' && window.location.pathname !== '/register') {
+                window.location.href = '/login'
+              }
             }
           } catch (refreshError) {
             processQueue(refreshError, null)
@@ -170,7 +172,9 @@ class ApiClient {
               localStorage.removeItem('refreshToken')
               localStorage.removeItem('auth-storage')
               document.cookie = 'token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT'
-              window.location.href = '/login'
+              if (window.location.pathname !== '/login' && window.location.pathname !== '/register') {
+                window.location.href = '/login'
+              }
             }
           }
         }
