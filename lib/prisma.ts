@@ -265,7 +265,8 @@ const MODEL_MAPPING: Record<string, string> = {
   invite: 'invites',
   branch: 'branches',
   campaign: 'campaigns',
-  reminder: 'reminders'
+  reminder: 'reminders',
+  expense: 'expenses'
 }
 
 // Helper to save fallback JSON database (with Vercel/serverless fallback to /tmp)

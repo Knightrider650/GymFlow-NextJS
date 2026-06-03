@@ -159,6 +159,20 @@ export default function DashboardPage() {
                 trendLabel="vs last month"
                 gradient="bg-purple-600 text-white"
               />
+              <StatCard
+                title="Monthly Expenses"
+                value={formatCurrency(stats?.monthlyExpenses || 0, settings?.currency)}
+                icon={TrendingUp}
+                description="Total operational cost"
+                gradient="bg-rose-600 text-white"
+              />
+              <StatCard
+                title="Monthly Net Profit"
+                value={formatCurrency(stats?.netProfit || 0, settings?.currency)}
+                icon={DollarSign}
+                description="Total profit this month"
+                gradient="bg-teal-600 text-white"
+              />
             </>
           )}
           <StatCard
@@ -192,8 +206,8 @@ export default function DashboardPage() {
           {!isTrainer(user?.role) && (
             <Card className="shadow-md">
               <CardHeader>
-                <CardTitle>Revenue Trend</CardTitle>
-                <CardDescription>Daily revenue this week</CardDescription>
+                <CardTitle>Cash Flow Trend</CardTitle>
+                <CardDescription>Daily revenue vs expenses this week</CardDescription>
               </CardHeader>
               <CardContent>
                 <ResponsiveContainer width="100%" height={300}>
@@ -205,9 +219,19 @@ export default function DashboardPage() {
                     <Line
                       type="monotone"
                       dataKey="revenue"
+                      name="Revenue"
                       stroke="#10b981"
                       strokeWidth={3}
                       dot={{ r: 4, fill: '#10b981', strokeWidth: 0 }}
+                      activeDot={{ r: 6, strokeWidth: 0 }}
+                    />
+                    <Line
+                      type="monotone"
+                      dataKey="expenses"
+                      name="Expenses"
+                      stroke="#ef4444"
+                      strokeWidth={3}
+                      dot={{ r: 4, fill: '#ef4444', strokeWidth: 0 }}
                       activeDot={{ r: 6, strokeWidth: 0 }}
                     />
                   </LineChart>

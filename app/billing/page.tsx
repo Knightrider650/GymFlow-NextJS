@@ -47,7 +47,7 @@ export default function BillingPage() {
 
   const [paymentForm, setPaymentForm] = useState({
     amount: '',
-    method: 'cash' as const,
+    method: 'cash' as string,
   })
 
   useEffect(() => {
@@ -509,7 +509,7 @@ export default function BillingPage() {
                 onChange={(e) =>
                   setPaymentForm({
                     ...paymentForm,
-                    method: e.target.value as any,
+                    method: e.target.value,
                   })
                 }
                 className="w-full h-10 px-3 rounded-md border border-input bg-background text-sm focus:ring-2 focus:ring-primary outline-none transition-all"
@@ -517,11 +517,31 @@ export default function BillingPage() {
                 <option value="cash">Cash Payment</option>
                 <option value="card">Card Transaction</option>
                 <option value="transfer">Bank Transfer</option>
+                <option value="upi">UPI QR Code</option>
                 <option value="cheque">Cheque Deposit</option>
               </select>
             </div>
+            {paymentForm.method === 'upi' && selectedInvoiceId && (
+              <div className="space-y-3 p-4 rounded-xl border border-dashed border-white/10 bg-slate-900/40 text-center animate-in fade-in slide-in-from-top-2 duration-300">
+                <Label className="text-xs text-muted-foreground block mb-1">Scan QR Code using GPay, PhonePe, Paytm</Label>
+                <div className="bg-white p-2 rounded-lg inline-block mx-auto border shadow-md">
+                  <img
+                    src={`https://api.qrserver.com/v1/create-qr-code/?size=160x160&data=${encodeURIComponent(
+                      `upi://pay?pa=gymflow@upi&pn=${encodeURIComponent(settings?.gymName || 'GymFlow')}&am=${paymentForm.amount}&cu=INR&tn=${encodeURIComponent(invoices.find(i => i.id === selectedInvoiceId)?.invoiceNumber || '')}`
+                    )}`}
+                    alt="UPI QR Code"
+                    className="h-40 w-40"
+                  />
+                </div>
+                <div className="text-[10px] text-muted-foreground font-mono">
+                  UPI ID: gymflow@upi
+                </div>
+              </div>
+            )}
             <DialogFooter className="pt-4">
-              <Button type="submit" className="w-full font-bold">Complete Transaction</Button>
+              <Button type="submit" className="w-full font-bold">
+                {paymentForm.method === 'upi' ? 'I Have Paid - Confirm Payment' : 'Complete Transaction'}
+              </Button>
             </DialogFooter>
           </form>
         </DialogContent>

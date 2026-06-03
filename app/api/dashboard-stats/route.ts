@@ -64,11 +64,14 @@ export async function GET(req: NextRequest) {
 
     const activeMembersTrend = active30DaysAgo > 0 ? Math.round(((activeMembers - active30DaysAgo) / active30DaysAgo) * 100) : 0
 
-    // 2. Revenue calculations (Hide or filter for trainers)
+    // 2. Revenue & Expense calculations (Hide or filter for trainers)
     let todayRevenue = 0
     let monthlyRevenue = 0
     let todayRevenueTrend = 0
     let monthlyRevenueTrend = 0
+    let todayExpenses = 0
+    let monthlyExpenses = 0
+    let netProfit = 0
 
     if (!isTrainer) {
       const yesterdayStart = startOfDay(subDays(now, 1))
@@ -76,7 +79,14 @@ export async function GET(req: NextRequest) {
       const prevMonthStart = startOfMonth(subMonths(now, 1))
       const prevMonthSameTime = subMonths(now, 1)
 
-      const [todayRevenueData, monthlyRevenueData, yesterdayRevenueData, lastMonthRevenueData] = await Promise.all([
+      const [
+        todayRevenueData,
+        monthlyRevenueData,
+        yesterdayRevenueData,
+        lastMonthRevenueData,
+        todayExpensesData,
+        monthlyExpensesData
+      ] = await Promise.all([
         prisma.payment.aggregate({
           where: {
             paymentDate: { gte: todayStart, lte: todayEnd },
@@ -104,12 +114,29 @@ export async function GET(req: NextRequest) {
             invoice: gymId ? { gymId } : {}
           },
           _sum: { amount: true }
+        }),
+        prisma.expense.aggregate({
+          where: {
+            date: { gte: todayStart, lte: todayEnd },
+            ...(gymId ? { gymId } : {})
+          },
+          _sum: { amount: true }
+        }),
+        prisma.expense.aggregate({
+          where: {
+            date: { gte: monthStart },
+            ...(gymId ? { gymId } : {})
+          },
+          _sum: { amount: true }
         })
       ])
       todayRevenue = todayRevenueData._sum.amount || 0
       monthlyRevenue = monthlyRevenueData._sum.amount || 0
       const yesterdayRevenue = yesterdayRevenueData._sum.amount || 0
       const lastMonthRevenue = lastMonthRevenueData._sum.amount || 0
+      todayExpenses = todayExpensesData._sum.amount || 0
+      monthlyExpenses = monthlyExpensesData._sum.amount || 0
+      netProfit = monthlyRevenue - monthlyExpenses
 
       todayRevenueTrend = yesterdayRevenue > 0 ? Math.round(((todayRevenue - yesterdayRevenue) / yesterdayRevenue) * 100) : 0
       monthlyRevenueTrend = lastMonthRevenue > 0 ? Math.round(((monthlyRevenue - lastMonthRevenue) / lastMonthRevenue) * 100) : 0
@@ -127,16 +154,26 @@ export async function GET(req: NextRequest) {
 
     const revenueTrend = isTrainer ? [] : await Promise.all(
       last7Days.map(async (day) => {
-        const sum = await prisma.payment.aggregate({
-          where: {
-            paymentDate: { gte: startOfDay(day.date), lte: endOfDay(day.date) },
-            invoice: gymId ? { gymId } : {}
-          },
-          _sum: { amount: true }
-        })
+        const [sumRevenue, sumExpense] = await Promise.all([
+          prisma.payment.aggregate({
+            where: {
+              paymentDate: { gte: startOfDay(day.date), lte: endOfDay(day.date) },
+              invoice: gymId ? { gymId } : {}
+            },
+            _sum: { amount: true }
+          }),
+          prisma.expense.aggregate({
+            where: {
+              date: { gte: startOfDay(day.date), lte: endOfDay(day.date) },
+              ...(gymId ? { gymId } : {})
+            },
+            _sum: { amount: true }
+          })
+        ])
         return {
           name: day.name,
-          revenue: sum._sum.amount || 0
+          revenue: sumRevenue._sum.amount || 0,
+          expenses: sumExpense._sum.amount || 0
         }
       })
     )
@@ -163,6 +200,9 @@ export async function GET(req: NextRequest) {
         totalMembers,
         todayRevenue,
         monthlyRevenue,
+        todayExpenses,
+        monthlyExpenses,
+        netProfit,
         todayVisits,
         pendingPayments,
         revenueTrend,

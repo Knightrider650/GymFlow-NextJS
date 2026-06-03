@@ -91,6 +91,7 @@ interface GymState {
   staffLoaded: boolean
   leadsLoaded: boolean
   plansLoaded: boolean
+  expensesLoaded: boolean
 
   // Global UI State
   error: string | null
@@ -120,6 +121,14 @@ interface GymState {
   createPlan: (plan: any) => Promise<void>
   updatePlan: (id: string, plan: any) => Promise<void>
   deletePlan: (id: string) => Promise<void>
+
+  // Expenses
+  expenses: any[]
+  expensesLoading: boolean
+  fetchExpenses: (force?: boolean) => Promise<void>
+  createExpense: (expense: any) => Promise<void>
+  updateExpense: (id: string, expense: any) => Promise<void>
+  deleteExpense: (id: string) => Promise<void>
   // Activity Logs
   activityLogs: any[]
   activityLogsLoading: boolean
@@ -274,12 +283,17 @@ export const useGymStore = create<GymState>()((set, get) => ({
   staffLoaded: false,
   leadsLoaded: false,
   plansLoaded: false,
+  expensesLoaded: false,
   stats: null,
   statsLoading: false,
 
   // Members
   members: [],
   membersLoading: false,
+
+  // Expenses
+  expenses: [],
+  expensesLoading: false,
   fetchMembers: async (filters?: import('../types').MemberFilters, force = false) => {
     if (get().membersLoaded && !force && !filters) return
     set({ membersLoading: true })
@@ -880,6 +894,70 @@ export const useGymStore = create<GymState>()((set, get) => ({
     }
   },
 
+  // Expenses
+  fetchExpenses: async (force = false) => {
+    if (get().expensesLoaded && !force) return
+    set({ expensesLoading: true, error: null })
+    try {
+      const response = await apiClient.get('/api/expenses')
+      if (response.success) {
+        set({ expenses: response.data || [], expensesLoaded: true })
+      } else {
+        throw new Error(response.error || 'Failed to fetch expenses')
+      }
+    } catch (error: any) {
+      console.error('Error fetching expenses:', error)
+      set({ error: error.message || 'Failed to fetch expenses' })
+    } finally {
+      set({ expensesLoading: false })
+    }
+  },
+  createExpense: async (expense: any) => {
+    try {
+      const res = await apiClient.post('/api/expenses', expense)
+      if (res.success) {
+        await get().fetchExpenses(true)
+        await get().fetchStats(true)
+      } else {
+        throw new Error(res.error || 'Failed to create expense')
+      }
+    } catch (error: any) {
+      console.error('Error creating expense:', error)
+      set({ error: error.message || 'Failed to create expense' })
+      throw error
+    }
+  },
+  updateExpense: async (id: string, expense: any) => {
+    try {
+      const res = await apiClient.put(`/api/expenses/${id}`, expense)
+      if (res.success) {
+        await get().fetchExpenses(true)
+        await get().fetchStats(true)
+      } else {
+        throw new Error(res.error || 'Failed to update expense')
+      }
+    } catch (error: any) {
+      console.error('Error updating expense:', error)
+      set({ error: error.message || 'Failed to update expense' })
+      throw error
+    }
+  },
+  deleteExpense: async (id: string) => {
+    try {
+      const res = await apiClient.delete(`/api/expenses/${id}`)
+      if (res.success) {
+        await get().fetchExpenses(true)
+        await get().fetchStats(true)
+      } else {
+        throw new Error(res.error || 'Failed to delete expense')
+      }
+    } catch (error: any) {
+      console.error('Error deleting expense:', error)
+      set({ error: error.message || 'Failed to delete expense' })
+      throw error
+    }
+  },
+
   plans: [],
   plansLoading: false,
   fetchPlans: async (force = false) => {
@@ -1015,6 +1093,9 @@ export const useGymStore = create<GymState>()((set, get) => ({
           get().fetchLeads(true);
         } else if (event.type.startsWith('plans:')) {
           get().fetchPlans(true);
+        } else if (event.type.startsWith('expenses:')) {
+          get().fetchExpenses(true);
+          get().fetchStats(true);
         } else if (event.type.startsWith('notifications:')) {
           get().fetchNotifications();
         }
@@ -1037,6 +1118,8 @@ export const useGymStore = create<GymState>()((set, get) => ({
       'leads:delete',
       'plans:update',
       'plans:delete',
+      'expenses:update',
+      'expenses:delete',
       'activity:new',
       'notifications:new',
       'notifications:update'

@@ -40,6 +40,7 @@ model Gym {
   branches         Branch[]
   campaigns        Campaign[]
   reminders        Reminder[]
+  expenses         Expense[]
 }
 
 model User {
@@ -297,3 +298,16 @@ model Reminder {
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
 }
+
+model Expense {
+  id          String   @id @default(cuid())
+  amount      Float
+  category    String   // Rent, Salaries, Utilities, Inventory, Marketing, Other
+  description String?
+  date        DateTime @default(now())
+  gymId       String
+  gym         Gym      @relation(fields: [gymId], references: [id])
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+

@@ -27,6 +27,7 @@ import {
   UserPlus,
   FileText,
   Globe,
+  Wallet,
 } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { NAV_VISIBILITY, type UserRole } from '@/lib/permissions'
@@ -55,6 +56,7 @@ const ALL_NAV_ITEMS: NavItem[] = [
   // ── Finance & Inventory ───────────────────────────────────────────────
   { href: '/plans',          label: 'Plans',           icon: Map,          section: 'finance' },
   { href: '/billing',        label: 'Billing',         icon: CreditCard,   section: 'finance' },
+  { href: '/expenses',       label: 'Expenses',        icon: Wallet,       section: 'finance' },
   { href: '/inventory',      label: 'Inventory',       icon: Package,      section: 'finance' },
   // ── Communications ───────────────────────────────────────────────────
   { href: '/communications', label: 'Communications',  icon: MessageSquare, section: 'comms' },

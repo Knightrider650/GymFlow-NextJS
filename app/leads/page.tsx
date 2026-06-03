@@ -16,22 +16,24 @@ import {
   DialogTitle,
   DialogTrigger,
 } from '@/components/ui/dialog'
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
-import { Plus, Search, Edit2, Trash2, ArrowRightCircle } from 'lucide-react'
+import { Plus, Search, Edit2, Trash2, ArrowRightCircle, Mail, Phone, Calendar, User, Move } from 'lucide-react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import * as z from 'zod'
 import { useGymStore } from '@/lib/store'
+import { format } from 'date-fns'
 
 const leadSchema = z.object({
   name: z.string().min(2, 'Name must be at least 2 characters'),
-  email: z.string().email('Invalid email address'),
+  email: z.string().email('Invalid email address').or(z.literal('')),
   phone: z.string().min(7, 'Phone must be at least 7 digits'),
   status: z.enum(['New', 'Contacted', 'Converted', 'Lost']),
   notes: z.string().optional(),
 })
 
 type LeadFormValues = z.infer<typeof leadSchema>
+
+type LeadStatus = 'New' | 'Contacted' | 'Converted' | 'Lost'
 
 export default function LeadsPage() {
   const fetchLeads = useGymStore(state => state.fetchLeads)
@@ -53,45 +55,7 @@ export default function LeadsPage() {
   const [convertingLeadId, setConvertingLeadId] = useState<string | null>(null)
   const [selectedPlan, setSelectedPlan] = useState('')
 
-  const matchesSearch = (text: string, query: string) => {
-    if (!text) return false
-    const normText = text.toLowerCase()
-    const normQuery = query.toLowerCase()
-    if (normText.includes(normQuery)) return true
-    
-    if (normQuery.length < 3) return false
-    
-    // Check if query is a subsequence of the text (allows gaps)
-    let qIdx = 0
-    for (let i = 0; i < normText.length; i++) {
-      if (normText[i] === normQuery[qIdx]) {
-        qIdx++
-        if (qIdx === normQuery.length) return true
-      }
-    }
-
-    // Check transposition / character presence (e.g., prahsant vs prash)
-    let matchedChars = 0
-    let tempText = normText
-    for (let i = 0; i < normQuery.length; i++) {
-      const idx = tempText.indexOf(normQuery[i])
-      if (idx !== -1) {
-        matchedChars++
-        tempText = tempText.substring(0, idx) + tempText.substring(idx + 1)
-      }
-    }
-    
-    if (matchedChars >= normQuery.length - 1) {
-      return normText[0] === normQuery[0]
-    }
-    
-    return false
-  }
-
-  const filteredLeads = leads.filter(lead =>
-    matchesSearch(lead.name, searchTerm) ||
-    matchesSearch(lead.email, searchTerm)
-  )
+  const [draggedLeadId, setDraggedLeadId] = useState<string | null>(null)
 
   const form = useForm<LeadFormValues>({
     resolver: zodResolver(leadSchema),
@@ -124,7 +88,7 @@ export default function LeadsPage() {
   const handleEdit = (lead: any) => {
     setEditingId(lead.id)
     setValue('name', lead.name)
-    setValue('email', lead.email)
+    setValue('email', lead.email || '')
     setValue('phone', lead.phone)
     setValue('status', lead.status || 'New')
     setValue('notes', lead.notes || '')
@@ -166,15 +130,60 @@ export default function LeadsPage() {
     }
   }
 
+  const handleStatusChange = async (leadId: string, newStatus: LeadStatus) => {
+    const lead = leads.find(l => l.id === leadId)
+    if (!lead) return
+    if ((lead.status || 'New') === newStatus) return
+
+    if (newStatus === 'Converted') {
+      openConvertDialog(leadId)
+      return
+    }
+
+    try {
+      await updateLead(leadId, {
+        name: lead.name,
+        email: lead.email || '',
+        phone: lead.phone,
+        notes: lead.notes || '',
+        status: newStatus
+      })
+    } catch (err) {
+      console.error('Failed to drag update lead status:', err)
+    }
+  }
+
+  const filteredLeads = leads.filter(lead =>
+    lead.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    (lead.email && lead.email.toLowerCase().includes(searchTerm.toLowerCase())) ||
+    lead.phone.includes(searchTerm)
+  )
+
+  // Group leads into columns
+  const columns: Record<LeadStatus, any[]> = {
+    New: filteredLeads.filter(l => (l.status || 'New') === 'New'),
+    Contacted: filteredLeads.filter(l => l.status === 'Contacted'),
+    Converted: filteredLeads.filter(l => l.status === 'Converted'),
+    Lost: filteredLeads.filter(l => l.status === 'Lost'),
+  }
+
+  const columnHeaders: Record<LeadStatus, { label: string, colorClass: string }> = {
+    New: { label: 'New Lead', colorClass: 'border-t-blue-500 bg-blue-500/5' },
+    Contacted: { label: 'Contacted', colorClass: 'border-t-yellow-500 bg-yellow-500/5' },
+    Converted: { label: 'Converted', colorClass: 'border-t-green-500 bg-green-500/5' },
+    Lost: { label: 'Lost', colorClass: 'border-t-red-500 bg-red-500/5' }
+  }
+
   const convertingLead = leads.find(l => l.id === convertingLeadId)
 
   return (
     <ProtectedLayout>
-      <div className="p-6 lg:p-8 space-y-8">
-        <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+      <div className="p-6 lg:p-8 space-y-8 h-full flex flex-col">
+        {/* Header */}
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between shrink-0">
           <div>
-            <h1 className="text-3xl font-bold tracking-tight bg-gradient-to-r from-primary to-indigo-600 bg-clip-text text-transparent">Lead Management</h1>
-            <p className="text-sm text-muted-foreground mt-1">Track and convert gym prospects</p>
+            <h1 className="text-3xl font-bold tracking-tight bg-gradient-to-r from-primary to-indigo-600 bg-clip-text text-transparent">Prospect pipeline</h1>
+            <p className="text-sm text-muted-foreground mt-1">Drag and drop leads to track conversion stages</p>
           </div>
 
           <Dialog open={isDialogOpen} onOpenChange={onOpenChange}>
@@ -187,13 +196,13 @@ export default function LeadsPage() {
               <DialogHeader>
                 <DialogTitle>{editingId ? 'Edit Lead' : 'Add New Lead'}</DialogTitle>
                 <DialogDescription>
-                  Enter prospect details to follow up later.
+                  Enter prospect details to log into CRM pipeline.
                 </DialogDescription>
               </DialogHeader>
               
               <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
                 <div className="space-y-2">
-                  <Label htmlFor="name">Full Name</Label>
+                  <Label htmlFor="name">Full Name *</Label>
                   <Input id="name" {...register('name')} />
                   {errors.name && <p className="text-xs text-red-400">{errors.name.message}</p>}
                 </div>
@@ -205,14 +214,14 @@ export default function LeadsPage() {
                     {errors.email && <p className="text-xs text-red-400">{errors.email.message}</p>}
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="phone">Phone</Label>
+                    <Label htmlFor="phone">Phone *</Label>
                     <Input id="phone" {...register('phone')} />
                     {errors.phone && <p className="text-xs text-red-400">{errors.phone.message}</p>}
                   </div>
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="status">Status</Label>
+                  <Label htmlFor="status">Pipeline Stage *</Label>
                   <select id="status" {...register('status')} className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
                     <option value="New">New</option>
                     <option value="Contacted">Contacted</option>
@@ -222,8 +231,8 @@ export default function LeadsPage() {
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="notes">Notes</Label>
-                  <Input id="notes" {...register('notes')} />
+                  <Label htmlFor="notes">Notes / Requirements</Label>
+                  <Input id="notes" {...register('notes')} placeholder="e.g. Looking for personal trainer" />
                 </div>
 
                 <DialogFooter>
@@ -237,95 +246,138 @@ export default function LeadsPage() {
         </div>
 
         {/* Search */}
-        <div className="relative">
+        <div className="relative shrink-0">
           <Search className="absolute left-3 top-3 h-5 w-5 text-muted-foreground" />
           <Input
             className="pl-10 h-11"
-            placeholder="Search leads by name or email..."
+            placeholder="Search prospects by name, email or phone..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
           />
         </div>
 
-        <Card className="border-none shadow-xl bg-card/40 backdrop-blur-md">
-          <CardContent className="p-0">
-            <div className="overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow className="bg-muted/50 hover:bg-muted/50">
-                    <TableHead className="font-bold">Name</TableHead>
-                    <TableHead className="font-bold">Contact</TableHead>
-                    <TableHead className="font-bold">Status</TableHead>
-                    <TableHead className="font-bold">Notes</TableHead>
-                    <TableHead className="text-right font-bold">Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {leadsLoading ? (
-                    <TableRow>
-                      <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">
-                        Loading leads...
-                      </TableCell>
-                    </TableRow>
-                  ) : filteredLeads.length === 0 ? (
-                    <TableRow>
-                      <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">
-                        No leads found. Create a new lead to get started.
-                      </TableCell>
-                    </TableRow>
-                  ) : (
-                    filteredLeads.map((lead) => (
-                      <TableRow key={lead.id} className="hover:bg-muted/30 transition-colors">
-                        <TableCell className="font-medium">
-                          {lead.name}
-                        </TableCell>
-                        <TableCell>
-                          <div className="text-sm">{lead.email}</div>
-                          <div className="text-xs text-muted-foreground">{lead.phone}</div>
-                        </TableCell>
-                        <TableCell>
-                          <Badge variant="outline" className={
-                            lead.status === 'New' ? 'bg-blue-500/10 text-blue-500 border-blue-500/20' :
-                            lead.status === 'Contacted' ? 'bg-yellow-500/10 text-yellow-500 border-yellow-500/20' :
-                            lead.status === 'Converted' ? 'bg-green-500/10 text-green-500 border-green-500/20' :
-                            'bg-red-500/10 text-red-500 border-red-500/20'
-                          }>
-                            {lead.status || 'New'}
+        {/* Kanban Board Layout */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 flex-1 min-h-[500px]">
+          {(Object.keys(columns) as LeadStatus[]).map((status) => (
+            <div
+              key={status}
+              onDragOver={(e) => e.preventDefault()}
+              onDrop={() => {
+                if (draggedLeadId) {
+                  handleStatusChange(draggedLeadId, status)
+                  setDraggedLeadId(null)
+                }
+              }}
+              className={`rounded-xl border border-white/5 border-t-4 p-4 flex flex-col h-full ${columnHeaders[status].colorClass}`}
+            >
+              <div className="flex items-center justify-between mb-4 shrink-0">
+                <h3 className="font-bold text-sm text-foreground/80 tracking-wide uppercase">
+                  {columnHeaders[status].label}
+                </h3>
+                <Badge variant="secondary" className="px-2 py-0.5 rounded-full font-bold">
+                  {columns[status].length}
+                </Badge>
+              </div>
+
+              <div className="space-y-3 flex-1 overflow-y-auto min-h-[400px] max-h-[600px] pr-1">
+                {leadsLoading ? (
+                  <p className="text-xs text-muted-foreground text-center py-8">Loading...</p>
+                ) : columns[status].length === 0 ? (
+                  <div className="rounded-lg border border-dashed border-white/5 p-8 text-center text-xs text-muted-foreground flex flex-col items-center justify-center h-full min-h-[150px]">
+                    <Move className="h-5 w-5 opacity-20 mb-2" />
+                    Drag leads here
+                  </div>
+                ) : (
+                  columns[status].map((lead) => (
+                    <Card
+                      key={lead.id}
+                      draggable
+                      onDragStart={() => setDraggedLeadId(lead.id)}
+                      className="group cursor-grab active:cursor-grabbing border-white/5 bg-card hover:bg-muted/10 transition-all hover:shadow-md hover:scale-[1.01] relative"
+                    >
+                      <CardContent className="p-4 space-y-3">
+                        <div className="flex justify-between items-start">
+                          <div>
+                            <h4 className="font-bold text-sm text-foreground/90">{lead.name}</h4>
+                            <span className="text-[10px] text-muted-foreground block font-mono">
+                              Logged: {format(new Date(lead.createdAt || Date.now()), 'dd MMM')}
+                            </span>
+                          </div>
+                          <Badge variant="outline" className="text-[9px] px-1 py-0.2 bg-white/5 border-none opacity-50 group-hover:opacity-100 transition-opacity">
+                            Drag
                           </Badge>
-                        </TableCell>
-                        <TableCell className="text-muted-foreground text-sm max-w-[200px] truncate">
-                          {lead.notes || '-'}
-                        </TableCell>
-                        <TableCell className="text-right">
-                          <div className="flex justify-end gap-2">
-                            <Button variant="ghost" size="icon" onClick={() => handleEdit(lead)}>
-                              <Edit2 className="h-4 w-4 text-muted-foreground hover:text-foreground" />
+                        </div>
+
+                        <div className="space-y-1 text-xs text-muted-foreground">
+                          {lead.phone && (
+                            <p className="flex items-center gap-1.5">
+                              <Phone className="h-3 w-3" />
+                              {lead.phone}
+                            </p>
+                          )}
+                          {lead.email && (
+                            <p className="flex items-center gap-1.5 truncate">
+                              <Mail className="h-3 w-3" />
+                              {lead.email}
+                            </p>
+                          )}
+                        </div>
+
+                        {lead.notes && (
+                          <p className="text-xs text-muted-foreground bg-muted/20 p-2 rounded italic line-clamp-2">
+                            "{lead.notes}"
+                          </p>
+                        )}
+
+                        <div className="flex justify-between items-center pt-2 border-t border-white/5">
+                          <div className="flex gap-1">
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-7 w-7"
+                              onClick={() => handleEdit(lead)}
+                            >
+                              <Edit2 className="h-3.5 w-3.5 text-muted-foreground hover:text-foreground" />
                             </Button>
-                            <Button variant="ghost" size="icon" onClick={() => openConvertDialog(lead.id)} disabled={lead.status === 'Converted'}>
-                              <ArrowRightCircle className="h-4 w-4 text-green-400 hover:text-green-300" />
-                            </Button>
-                            <Button variant="ghost" size="icon" onClick={() => { if(confirm('Delete lead?')) deleteLead(lead.id) }}>
-                              <Trash2 className="h-4 w-4 text-red-400 hover:text-red-300" />
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-7 w-7 text-red-500/50 hover:text-red-500 hover:bg-red-500/10"
+                              onClick={() => { if(confirm('Delete lead?')) deleteLead(lead.id) }}
+                            >
+                              <Trash2 className="h-3.5 w-3.5" />
                             </Button>
                           </div>
-                        </TableCell>
-                      </TableRow>
-                    ))
-                  )}
-                </TableBody>
-              </Table>
-            </div>
-          </CardContent>
-        </Card>
 
-        {/* Convert Lead Dialog — with plan selection */}
+                          {lead.status !== 'Converted' && (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="text-xs text-green-400 hover:text-green-300 hover:bg-green-500/10 px-2 py-1 h-7 gap-1"
+                              onClick={() => openConvertDialog(lead.id)}
+                            >
+                              <ArrowRightCircle className="h-3.5 w-3.5" />
+                              Convert
+                            </Button>
+                          )}
+                        </div>
+                      </CardContent>
+                    </Card>
+                  ))
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
+
+        {/* Convert Lead Dialog */}
         <Dialog open={isConvertDialogOpen} onOpenChange={setIsConvertDialogOpen}>
           <DialogContent className="sm:max-w-[425px]">
             <DialogHeader>
               <DialogTitle>Convert Lead to Member</DialogTitle>
               <DialogDescription>
                 {convertingLead
-                  ? `You are about to convert "${convertingLead.name}" into an active gym member.`
+                  ? `Select a membership plan to convert "${convertingLead.name}" into a registered active gym member.`
                   : 'Select a membership plan for the new member.'}
               </DialogDescription>
             </DialogHeader>
@@ -339,21 +391,26 @@ export default function LeadsPage() {
                 >
                   {plans.length > 0 ? (
                     plans.map((plan: any) => (
-                      <option key={plan.id} value={plan.name}>{plan.name} — ${plan.price}/{plan.durationMonths}mo</option>
+                      <option key={plan.id} value={plan.name}>
+                        {plan.name} — INR {plan.price} ({plan.durationMonths || plan.durationDays / 30} Months)
+                      </option>
                     ))
                   ) : (
                     <>
-                      <option value="Basic">Basic</option>
-                      <option value="Premium">Premium</option>
-                      <option value="Elite">Elite</option>
+                      <option value="Basic">Basic Plan</option>
+                      <option value="Premium">Premium Plan</option>
+                      <option value="Elite">Elite Plan</option>
                     </>
                   )}
                 </select>
               </div>
             </div>
             <DialogFooter>
-              <Button variant="ghost" onClick={() => setIsConvertDialogOpen(false)}>Cancel</Button>
-              <Button onClick={handleConvert} className="gap-2">
+              <Button variant="ghost" onClick={() => {
+                setIsConvertDialogOpen(false)
+                setConvertingLeadId(null)
+              }}>Cancel</Button>
+              <Button onClick={handleConvert} className="gap-2 bg-green-600 hover:bg-green-700 text-white">
                 <ArrowRightCircle className="h-4 w-4" />
                 Confirm Conversion
               </Button>
