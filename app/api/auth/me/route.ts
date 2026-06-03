@@ -28,8 +28,19 @@ async function tryBackendMe(req: NextRequest) {
 
 export async function GET(req: NextRequest) {
   try {
+    const hostHeader = req.headers.get('host')
     const backendUrl = process.env.API_FALLBACK_URL || process.env.NEXT_PUBLIC_API_URL
-    if (backendUrl && /^https?:\/\//.test(backendUrl)) {
+    const isSameHost = (urlStr: string, host: string | null) => {
+      if (!host) return false
+      try {
+        const url = new URL(urlStr)
+        return url.host === host || url.host.split(':')[0] === host.split(':')[0]
+      } catch {
+        return false
+      }
+    }
+
+    if (backendUrl && /^https?:\/\//.test(backendUrl) && !isSameHost(backendUrl, hostHeader)) {
       try {
         const backendResponse = await tryBackendMe(req)
         if (backendResponse) return backendResponse
@@ -56,7 +67,7 @@ export async function GET(req: NextRequest) {
         }
       })
     } catch (dbError: any) {
-      if (isDatabaseUnavailable(dbError)) {
+      if (isDatabaseUnavailable(dbError) && backendUrl && !isSameHost(backendUrl, hostHeader)) {
         const fallback = await tryBackendMe(req)
         if (fallback) return fallback
       }

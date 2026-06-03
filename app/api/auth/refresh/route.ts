@@ -36,8 +36,19 @@ export async function POST(request: Request) {
       )
     }
 
+    const hostHeader = request.headers.get('host')
     const backendUrl = process.env.API_FALLBACK_URL || process.env.NEXT_PUBLIC_API_URL
-    if (backendUrl && /^https?:\/\//.test(backendUrl)) {
+    const isSameHost = (urlStr: string, host: string | null) => {
+      if (!host) return false
+      try {
+        const url = new URL(urlStr)
+        return url.host === host || url.host.split(':')[0] === host.split(':')[0]
+      } catch {
+        return false
+      }
+    }
+
+    if (backendUrl && /^https?:\/\//.test(backendUrl) && !isSameHost(backendUrl, hostHeader)) {
       try {
         const backendResponse = await tryBackendRefresh(refreshToken)
         if (backendResponse) return backendResponse
@@ -64,7 +75,7 @@ export async function POST(request: Request) {
         include: { gym: true }
       })
     } catch (dbError: any) {
-      if (isDatabaseUnavailable(dbError)) {
+      if (isDatabaseUnavailable(dbError) && backendUrl && !isSameHost(backendUrl, hostHeader)) {
         const fallback = await tryBackendRefresh(refreshToken)
         if (fallback) return fallback
       }
