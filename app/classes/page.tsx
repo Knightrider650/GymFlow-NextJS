@@ -215,7 +215,7 @@ export default function ClassesPage() {
               </DialogTrigger>
               <DialogContent className="sm:max-w-[425px] max-h-[90vh] overflow-y-auto border-none shadow-2xl">
                 <DialogHeader className="bg-slate-50 -m-6 mb-0 p-6 border-b border-slate-100">
-                  <DialogTitle className="text-xl">{editingClassId ? 'Edit Fitness Session' : 'Create Fitness Session'}</DialogTitle>
+                  <DialogTitle className="text-xl">{editingClassId ? 'Edit Class' : 'Add New Class'}</DialogTitle>
                   <DialogDescription>
                     {editingClassId ? 'Modify the class parameters and assigned instructor.' : 'Define a new class schedule and assign a specialized instructor.'}
                   </DialogDescription>

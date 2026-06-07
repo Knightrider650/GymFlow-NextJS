@@ -146,7 +146,7 @@ export const useAuthStore = create<AuthState>()(
     persist(
       (set) => ({
         user: null,
-        isLoading: false,
+        isLoading: true,
         error: null,
         isAuthenticated: false,
 
@@ -182,6 +182,27 @@ export const useAuthStore = create<AuthState>()(
             localStorage.removeItem('refreshToken')
             localStorage.removeItem('auth-storage')
             document.cookie = 'token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT'
+            useGymStore.setState({
+              members: [],
+              membersLoaded: false,
+              attendance: [],
+              attendanceLoaded: false,
+              invoices: [],
+              invoicesLoaded: false,
+              classes: [],
+              classesLoaded: false,
+              inventory: [],
+              inventoryLoaded: false,
+              staff: [],
+              staffLoaded: false,
+              leads: [],
+              leadsLoaded: false,
+              plans: [],
+              plansLoaded: false,
+              expenses: [],
+              expensesLoaded: false,
+              stats: null,
+            })
             set({ user: null, isAuthenticated: false })
           }
         },
@@ -251,6 +272,27 @@ export const useAuthStore = create<AuthState>()(
               // After switching tokens, we need to refresh the user data from /api/auth/me
               const meRes = await apiClient.get('/api/auth/me')
               if (meRes.success && meRes.data) {
+                useGymStore.setState({
+                  members: [],
+                  membersLoaded: false,
+                  attendance: [],
+                  attendanceLoaded: false,
+                  invoices: [],
+                  invoicesLoaded: false,
+                  classes: [],
+                  classesLoaded: false,
+                  inventory: [],
+                  inventoryLoaded: false,
+                  staff: [],
+                  staffLoaded: false,
+                  leads: [],
+                  leadsLoaded: false,
+                  plans: [],
+                  plansLoaded: false,
+                  expenses: [],
+                  expensesLoaded: false,
+                  stats: null,
+                })
                 set({ user: meRes.data, isAuthenticated: true })
                 return true
               }

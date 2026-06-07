@@ -123,7 +123,8 @@ export function Sidebar() {
     if (!allowed) return true
     if (!allowed.includes(actorRole)) return false
 
-    if (isGlobalUser && !isSupportMode) {
+    const isPlatformPath = pathname === '/super-dashboard' || pathname === '/team' || pathname.startsWith('/super-dashboard/') || pathname.startsWith('/team/')
+    if (isGlobalUser && !isSupportMode && isPlatformPath) {
       return PLATFORM_ROUTES.has(item.href)
     }
 

@@ -177,7 +177,7 @@ export default function InvitesPage() {
                         <TableCell>{invite.role}</TableCell>
                         <TableCell>{getStatusBadge(invite.status)}</TableCell>
                         <TableCell className="text-xs text-muted-foreground">
-                          {formatDate(invite.sentAt)}
+                          {formatDate(invite.sentAt || (invite as any).createdAt || (invite as any).created_at)}
                         </TableCell>
                         <TableCell className="text-right">
                           <Button variant="ghost" size="icon" className="text-rose-500 hover:text-rose-600 hover:bg-rose-500/10" onClick={() => handleDeleteInvite(invite.id)}>

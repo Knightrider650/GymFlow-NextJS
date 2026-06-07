@@ -55,6 +55,7 @@ export async function POST(req: NextRequest) {
         email,
         role,
         status: 'pending',
+        sentAt: new Date(),
         expiresAt: expiresAt ? new Date(expiresAt) : new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
         gymId
       }

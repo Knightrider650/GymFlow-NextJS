@@ -52,6 +52,9 @@ export default function LoginPage() {
           <CardDescription className="text-base">
             Professional Gym Management System
           </CardDescription>
+          <p className="text-xs text-amber-500 mt-2 font-medium">
+            ⚠️ Access to the platform is invite-only. Sign ups require an invitation link from your administrator.
+          </p>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-4">
@@ -67,7 +70,7 @@ export default function LoginPage() {
                 id="email"
                 name="email"
                 type="email"
-                autoComplete="off"
+                autoComplete="username"
                 placeholder="Enter your email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
@@ -81,7 +84,7 @@ export default function LoginPage() {
                 id="password"
                 name="password"
                 type="password"
-                autoComplete="off"
+                autoComplete="current-password"
                 placeholder="••••••••"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}

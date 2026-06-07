@@ -35,7 +35,7 @@
       "scope": "platform",
       "tenantId": "gym-001",
       "tenant_id": "gym-001",
-      "updatedAt": "2026-06-07T07:07:20.514Z",
+      "updatedAt": "2026-06-07T17:23:42.558Z",
       "gym_id": "gym-001"
     },
     {
@@ -46,7 +46,7 @@
       "role": "cto",
       "gymId": "default-gym",
       "createdAt": "2026-06-07T07:07:20.577Z",
-      "updatedAt": "2026-06-07T07:07:20.577Z",
+      "updatedAt": "2026-06-07T17:23:42.616Z",
       "gym_id": "default-gym",
       "tenantId": "default-gym",
       "tenant_id": "default-gym"
@@ -59,7 +59,7 @@
       "role": "ceo",
       "gymId": "default-gym",
       "createdAt": "2026-06-07T07:07:20.640Z",
-      "updatedAt": "2026-06-07T07:07:20.640Z",
+      "updatedAt": "2026-06-07T17:23:42.674Z",
       "gym_id": "default-gym",
       "tenantId": "default-gym",
       "tenant_id": "default-gym"
@@ -217,6 +217,34 @@
       "created_at": "2026-04-26T22:32:53.342Z",
       "tenant_id": "gym-001",
       "tenantId": "gym-001"
+    },
+    {
+      "id": "0.4603506593022284",
+      "name": "Test LeadTest Lead",
+      "email": "test@lead.com",
+      "phone": "555-1234",
+      "status": "New",
+      "notes": "Test note",
+      "gymId": "default-gym",
+      "createdAt": "2026-06-07T17:34:00.530Z",
+      "updatedAt": "2026-06-07T17:34:00.530Z",
+      "gym_id": "default-gym",
+      "tenantId": "default-gym",
+      "tenant_id": "default-gym"
+    },
+    {
+      "id": "0.5789350400196767",
+      "name": "Test Lead",
+      "email": "test@lead.com",
+      "phone": "555-1234",
+      "status": "New",
+      "notes": "Test note",
+      "gymId": "default-gym",
+      "createdAt": "2026-06-07T17:35:39.493Z",
+      "updatedAt": "2026-06-07T17:35:39.493Z",
+      "gym_id": "default-gym",
+      "tenantId": "default-gym",
+      "tenant_id": "default-gym"
     }
   ],
   "plans": [
@@ -246,7 +274,7 @@
       "features": "Gym Access, Locker Room",
       "gymId": "default-gym",
       "createdAt": "2026-06-07T07:07:20.641Z",
-      "updatedAt": "2026-06-07T07:07:20.641Z",
+      "updatedAt": "2026-06-07T17:23:42.675Z",
       "gym_id": "default-gym",
       "tenantId": "default-gym",
       "tenant_id": "default-gym"
@@ -259,7 +287,7 @@
       "features": "Gym Access, Pool, Personal Trainer",
       "gymId": "default-gym",
       "createdAt": "2026-06-07T07:07:20.641Z",
-      "updatedAt": "2026-06-07T07:07:20.641Z",
+      "updatedAt": "2026-06-07T17:23:42.676Z",
       "gym_id": "default-gym",
       "tenantId": "default-gym",
       "tenant_id": "default-gym"
@@ -299,7 +327,7 @@
       "dateFormat": "MM/DD/YYYY",
       "invoicePrefix": "GF-",
       "createdAt": "2026-06-07T07:07:20.438Z",
-      "updatedAt": "2026-06-07T07:07:20.438Z"
+      "updatedAt": "2026-06-07T17:23:42.494Z"
     }
   ],
   "activity_logs": [
@@ -311,7 +339,37 @@
       "entityType": "support-session",
       "entityId": "gym-001",
       "entityName": "GymFlow Pro",
-      "details": "Opened support session for GymFlow Pro",
+      "details": "Opened support session for GymFlow Pro"
+    },
+    {
+      "id": "0.9780058355561791",
+      "action": "Add Lead",
+      "details": "Added new lead: Test LeadTest Lead",
+      "entityType": "Lead",
+      "entityId": "0.4603506593022284",
+      "userName": "ceo@gym.com",
+      "userId": "0.05520859356913421",
+      "gymId": "default-gym",
+      "createdAt": "2026-06-07T17:34:00.533Z",
+      "updatedAt": "2026-06-07T17:34:00.533Z",
+      "gym_id": "default-gym",
+      "tenantId": "default-gym",
+      "tenant_id": "default-gym"
+    },
+    {
+      "id": "0.09431832577417443",
+      "action": "Add Lead",
+      "details": "Added new lead: Test Lead",
+      "entityType": "Lead",
+      "entityId": "0.5789350400196767",
+      "userName": "ceo@gym.com",
+      "userId": "0.05520859356913421",
+      "gymId": "default-gym",
+      "createdAt": "2026-06-07T17:35:39.504Z",
+      "updatedAt": "2026-06-07T17:35:39.504Z",
+      "gym_id": "default-gym",
+      "tenantId": "default-gym",
+      "tenant_id": "default-gym"
     }
   ],
   "branches": [

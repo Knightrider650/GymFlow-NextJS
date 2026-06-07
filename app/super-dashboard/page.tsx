@@ -118,6 +118,16 @@ export default function SuperDashboard() {
     try {
       setLoading(true)
       const response = await fetch('/api/super-admin/gyms')
+      const overviewRes = await fetch('/api/super-admin/overview')
+      
+      let overviewData = null
+      if (overviewRes.ok) {
+        const ovResult = await overviewRes.json()
+        if (ovResult.success) {
+          overviewData = ovResult.data
+        }
+      }
+
       if (response.ok) {
         const result = await response.json()
         if (result.success && Array.isArray(result.data)) {
@@ -125,9 +135,9 @@ export default function SuperDashboard() {
           
           const list = result.data
           const totalGyms = list.length
-          const totalMembers = list.reduce((sum: number, t: any) => sum + (t.totalMembers || 0), 0)
-          const activeMembers = list.reduce((sum: number, t: any) => sum + (t.activeMembers || 0), 0)
-          const totalRevenue = list.reduce((sum: number, t: any) => sum + (t.totalRevenue || 0), 0)
+          const totalMembers = overviewData ? overviewData.totalMembers : list.reduce((sum: number, t: any) => sum + (t.totalMembers || 0), 0)
+          const activeMembers = overviewData ? overviewData.activeMembers : list.reduce((sum: number, t: any) => sum + (t.activeMembers || 0), 0)
+          const totalRevenue = overviewData ? overviewData.totalRevenue : list.reduce((sum: number, t: any) => sum + (t.totalRevenue || 0), 0)
           const suspendedGyms = list.filter((t: any) => t.status === 'suspended').length
           const mrr = list.filter((t: any) => t.status === 'active').reduce((sum: number, t: any) => {
             const planRate = t.plan === 'Enterprise' ? 299 : t.plan === 'Pro' ? 149 : 49
@@ -135,7 +145,7 @@ export default function SuperDashboard() {
           }, 0)
 
           setStats({
-            totalGyms,
+            totalGyms: overviewData ? overviewData.totalGyms : totalGyms,
             totalMembers,
             activeMembers,
             totalRevenue,
@@ -162,9 +172,9 @@ export default function SuperDashboard() {
 
   // Simulated Alert Queue
   const [alerts, setAlerts] = useState([
-    { id: '1', tenant: 'Elite Athletics Center', detail: 'Elite Athletics Center has reached 95% of active member plan limit (210/220).', type: 'limit', tenantId: 'elite-athletics' },
-    { id: '2', tenant: 'Prime Fitness Club', detail: 'Stripe subscription renew payment failed for Invoice #8791 (tenant: Prime Fitness).', type: 'billing', tenantId: 'prime-fitness' },
-    { id: '3', tenant: 'Platform Internal', detail: 'Job queue backlog: 14 notifications currently retry pending.', type: 'jobs', tenantId: 'gymflow-hq' }
+    { id: '1', tenant: 'Elite Athletics Center', detail: 'Elite Athletics Center has reached 95% of active member plan limit (210/220).', type: 'limit', tenantId: 'gym-001' },
+    { id: '2', tenant: 'Prime Fitness Club', detail: 'Stripe subscription renew payment failed for Invoice #8791 (tenant: Prime Fitness).', type: 'billing', tenantId: 'gym-001' },
+    { id: '3', tenant: 'Platform Internal', detail: 'Job queue backlog: 14 notifications currently retry pending.', type: 'jobs', tenantId: 'default-gym' }
   ])
 
   // Logs & jobs simulation state
@@ -186,6 +196,127 @@ export default function SuperDashboard() {
     { id: 'flag_02', name: 'Supplements POS Integrations', description: 'Include barcode scanning & instant inventory check for drinks.', activeGlobally: true, betaTenants: [] },
     { id: 'flag_03', name: 'QR Check-in Support', description: 'Mark daily attendance via QR code scanners on frontdesk.', activeGlobally: false, betaTenants: ['gymflow-hq'] }
   ])
+
+  // Pricing plans state
+  const [pricingPlans, setPricingPlans] = useState<any[]>([
+    {
+      id: 'plan_basic',
+      name: 'GymFlow Basic',
+      tier: 'Tier 1',
+      price: 49,
+      maxMembers: '150 active',
+      maxBranches: '1 branch',
+      features: ['Staff Management HR', 'Basic Attendance Desk'],
+      disabledFeatures: ['POS Supplement Registers', 'Inventory & Wastage CRM'],
+      color: 'bg-slate-800 text-slate-300',
+      borderColor: 'border-slate-800'
+    },
+    {
+      id: 'plan_pro',
+      name: 'GymFlow Professional',
+      tier: 'Tier 2',
+      price: 149,
+      maxMembers: '500 active',
+      maxBranches: '3 branches',
+      features: ['Staff Management HR', 'Advanced Attendance Desk', 'POS Supplement Registers', 'Inventory & Wastage CRM'],
+      disabledFeatures: [],
+      popular: true,
+      color: 'bg-violet-950 text-violet-400',
+      borderColor: 'border-violet-500/20'
+    },
+    {
+      id: 'plan_enterprise',
+      name: 'GymFlow Enterprise',
+      tier: 'Tier 3',
+      price: 399,
+      maxMembers: '2,000 active',
+      maxBranches: '10 branches',
+      features: ['Unlimited Staff Management', 'Advanced Attendance Desk', 'POS Supplement Registers', 'Multi-location Data sync & Reports'],
+      disabledFeatures: [],
+      color: 'bg-cyan-950 text-cyan-400',
+      borderColor: 'border-slate-800'
+    }
+  ])
+
+  const [isPlanModalOpen, setIsPlanModalOpen] = useState(false)
+  const [editingPlan, setEditingPlan] = useState<any | null>(null)
+  const [planFormData, setPlanFormData] = useState({
+    name: '',
+    tier: '',
+    price: 0,
+    maxMembers: '',
+    maxBranches: '',
+    features: '',
+    disabledFeatures: ''
+  })
+
+  const handleOpenAddPlan = () => {
+    setEditingPlan(null)
+    setPlanFormData({
+      name: '',
+      tier: 'Tier 1',
+      price: 0,
+      maxMembers: '',
+      maxBranches: '',
+      features: '',
+      disabledFeatures: ''
+    })
+    setIsPlanModalOpen(true)
+  }
+
+  const handleOpenEditPlan = (plan: any) => {
+    setEditingPlan(plan)
+    setPlanFormData({
+      name: plan.name,
+      tier: plan.tier || 'Tier 1',
+      price: plan.price,
+      maxMembers: plan.maxMembers,
+      maxBranches: plan.maxBranches,
+      features: plan.features.join(', '),
+      disabledFeatures: (plan.disabledFeatures || []).join(', ')
+    })
+    setIsPlanModalOpen(true)
+  }
+
+  const handleDeletePlan = (id: string) => {
+    if (confirm('Are you sure you want to delete this pricing plan?')) {
+      setPricingPlans(pricingPlans.filter(p => p.id !== id))
+    }
+  }
+
+  const handleSavePlanSubmit = (e: React.FormEvent) => {
+    e.preventDefault()
+    const featuresList = planFormData.features.split(',').map(f => f.trim()).filter(Boolean)
+    const disabledFeaturesList = planFormData.disabledFeatures.split(',').map(f => f.trim()).filter(Boolean)
+
+    if (editingPlan) {
+      setPricingPlans(pricingPlans.map(p => p.id === editingPlan.id ? {
+        ...p,
+        name: planFormData.name,
+        tier: planFormData.tier,
+        price: Number(planFormData.price),
+        maxMembers: planFormData.maxMembers,
+        maxBranches: planFormData.maxBranches,
+        features: featuresList,
+        disabledFeatures: disabledFeaturesList
+      } : p))
+    } else {
+      const newPlan = {
+        id: 'plan_' + Math.random().toString(36).substr(2, 9),
+        name: planFormData.name,
+        tier: planFormData.tier,
+        price: Number(planFormData.price),
+        maxMembers: planFormData.maxMembers,
+        maxBranches: planFormData.maxBranches,
+        features: featuresList,
+        disabledFeatures: disabledFeaturesList,
+        color: 'bg-slate-800 text-slate-300',
+        borderColor: 'border-slate-800'
+      }
+      setPricingPlans([...pricingPlans, newPlan])
+    }
+    setIsPlanModalOpen(false)
+  }
 
   // UI state for modals / details
   const [selectedTenant, setSelectedTenant] = useState<GymOverview | null>(null)
@@ -1087,97 +1218,187 @@ export default function SuperDashboard() {
                 </h2>
                 <p className="text-xs text-slate-400">Configure global tenant caps and active database features allowed per subscription plan tier.</p>
               </div>
-              <Button className="gap-2 font-semibold" onClick={() => alert('Custom plan creation is coming soon! Contact platform support to configure new subscription tiers.')}>
+              <Button className="gap-2 font-semibold" onClick={handleOpenAddPlan}>
                 <Plus className="h-4 w-4" />
                 Add Pricing Plan
               </Button>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              
-              {/* Basic Card */}
-              <Card className="border border-slate-800 bg-slate-900/30 flex flex-col justify-between overflow-hidden relative">
-                <CardHeader className="bg-slate-900 p-6 border-b border-slate-800">
-                  <Badge className="bg-slate-800 text-slate-300 w-fit mb-2">Tier 1</Badge>
-                  <CardTitle className="text-xl font-bold">GymFlow Basic</CardTitle>
-                  <div className="mt-2 text-2xl font-black text-slate-100">$49 <span className="text-xs font-normal text-slate-500">/ month</span></div>
-                </CardHeader>
-                <CardContent className="p-6 space-y-4">
-                  <div className="space-y-2">
-                    <div className="flex justify-between text-sm text-slate-300">
-                      <span>Max Members Allowed</span>
-                      <span className="font-bold">150 active</span>
+              {pricingPlans.map((plan) => (
+                <Card key={plan.id} className={`border ${plan.borderColor} bg-slate-900/30 flex flex-col justify-between overflow-hidden relative`}>
+                  {plan.popular && (
+                    <div className="absolute top-0 right-0 bg-violet-600 text-slate-50 text-[9px] font-black uppercase px-3 py-1 rounded-bl">Popular</div>
+                  )}
+                  <CardHeader className="bg-slate-900 p-6 border-b border-slate-800">
+                    <div className="flex justify-between items-center mb-2">
+                      <Badge className={`${plan.color} w-fit`}>{plan.tier}</Badge>
+                      <div className="flex items-center gap-1.5">
+                        <Button 
+                          variant="ghost" 
+                          size="sm" 
+                          className="h-7 px-2 hover:bg-slate-800 text-slate-400 hover:text-slate-200 text-xs font-bold"
+                          onClick={() => handleOpenEditPlan(plan)}
+                        >
+                          Edit
+                        </Button>
+                        <Button 
+                          variant="ghost" 
+                          size="sm" 
+                          className="h-7 px-2 hover:bg-slate-800 text-slate-400 hover:text-red-400 text-xs font-bold"
+                          onClick={() => handleDeletePlan(plan.id)}
+                        >
+                          Delete
+                        </Button>
+                      </div>
                     </div>
-                    <div className="flex justify-between text-sm text-slate-300">
-                      <span>Max Branches Cap</span>
-                      <span className="font-bold">1 branch</span>
+                    <CardTitle className="text-xl font-bold">{plan.name}</CardTitle>
+                    <div className="mt-2 text-2xl font-black text-slate-100">${plan.price} <span className="text-xs font-normal text-slate-500">/ month</span></div>
+                  </CardHeader>
+                  <CardContent className="p-6 space-y-4">
+                    <div className="space-y-2">
+                      <div className="flex justify-between text-sm text-slate-300">
+                        <span>Max Members Allowed</span>
+                        <span className="font-bold">{plan.maxMembers}</span>
+                      </div>
+                      <div className="flex justify-between text-sm text-slate-300">
+                        <span>Max Branches Cap</span>
+                        <span className="font-bold">{plan.maxBranches}</span>
+                      </div>
                     </div>
-                  </div>
-                  <div className="pt-4 border-t border-slate-800 space-y-2">
-                    <div className="flex items-center gap-2 text-xs text-emerald-400"><CheckCircle className="h-3.5 w-3.5" /> Staff Management HR</div>
-                    <div className="flex items-center gap-2 text-xs text-emerald-400"><CheckCircle className="h-3.5 w-3.5" /> Basic Attendance Desk</div>
-                    <div className="flex items-center gap-2 text-xs text-slate-500"><X className="h-3.5 w-3.5" /> POS Supplement Registers</div>
-                    <div className="flex items-center gap-2 text-xs text-slate-500"><X className="h-3.5 w-3.5" /> Inventory & Wastage CRM</div>
-                  </div>
-                </CardContent>
-              </Card>
-
-              {/* Pro Card */}
-              <Card className="border border-violet-500/20 bg-slate-900/30 flex flex-col justify-between overflow-hidden relative">
-                <div className="absolute top-0 right-0 bg-violet-600 text-slate-50 text-[9px] font-black uppercase px-3 py-1 rounded-bl">Popular</div>
-                <CardHeader className="bg-slate-900 p-6 border-b border-slate-800">
-                  <Badge className="bg-violet-950 text-violet-400 w-fit mb-2">Tier 2</Badge>
-                  <CardTitle className="text-xl font-bold">GymFlow Professional</CardTitle>
-                  <div className="mt-2 text-2xl font-black text-slate-100">$149 <span className="text-xs font-normal text-slate-500">/ month</span></div>
-                </CardHeader>
-                <CardContent className="p-6 space-y-4">
-                  <div className="space-y-2">
-                    <div className="flex justify-between text-sm text-slate-300">
-                      <span>Max Members Allowed</span>
-                      <span className="font-bold">500 active</span>
+                    <div className="pt-4 border-t border-slate-800 space-y-2">
+                      {plan.features.map((feat: any, idx: number) => (
+                        <div key={idx} className="flex items-center gap-2 text-xs text-emerald-400">
+                          <CheckCircle className="h-3.5 w-3.5" /> {feat}
+                        </div>
+                      ))}
+                      {(plan.disabledFeatures || []).map((feat: any, idx: number) => (
+                        <div key={idx} className="flex items-center gap-2 text-xs text-slate-500">
+                          <X className="h-3.5 w-3.5" /> {feat}
+                        </div>
+                      ))}
                     </div>
-                    <div className="flex justify-between text-sm text-slate-300">
-                      <span>Max Branches Cap</span>
-                      <span className="font-bold">3 branches</span>
-                    </div>
-                  </div>
-                  <div className="pt-4 border-t border-slate-800 space-y-2">
-                    <div className="flex items-center gap-2 text-xs text-emerald-400"><CheckCircle className="h-3.5 w-3.5" /> Staff Management HR</div>
-                    <div className="flex items-center gap-2 text-xs text-emerald-400"><CheckCircle className="h-3.5 w-3.5" /> Advanced Attendance Desk</div>
-                    <div className="flex items-center gap-2 text-xs text-emerald-400"><CheckCircle className="h-3.5 w-3.5" /> POS Supplement Registers</div>
-                    <div className="flex items-center gap-2 text-xs text-emerald-400"><CheckCircle className="h-3.5 w-3.5" /> Inventory & Wastage CRM</div>
-                  </div>
-                </CardContent>
-              </Card>
-
-              {/* Enterprise Card */}
-              <Card className="border border-slate-800 bg-slate-900/30 flex flex-col justify-between overflow-hidden relative">
-                <CardHeader className="bg-slate-900 p-6 border-b border-slate-800">
-                  <Badge className="bg-cyan-950 text-cyan-400 w-fit mb-2">Tier 3</Badge>
-                  <CardTitle className="text-xl font-bold">GymFlow Enterprise</CardTitle>
-                  <div className="mt-2 text-2xl font-black text-slate-100">$399 <span className="text-xs font-normal text-slate-500">/ month</span></div>
-                </CardHeader>
-                <CardContent className="p-6 space-y-4">
-                  <div className="space-y-2">
-                    <div className="flex justify-between text-sm text-slate-300">
-                      <span>Max Members Allowed</span>
-                      <span className="font-bold">2,000 active</span>
-                    </div>
-                    <div className="flex justify-between text-sm text-slate-300">
-                      <span>Max Branches Cap</span>
-                      <span className="font-bold">10 branches</span>
-                    </div>
-                  </div>
-                  <div className="pt-4 border-t border-slate-800 space-y-2">
-                    <div className="flex items-center gap-2 text-xs text-emerald-400"><CheckCircle className="h-3.5 w-3.5" /> Unlimited Staff Management</div>
-                    <div className="flex items-center gap-2 text-xs text-emerald-400"><CheckCircle className="h-3.5 w-3.5" /> Advanced Attendance Desk</div>
-                    <div className="flex items-center gap-2 text-xs text-emerald-400"><CheckCircle className="h-3.5 w-3.5" /> POS Supplement Registers</div>
-                    <div className="flex items-center gap-2 text-xs text-emerald-400"><CheckCircle className="h-3.5 w-3.5" /> Multi-location Data sync & Reports</div>
-                  </div>
-                </CardContent>
-              </Card>
-
+                  </CardContent>
+                </Card>
+              ))}
             </div>
+
+            {/* Plan Add/Edit Modal */}
+            {isPlanModalOpen && (
+              <div className="fixed inset-0 bg-slate-950/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+                <div className="bg-slate-900 border border-slate-800 shadow-2xl rounded-2xl w-full max-w-md overflow-hidden animate-in zoom-in-95 duration-200 text-slate-100">
+                  <div className="p-6 bg-slate-900 border-b border-slate-800 flex items-center justify-between">
+                    <div>
+                      <h3 className="text-lg font-bold text-slate-100">
+                        {editingPlan ? 'Modify Subscription Plan' : 'Add Subscription Plan'}
+                      </h3>
+                      <p className="text-xs text-slate-400">Define global caps and features allowed for this tier.</p>
+                    </div>
+                    <Button variant="ghost" size="icon" onClick={() => setIsPlanModalOpen(false)} className="h-8 w-8 text-slate-400 hover:text-slate-100 hover:bg-slate-800">
+                      <X className="h-4 w-4" />
+                    </Button>
+                  </div>
+
+                  <form onSubmit={handleSavePlanSubmit} className="p-6 space-y-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="planNameInput">Plan Name *</Label>
+                      <Input 
+                        id="planNameInput" 
+                        required 
+                        value={planFormData.name}
+                        onChange={(e) => setPlanFormData({ ...planFormData, name: e.target.value })}
+                        placeholder="e.g. GymFlow Pro Plus" 
+                        className="bg-slate-950 border-slate-800 text-slate-100"
+                      />
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="planTierInput">Tier Label *</Label>
+                        <Input 
+                          id="planTierInput" 
+                          required 
+                          value={planFormData.tier}
+                          onChange={(e) => setPlanFormData({ ...planFormData, tier: e.target.value })}
+                          placeholder="e.g. Tier 4" 
+                          className="bg-slate-950 border-slate-800 text-slate-100"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="planPriceInput">Monthly Price ($) *</Label>
+                        <Input 
+                          id="planPriceInput" 
+                          required 
+                          type="number"
+                          value={planFormData.price}
+                          onChange={(e) => setPlanFormData({ ...planFormData, price: Number(e.target.value) })}
+                          placeholder="e.g. 199" 
+                          className="bg-slate-950 border-slate-800 text-slate-100"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="planMaxMembersInput">Max Members Limit *</Label>
+                        <Input 
+                          id="planMaxMembersInput" 
+                          required 
+                          value={planFormData.maxMembers}
+                          onChange={(e) => setPlanFormData({ ...planFormData, maxMembers: e.target.value })}
+                          placeholder="e.g. 1,000 active" 
+                          className="bg-slate-950 border-slate-800 text-slate-100"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="planMaxBranchesInput">Max Branches Cap *</Label>
+                        <Input 
+                          id="planMaxBranchesInput" 
+                          required 
+                          value={planFormData.maxBranches}
+                          onChange={(e) => setPlanFormData({ ...planFormData, maxBranches: e.target.value })}
+                          placeholder="e.g. 5 branches" 
+                          className="bg-slate-950 border-slate-800 text-slate-100"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="planFeaturesInput">Enabled Features (comma-separated)</Label>
+                      <textarea 
+                        id="planFeaturesInput" 
+                        rows={2}
+                        value={planFormData.features}
+                        onChange={(e) => setPlanFormData({ ...planFormData, features: e.target.value })}
+                        placeholder="Staff Management HR, Advanced Attendance Desk, POS Supplement Registers" 
+                        className="w-full rounded-md border border-slate-800 bg-slate-950 text-sm p-3 focus:outline-none text-slate-100 focus:border-violet-500"
+                      />
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="planDisabledFeaturesInput">Disabled Features (comma-separated)</Label>
+                      <textarea 
+                        id="planDisabledFeaturesInput" 
+                        rows={2}
+                        value={planFormData.disabledFeatures}
+                        onChange={(e) => setPlanFormData({ ...planFormData, disabledFeatures: e.target.value })}
+                        placeholder="Inventory & Wastage CRM" 
+                        className="w-full rounded-md border border-slate-800 bg-slate-950 text-sm p-3 focus:outline-none text-slate-100 focus:border-violet-500"
+                      />
+                    </div>
+
+                    <div className="flex justify-end gap-3 pt-4 border-t border-slate-800">
+                      <Button type="button" variant="outline" onClick={() => setIsPlanModalOpen(false)} className="border-slate-800 hover:bg-slate-800 text-xs">
+                        Cancel
+                      </Button>
+                      <Button type="submit" className="bg-violet-600 hover:bg-violet-500 text-slate-50 font-bold text-xs">
+                        {editingPlan ? 'Save Changes' : 'Create Pricing Plan'}
+                      </Button>
+                    </div>
+                  </form>
+                </div>
+              </div>
+            )}
           </div>
         )}
 

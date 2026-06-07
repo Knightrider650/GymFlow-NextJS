@@ -81,22 +81,22 @@ export default function RegisterPage() {
 
             <div className="space-y-2">
               <Label htmlFor="name">Full Name</Label>
-              <Input id="name" name="name" autoComplete="off" placeholder="John Doe" value={formData.name} onChange={(e) => setFormData({...formData, name: e.target.value})} disabled={isLoading} />
+              <Input id="name" name="name" autoComplete="name" placeholder="John Doe" value={formData.name} onChange={(e) => setFormData({...formData, name: e.target.value})} disabled={isLoading} />
             </div>
 
             <div className="space-y-2">
               <Label htmlFor="email">Email</Label>
-              <Input id="email" name="email" autoComplete="off" type="email" placeholder="john@example.com" value={formData.email} onChange={(e) => setFormData({...formData, email: e.target.value})} disabled={isLoading} />
+              <Input id="email" name="email" autoComplete="email" type="email" placeholder="john@example.com" value={formData.email} onChange={(e) => setFormData({...formData, email: e.target.value})} disabled={isLoading} />
             </div>
 
             <div className="space-y-2">
               <Label htmlFor="password">Password</Label>
-              <Input id="password" name="password" autoComplete="off" type="password" placeholder="••••••••" value={formData.password} onChange={(e) => setFormData({...formData, password: e.target.value})} disabled={isLoading} />
+              <Input id="password" name="password" autoComplete="new-password" type="password" placeholder="••••••••" value={formData.password} onChange={(e) => setFormData({...formData, password: e.target.value})} disabled={isLoading} />
             </div>
 
             <div className="space-y-2">
               <Label htmlFor="confirmPassword">Confirm Password</Label>
-              <Input id="confirmPassword" name="confirmPassword" autoComplete="off" type="password" placeholder="••••••••" value={formData.confirmPassword} onChange={(e) => setFormData({...formData, confirmPassword: e.target.value})} disabled={isLoading} />
+              <Input id="confirmPassword" name="confirmPassword" autoComplete="new-password" type="password" placeholder="••••••••" value={formData.confirmPassword} onChange={(e) => setFormData({...formData, confirmPassword: e.target.value})} disabled={isLoading} />
             </div>
 
             <Button type="submit" className="w-full" disabled={isLoading} size="lg">
