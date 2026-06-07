@@ -141,8 +141,8 @@ export async function GET(req: NextRequest) {
     ]
 
     const mergedGyms = (dbGyms.length > 0 ? dbGyms.map(gym => {
-      const activeMembers = gym.members.filter((m: any) => m.status === 'active').length
-      const totalRevenue = gym.invoices
+      const activeMembers = (gym.members || []).filter((m: any) => m.status === 'active').length
+      const totalRevenue = (gym.invoices || [])
         .filter((i: any) => i.status === 'paid')
         .reduce((sum: number, i: any) => sum + i.amount, 0)
 

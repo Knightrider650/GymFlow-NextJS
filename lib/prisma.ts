@@ -184,6 +184,9 @@ function resolveRelations(modelName: string, itemOrItems: any, include: any, jso
     } else if (modelName === 'gym' && relationKey === 'members') {
       targetJsonKey = 'members';
       isMany = true;
+    } else if (modelName === 'gym' && relationKey === 'invoices') {
+      targetJsonKey = 'billing';
+      isMany = true;
     } else if (modelName === 'member' && relationKey === 'attendance') {
       targetJsonKey = 'attendance';
       isMany = true;
