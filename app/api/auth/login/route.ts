@@ -29,7 +29,20 @@ async function tryBackendLogin(email: string, password: string) {
 
 export async function POST(request: Request) {
   try {
-    const { email, password } = await request.json()
+      let payload: any = {};
+  try {
+    payload = await request.json();
+  } catch (e) {
+    // Fallback to raw text parsing for compatibility
+    const raw = await request.text();
+    try {
+      payload = JSON.parse(raw);
+    } catch (_) {
+      // If still invalid, return bad request
+      return NextResponse.json({ success: false, error: 'Invalid JSON payload' }, { status: 400 });
+    }
+  }
+  const { email, password } = payload;
 
     if (!email || !password) {
       return NextResponse.json(
@@ -65,6 +78,8 @@ export async function POST(request: Request) {
         where: { email },
         include: { gym: true }
       })
+      console.log('Login attempt for email:', email)
+      console.log('Retrieved user password hash:', user?.password)
     } catch (dbError: any) {
       if (isDatabaseUnavailable(dbError) && backendUrl && !isSameHost(backendUrl, hostHeader)) {
         const fallback = await tryBackendLogin(email, password)

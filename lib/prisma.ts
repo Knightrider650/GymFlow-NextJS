@@ -13,18 +13,17 @@ declare global {
 
 let prismaInstance: PrismaClient;
 
-try {
-  if (!process.env.DATABASE_URL) {
-    throw new Error('DATABASE_URL is not set')
-  }
-
-  const rawUrl = process.env.DATABASE_URL;
-  const connectionString = rawUrl ? rawUrl.replace(/sslmode=(require|prefer|verify-ca)/g, 'sslmode=verify-full') : undefined;
-  const adapter = new PrismaPg({ connectionString: connectionString! })
+// Initialize PrismaClient with SQLite fallback.
+// If DATABASE_URL points to a file (SQLite), we create a plain PrismaClient.
+// Otherwise we use the PostgreSQL adapter.
+const rawUrl = process.env.DATABASE_URL || 'file:./dev.db';
+if (rawUrl.startsWith('file:')) {
+  // SQLite connection, no adapter needed
+  prismaInstance = (global as any).prisma || new PrismaClient();
+} else {
+  const connectionString = rawUrl.replace(/sslmode=(require|prefer|verify-ca)/g, 'sslmode=verify-full');
+  const adapter = new PrismaPg({ connectionString });
   prismaInstance = (global as any).prisma || new PrismaClient({ adapter });
-} catch (e) {
-  console.warn("Prisma failed to initialize at module level (expected during build). Using dummy client.");
-  prismaInstance = {} as PrismaClient;
 }
 
 if (process.env.NODE_ENV !== "production") (global as any).prisma = prismaInstance;

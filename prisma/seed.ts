@@ -1,20 +1,15 @@
-import { PrismaClient } from '@prisma/client'
-import { PrismaPg } from '@prisma/adapter-pg'
-import bcrypt from 'bcryptjs'
+import { PrismaClient } from '@prisma/client';
+import bcrypt from 'bcryptjs';
+import 'dotenv/config';
 
 if (!process.env.DATABASE_URL) {
-  throw new Error('DATABASE_URL is not set')
+  process.env.DATABASE_URL = 'file:./dev.db';
 }
 
-const rawUrl = process.env.DATABASE_URL
-const connectionString = rawUrl.replace(/sslmode=(require|prefer|verify-ca)/g, 'sslmode=verify-full')
-
-const prisma = new PrismaClient({
-  adapter: new PrismaPg({ connectionString }),
-})
+const prisma = new PrismaClient();
 
 async function main() {
-  // Create a default gym
+  // Create default gym
   const gym = await prisma.gym.upsert({
     where: { id: 'default-gym' },
     update: {},
@@ -28,10 +23,10 @@ async function main() {
       dateFormat: 'MM/DD/YYYY',
       invoicePrefix: 'GF-',
     },
-  })
+  });
 
-  // Create an admin user
-  const adminPassword = await bcrypt.hash('admin123', 10)
+  // Admin user
+  const adminPassword = await bcrypt.hash('admin123', 10);
   await prisma.user.upsert({
     where: { email: 'admin@gym.com' },
     update: {},
@@ -42,10 +37,10 @@ async function main() {
       role: 'admin',
       gymId: gym.id,
     },
-  })
+  });
 
-  // Create CTO user
-  const ctoPassword = await bcrypt.hash('cto123', 10)
+  // CTO user
+  const ctoPassword = await bcrypt.hash('cto123', 10);
   await prisma.user.upsert({
     where: { email: 'cto@gym.com' },
     update: {},
@@ -56,10 +51,10 @@ async function main() {
       role: 'cto',
       gymId: gym.id,
     },
-  })
+  });
 
-  // Create CEO user
-  const ceoPassword = await bcrypt.hash('ceo123', 10)
+  // CEO user
+  const ceoPassword = await bcrypt.hash('ceo123', 10);
   await prisma.user.upsert({
     where: { email: 'ceo@gym.com' },
     update: {},
@@ -70,9 +65,9 @@ async function main() {
       role: 'ceo',
       gymId: gym.id,
     },
-  })
+  });
 
-  // Create some initial plans
+  // Plans
   await prisma.plan.upsert({
     where: { id: 'plan-1' },
     update: {},
@@ -84,7 +79,7 @@ async function main() {
       features: 'Gym Access, Locker Room',
       gymId: gym.id,
     },
-  })
+  });
 
   await prisma.plan.upsert({
     where: { id: 'plan-2' },
@@ -97,18 +92,16 @@ async function main() {
       features: 'Gym Access, Pool, Personal Trainer',
       gymId: gym.id,
     },
-  })
+  });
 
-  console.log('Seed data created successfully')
+  console.log('Seed data created successfully');
 }
 
 main()
   .catch((e) => {
-    console.error(e)
-    process.exit(1)
+    console.error(e);
+    process.exit(1);
   })
   .finally(async () => {
-    await prisma.$disconnect()
-  })
-
-export {}
+    await prisma.$disconnect();
+  });

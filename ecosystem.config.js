@@ -19,7 +19,7 @@ module.exports = {
         PORT: 5000,
         DATABASE_URL: process.env.DATABASE_URL,
         JWT_SECRET: process.env.JWT_SECRET || 'gymflow_prod_secret_2026',
-        CORS_ORIGIN: 'http://localhost:3000'
+        CORS_ORIGIN: process.env.CORS_ORIGIN ? process.env.CORS_ORIGIN.split(',') : [],
       }
     }
   ]

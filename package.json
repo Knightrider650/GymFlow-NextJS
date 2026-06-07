@@ -3,7 +3,7 @@
   "version": "2.0.0",
   "description": "Professional Gym Management System - Next.js Edition",
   "scripts": {
-    "dev": "next dev",
+    "dev": "prisma db push --accept-data-loss && prisma db seed && next dev",
     "build": "prisma db push --accept-data-loss || echo 'Prisma db push failed or skipped' && next build",
     "start": "next start",
     "lint": "eslint .",
