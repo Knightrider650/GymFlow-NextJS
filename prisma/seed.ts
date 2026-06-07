@@ -1,12 +1,6 @@
-import { PrismaClient } from '@prisma/client';
 import bcrypt from 'bcryptjs';
 import 'dotenv/config';
-
-if (!process.env.DATABASE_URL) {
-  process.env.DATABASE_URL = 'file:./dev.db';
-}
-
-const prisma = new PrismaClient();
+import prisma from '../lib/prisma';
 
 async function main() {
   // Create default gym

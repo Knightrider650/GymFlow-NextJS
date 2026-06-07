@@ -34,7 +34,35 @@
       "created_at": "2026-04-26T22:32:53.342Z",
       "scope": "platform",
       "tenantId": "gym-001",
-      "tenant_id": "gym-001"
+      "tenant_id": "gym-001",
+      "updatedAt": "2026-06-07T07:07:20.514Z",
+      "gym_id": "gym-001"
+    },
+    {
+      "id": "0.07172314174038075",
+      "email": "cto@gym.com",
+      "password": "$2b$10$4ehHNEfoEi1G6FyQQZyl6OHMe3492vRvJfYq4QdZvJH8MLRGynOhO",
+      "fullname": "CTO User",
+      "role": "cto",
+      "gymId": "default-gym",
+      "createdAt": "2026-06-07T07:07:20.577Z",
+      "updatedAt": "2026-06-07T07:07:20.577Z",
+      "gym_id": "default-gym",
+      "tenantId": "default-gym",
+      "tenant_id": "default-gym"
+    },
+    {
+      "id": "0.05520859356913421",
+      "email": "ceo@gym.com",
+      "password": "$2b$10$qJceDvtriog3kCykIsy/3eEHN.Ik0xvIbQHjAB/qUjtqrJ43.aCTe",
+      "fullname": "CEO User",
+      "role": "ceo",
+      "gymId": "default-gym",
+      "createdAt": "2026-06-07T07:07:20.640Z",
+      "updatedAt": "2026-06-07T07:07:20.640Z",
+      "gym_id": "default-gym",
+      "tenantId": "default-gym",
+      "tenant_id": "default-gym"
     }
   ],
   "members": [
@@ -209,6 +237,32 @@
       "features": "Gym Only",
       "tenant_id": "gym-001",
       "tenantId": "gym-001"
+    },
+    {
+      "id": "plan-1",
+      "name": "Basic Monthly",
+      "price": 30,
+      "durationMonths": 1,
+      "features": "Gym Access, Locker Room",
+      "gymId": "default-gym",
+      "createdAt": "2026-06-07T07:07:20.641Z",
+      "updatedAt": "2026-06-07T07:07:20.641Z",
+      "gym_id": "default-gym",
+      "tenantId": "default-gym",
+      "tenant_id": "default-gym"
+    },
+    {
+      "id": "plan-2",
+      "name": "Annual Premium",
+      "price": 300,
+      "durationMonths": 12,
+      "features": "Gym Access, Pool, Personal Trainer",
+      "gymId": "default-gym",
+      "createdAt": "2026-06-07T07:07:20.641Z",
+      "updatedAt": "2026-06-07T07:07:20.641Z",
+      "gym_id": "default-gym",
+      "tenantId": "default-gym",
+      "tenant_id": "default-gym"
     }
   ],
   "settings": {
@@ -234,6 +288,18 @@
       "contactEmail": "admin@gymflow.com",
       "createdAt": "2026-05-17T09:13:56.039Z",
       "lastActiveAt": "2026-05-17T09:13:56.039Z"
+    },
+    {
+      "id": "default-gym",
+      "name": "GymFlow HQ",
+      "email": "contact@gymflow.com",
+      "phone": "+1 (555) 999-8888",
+      "address": "123 Fitness Ave, Wellness City",
+      "currency": "INR",
+      "dateFormat": "MM/DD/YYYY",
+      "invoicePrefix": "GF-",
+      "createdAt": "2026-06-07T07:07:20.438Z",
+      "updatedAt": "2026-06-07T07:07:20.438Z"
     }
   ],
   "activity_logs": [

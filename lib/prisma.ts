@@ -11,22 +11,27 @@ declare global {
   }
 }
 
-let prismaInstance: PrismaClient;
+let prismaInstance: PrismaClient | null = null;
 
-// Initialize PrismaClient with SQLite fallback.
-// If DATABASE_URL points to a file (SQLite), we create a plain PrismaClient.
-// Otherwise we use the PostgreSQL adapter.
-const rawUrl = process.env.DATABASE_URL || 'file:./dev.db';
-if (rawUrl.startsWith('file:')) {
-  // SQLite connection, no adapter needed
-  prismaInstance = (global as any).prisma || new PrismaClient();
-} else {
-  const connectionString = rawUrl.replace(/sslmode=(require|prefer|verify-ca)/g, 'sslmode=verify-full');
-  const adapter = new PrismaPg({ connectionString });
-  prismaInstance = (global as any).prisma || new PrismaClient({ adapter });
+function getPrismaInstance(): PrismaClient {
+  if (prismaInstance) return prismaInstance;
+
+  // Initialize PrismaClient with SQLite fallback.
+  // If DATABASE_URL points to a file (SQLite), we create a plain PrismaClient.
+  // Otherwise we use the PostgreSQL adapter.
+  const rawUrl = process.env.DATABASE_URL || 'file:./dev.db';
+  if (rawUrl.startsWith('file:')) {
+    // SQLite connection, no adapter needed
+    prismaInstance = (global as any).prisma || new PrismaClient();
+  } else {
+    const connectionString = rawUrl.replace(/sslmode=(require|prefer|verify-ca)/g, 'sslmode=verify-full');
+    const adapter = new PrismaPg({ connectionString });
+    prismaInstance = (global as any).prisma || new PrismaClient({ adapter });
+  }
+
+  if (process.env.NODE_ENV !== "production") (global as any).prisma = prismaInstance;
+  return prismaInstance;
 }
-
-if (process.env.NODE_ENV !== "production") (global as any).prisma = prismaInstance;
 
 // Helper to read fallback JSON database (tries primary, then fallback on /tmp)
 function getJsonData() {
@@ -298,16 +303,23 @@ function saveJsonData(data: any) {
 }
 
 // Wrap prismaInstance in a Proxy to fallback gracefully to JSON database on query failures
-const prisma = new Proxy(prismaInstance, {
+const prisma = new Proxy({} as PrismaClient, {
   get(target, prop) {
+    let instance: any;
+    try {
+      instance = getPrismaInstance();
+    } catch (e) {
+      instance = {};
+    }
+
     const modelName = prop as string;
     const jsonKey = MODEL_MAPPING[modelName];
 
     if (prop === '$transaction') {
       return async function (arg: any) {
         try {
-          if (typeof target.$transaction === 'function') {
-            return await target.$transaction(arg);
+          if (typeof instance.$transaction === 'function') {
+            return await instance.$transaction(arg);
           }
         } catch (dbError: any) {
           console.warn("Prisma transaction failed, falling back to simulated transaction:", dbError.message);
@@ -323,13 +335,13 @@ const prisma = new Proxy(prismaInstance, {
     }
 
     if (prop === '$connect' || prop === '$disconnect') {
-      return typeof (target as any)[prop] === 'function'
-        ? (target as any)[prop]
+      return typeof (instance as any)[prop] === 'function'
+        ? (instance as any)[prop]
         : async () => {};
     }
 
     if (jsonKey) {
-      const modelTarget = (target as any)[prop] || {};
+      const modelTarget = (instance as any)[prop] || {};
       return new Proxy(modelTarget, {
         get(mTarget, methodProp) {
           const methodName = methodProp as string;
@@ -376,6 +388,30 @@ const prisma = new Proxy(prismaInstance, {
                 const item = items.find((item: any) => matchesFilter(item, where)) || null;
                 const normalized = normalizeGymId(item);
                 return resolveRelations(modelName, normalized, args[0]?.include, jsonData);
+              }
+
+              if (methodName === 'upsert') {
+                const item = items.find((item: any) => matchesFilter(item, where)) || null;
+                if (item) {
+                  const updateData = args[0]?.update || {};
+                  const updated = normalizeGymId({ ...item, ...updateData, updatedAt: new Date() });
+                  const newItems = items.map((t: any) => (t.id === item.id ? updated : t));
+                  jsonData[jsonKey] = newItems;
+                  saveJsonData(jsonData);
+                  return resolveRelations(modelName, updated, args[0]?.include, jsonData);
+                } else {
+                  const createData = args[0]?.create || {};
+                  const newItem = normalizeGymId({
+                    id: createData.id || Math.random().toString(),
+                    ...createData,
+                    createdAt: new Date(),
+                    updatedAt: new Date()
+                  });
+                  if (!jsonData[jsonKey]) jsonData[jsonKey] = [];
+                  jsonData[jsonKey].push(newItem);
+                  saveJsonData(jsonData);
+                  return resolveRelations(modelName, newItem, args[0]?.include, jsonData);
+                }
               }
 
               if (methodName === 'count') {
@@ -461,7 +497,7 @@ const prisma = new Proxy(prismaInstance, {
       });
     }
 
-    return (target as any)[prop];
+    return (instance as any)[prop];
   }
 });
 
