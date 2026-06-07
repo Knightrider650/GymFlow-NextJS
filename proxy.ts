@@ -18,7 +18,7 @@ function getRouteScope(pathname: string): 'platform' | 'tenant' | null {
 }
 
 // Proxy to enforce route-level RBAC based on ROUTE_PERMISSIONS
-export async function middleware(req: NextRequest) {
+export async function proxy(req: NextRequest) {
   const { pathname } = req.nextUrl
 
   // Allow static, api and next internals
