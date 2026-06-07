@@ -1068,8 +1068,7 @@ export const useGymStore = create<GymState>()((set, get) => ({
   // Real-time SSE
   initStream: () => {
     if (typeof window === 'undefined') return () => {};
-    const url = process.env.NEXT_PUBLIC_API_URL || (typeof window !== 'undefined' ? window.location.origin : '');
-    const evtSource = new EventSource(`${url}/api/sync/stream`);
+    const evtSource = new EventSource('/api/sync/stream');
     
     evtSource.onmessage = (event) => {
       console.log('SSE Generic Pulse:', event.data);
