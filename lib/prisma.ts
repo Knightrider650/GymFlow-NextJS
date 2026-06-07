@@ -1,5 +1,4 @@
 import { PrismaClient } from '@prisma/client'
-import { PrismaPg } from '@prisma/adapter-pg'
 import fs from 'fs'
 import path from 'path'
 
@@ -24,9 +23,8 @@ function getPrismaInstance(): PrismaClient {
     // SQLite connection, no adapter needed
     prismaInstance = (global as any).prisma || new PrismaClient();
   } else {
-    const connectionString = rawUrl.replace(/sslmode=(require|prefer|verify-ca)/g, 'sslmode=verify-full');
-    const adapter = new PrismaPg({ connectionString });
-    prismaInstance = (global as any).prisma || new PrismaClient({ adapter });
+    // Native PostgreSQL connection
+    prismaInstance = (global as any).prisma || new PrismaClient();
   }
 
   if (process.env.NODE_ENV !== "production") (global as any).prisma = prismaInstance;
