@@ -62,7 +62,7 @@ const ALL_NAV_ITEMS: NavItem[] = [
   { href: '/communications', label: 'Communications',  icon: MessageSquare, section: 'comms' },
   { href: '/feedback',       label: 'Feedback',        icon: FileText,     section: 'comms' },
   // ── Admin ────────────────────────────────────────────────────────────
-  { href: '/staff',          label: 'Staff HR',        icon: Users2,       section: 'admin' },
+  { href: '/staff-hr',       label: 'Staff HR',        icon: Users2,       section: 'admin' },
   { href: '/reports',        label: 'Reports',         icon: BarChart3,    section: 'admin' },
   { href: '/activity-log',   label: 'Activity Log',    icon: Activity,     section: 'admin' },
   { href: '/settings',       label: 'Settings',        icon: Settings,     section: 'admin' },

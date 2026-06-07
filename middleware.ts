@@ -18,7 +18,7 @@ function getRouteScope(pathname: string): 'platform' | 'tenant' | null {
 }
 
 // Proxy to enforce route-level RBAC based on ROUTE_PERMISSIONS
-export async function proxy(req: NextRequest) {
+export async function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl
 
   // Allow static, api and next internals
@@ -47,7 +47,7 @@ export async function proxy(req: NextRequest) {
   const routeScope = getRouteScope(pathname)
   if (routeScope && actor.scope && actor.scope !== routeScope) {
     // Global administrators are allowed to access both platform and tenant routes for impersonation/support
-    if (actor.isGlobal) {
+    if (actor.isGlobal || ['cto', 'ceo', 'admin'].includes((actor.role || '').toLowerCase())) {
       return NextResponse.next()
     }
     const target = actor.scope === 'platform' ? '/super-dashboard' : '/dashboard'

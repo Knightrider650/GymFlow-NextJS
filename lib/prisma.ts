@@ -36,23 +36,22 @@ function getJsonData() {
   const primaryPath = path.join(process.cwd(), 'server', 'data.json')
   const fallbackPath = process.env.GYMFLOW_JSON_DB_FILE || '/tmp/gymflow-data.json'
   
-  // Try primary path first
+  // Try fallback path first (where we write updates)
+  try {
+    if (fs.existsSync(fallbackPath)) {
+      return JSON.parse(fs.readFileSync(fallbackPath, 'utf-8'))
+    }
+  } catch (err) {
+    console.warn('Failed to read fallback JSON database:', err)
+  }
+  
+  // Try primary path as template fallback
   try {
     if (fs.existsSync(primaryPath)) {
       return JSON.parse(fs.readFileSync(primaryPath, 'utf-8'))
     }
   } catch (err) {
     console.warn('Failed to read primary JSON database:', err)
-  }
-  
-  // Try fallback path
-  try {
-    if (fs.existsSync(fallbackPath)) {
-      console.log(`✓ Reading from fallback database: ${fallbackPath}`)
-      return JSON.parse(fs.readFileSync(fallbackPath, 'utf-8'))
-    }
-  } catch (err) {
-    console.warn('Failed to read fallback JSON database:', err)
   }
   
   return {}
@@ -283,22 +282,17 @@ function saveJsonData(data: any) {
     fs.writeFileSync(primaryPath, JSON.stringify(data, null, 2), 'utf-8')
     return
   } catch (err: any) {
-    // Check for read-only filesystem errors
-    if (err.code === 'EROFS' || err.code === 'EPERM') {
-      try {
-        // Ensure /tmp directory exists
-        const dir = path.dirname(fallbackPath)
-        if (!fs.existsSync(dir)) {
-          fs.mkdirSync(dir, { recursive: true })
-        }
-        fs.writeFileSync(fallbackPath, JSON.stringify(data, null, 2), 'utf-8')
-        console.log(`✓ Saved to fallback database: ${fallbackPath}`)
-        return
-      } catch (fallbackErr) {
-        console.error('Failed to write to both primary and fallback JSON databases:', fallbackErr)
+    try {
+      // Ensure /tmp directory exists
+      const dir = path.dirname(fallbackPath)
+      if (!fs.existsSync(dir)) {
+        fs.mkdirSync(dir, { recursive: true })
       }
-    } else {
-      console.error('Failed to write to fallback JSON database:', err)
+      fs.writeFileSync(fallbackPath, JSON.stringify(data, null, 2), 'utf-8')
+      console.log(`✓ Saved to fallback database: ${fallbackPath} (due to write error: ${err.message})`)
+      return
+    } catch (fallbackErr) {
+      console.error('Failed to write to both primary and fallback JSON databases:', fallbackErr)
     }
   }
 }

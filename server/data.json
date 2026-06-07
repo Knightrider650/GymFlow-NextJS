@@ -312,7 +312,30 @@
       "entityId": "gym-001",
       "entityName": "GymFlow Pro",
       "details": "Opened support session for GymFlow Pro",
-      "createdAt": "2026-05-17T09:14:45.766Z"
+    }
+  ],
+  "branches": [
+    {
+      "id": "branch-default-1",
+      "gymId": "default-gym",
+      "owner_id": "default-gym",
+      "name": "HQ Main Branch",
+      "address": "123 Fitness Ave, Wellness City",
+      "phone": "+1 (555) 999-8888",
+      "email": "contact@gymflow.com",
+      "isDefault": true,
+      "is_default": true
+    },
+    {
+      "id": "branch-pro-1",
+      "gymId": "gym-001",
+      "owner_id": "gym-001",
+      "name": "Downtown Branch",
+      "address": "456 Central Ave, Metro City",
+      "phone": "555-0301",
+      "email": "downtown@gymflow.com",
+      "isDefault": true,
+      "is_default": true
     }
   ]
 }

@@ -149,6 +149,7 @@ export async function GET(req: NextRequest) {
       return {
         id: gym.id,
         name: gym.name,
+        subdomain: `${gym.id}.gymflow.app`,
         email: gym.email,
         phone: gym.phone,
         address: gym.address,

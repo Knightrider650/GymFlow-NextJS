@@ -67,7 +67,7 @@ export default function CalendarPage() {
         <Card className="border-none shadow-xl bg-card/40 backdrop-blur-md overflow-hidden">
           <CardContent className="p-0">
             <div className="w-full overflow-x-auto">
-              <div className="min-w-[900px]">
+              <div className="min-w-[1050px]">
                 {/* Header Row */}
                 <div className="grid grid-cols-8 border-b border-white/5 bg-muted/50">
                   <div className="p-4 text-center font-bold text-muted-foreground border-r border-white/5">

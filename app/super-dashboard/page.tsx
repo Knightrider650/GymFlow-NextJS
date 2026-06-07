@@ -190,6 +190,7 @@ export default function SuperDashboard() {
   // UI state for modals / details
   const [selectedTenant, setSelectedTenant] = useState<GymOverview | null>(null)
   const [isNewTenantOpen, setIsNewTenantOpen] = useState(false)
+  const [isProvisioning, setIsProvisioning] = useState(false)
   const [newTenantData, setNewTenantData] = useState({
     name: '',
     subdomain: '',
@@ -242,6 +243,7 @@ export default function SuperDashboard() {
 
   const handleCreateTenantSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    setIsProvisioning(true)
     try {
       const response = await fetch('/api/super-admin/gyms', {
         method: 'POST',
@@ -254,12 +256,16 @@ export default function SuperDashboard() {
           await fetchGyms()
           setIsNewTenantOpen(false)
           setNewTenantData({ name: '', subdomain: '', plan: 'Basic', email: '', phone: '', address: '' })
+          alert('Gym tenant successfully provisioned!')
         }
       } else {
         alert('Failed to provision tenant')
       }
     } catch (err) {
       console.error('Error provisioning tenant:', err)
+      alert('Error provisioning tenant')
+    } finally {
+      setIsProvisioning(false)
     }
   }
 
@@ -518,9 +524,12 @@ export default function SuperDashboard() {
 
   // Filtered tenants for search & metrics
   const filteredTenants = tenants.filter(t => {
-    const matchesSearch = t.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
-      t.subdomain.toLowerCase().includes(searchTerm.toLowerCase()) || 
-      t.email.toLowerCase().includes(searchTerm.toLowerCase())
+    const name = t.name || ''
+    const subdomain = t.subdomain || ''
+    const email = t.email || ''
+    const matchesSearch = name.toLowerCase().includes(searchTerm.toLowerCase()) || 
+      subdomain.toLowerCase().includes(searchTerm.toLowerCase()) || 
+      email.toLowerCase().includes(searchTerm.toLowerCase())
     const matchesStatus = statusFilter === 'all' || t.status === statusFilter
     return matchesSearch && matchesStatus
   })
@@ -1078,7 +1087,7 @@ export default function SuperDashboard() {
                 </h2>
                 <p className="text-xs text-slate-400">Configure global tenant caps and active database features allowed per subscription plan tier.</p>
               </div>
-              <Button className="gap-2 font-semibold">
+              <Button className="gap-2 font-semibold" onClick={() => alert('Custom plan creation is coming soon! Contact platform support to configure new subscription tiers.')}>
                 <Plus className="h-4 w-4" />
                 Add Pricing Plan
               </Button>
@@ -1210,7 +1219,10 @@ export default function SuperDashboard() {
                       size="sm"
                       className="font-bold text-xs"
                       onClick={() => {
-                        setGlobalFlags(globalFlags.map(f => f.id === flag.id ? { ...f, activeGlobally: !f.activeGlobally } : f))
+                        const action = flag.activeGlobally ? 'deactivate' : 'activate'
+                        if (confirm(`Are you sure you want to ${action} "${flag.name}" globally? This affects all tenants.`)) {
+                          setGlobalFlags(globalFlags.map(f => f.id === flag.id ? { ...f, activeGlobally: !f.activeGlobally } : f))
+                        }
                       }}
                     >
                       {flag.activeGlobally ? 'Active Globally' : 'Inactive (Beta Only)'}
@@ -1666,8 +1678,8 @@ export default function SuperDashboard() {
                   <Button type="button" variant="outline" onClick={() => setIsNewTenantOpen(false)} className="border-slate-800 hover:bg-slate-800">
                     Cancel
                   </Button>
-                  <Button type="submit" className="font-bold">
-                    Deploy Tenant DB Isolation
+                  <Button type="submit" className="font-bold" disabled={isProvisioning}>
+                    {isProvisioning ? 'Deploying Tenant...' : 'Deploy Tenant DB Isolation'}
                   </Button>
                 </div>
               </form>

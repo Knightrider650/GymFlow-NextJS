@@ -454,6 +454,7 @@ export default function TeamPage() {
                   id="cu-fullname"
                   placeholder="John Smith"
                   required
+                  autoComplete="off"
                   value={createForm.fullname}
                   onChange={(e) => setCreateForm({ ...createForm, fullname: e.target.value })}
                 />
@@ -465,6 +466,7 @@ export default function TeamPage() {
                   type="email"
                   placeholder="john@yourgym.com"
                   required
+                  autoComplete="off"
                   value={createForm.email}
                   onChange={(e) => setCreateForm({ ...createForm, email: e.target.value })}
                 />
@@ -490,6 +492,7 @@ export default function TeamPage() {
                     placeholder="Min 8 characters"
                     required
                     minLength={8}
+                    autoComplete="off"
                     value={createForm.password}
                     onChange={(e) => setCreateForm({ ...createForm, password: e.target.value })}
                     className="pr-10"

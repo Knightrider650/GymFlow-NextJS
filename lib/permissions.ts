@@ -185,7 +185,7 @@ export const ROUTE_PERMISSIONS: Record<string, UserRole[]> = {
   '/inventory': ['cto', 'ceo', 'admin', 'owner', 'manager', 'staff', 'trainer'],
   '/communications': ['cto', 'ceo', 'admin', 'owner', 'manager', 'staff'],
   '/reports': ['cto', 'ceo', 'admin', 'owner', 'manager', 'staff', 'trainer'],
-  '/staff': ['cto', 'ceo', 'admin', 'owner', 'manager'],
+  '/staff-hr': ['cto', 'ceo', 'admin', 'owner', 'manager'],
   '/settings': ['cto', 'ceo', 'admin', 'owner', 'manager'],
   '/activity-log': ['cto', 'ceo', 'admin', 'owner', 'manager'],
   '/team': ['cto', 'ceo', 'admin', 'owner', 'manager'],
