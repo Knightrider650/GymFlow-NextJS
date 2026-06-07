@@ -30,7 +30,7 @@ function getPrismaInstance(): PrismaClient {
   }
 
   if (process.env.NODE_ENV !== "production") (global as any).prisma = prismaInstance;
-  return prismaInstance;
+  return prismaInstance!;
 }
 
 // Helper to read fallback JSON database (tries primary, then fallback on /tmp)
