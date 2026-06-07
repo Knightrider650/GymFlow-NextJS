@@ -157,7 +157,7 @@ export async function GET(req: NextRequest) {
         totalRevenue,
         staffCount: gym._count.users,
         branchesCount: gym._count.branches || 1,
-        createdAt: gym.createdAt.toISOString()
+        createdAt: gym.createdAt instanceof Date ? gym.createdAt.toISOString() : (gym.createdAt ? new Date(gym.createdAt).toISOString() : new Date().toISOString())
       }
     }) : defaultGyms).map(gym => {
       const override = overrides[gym.id] || {}

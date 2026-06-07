@@ -126,12 +126,16 @@ export async function POST(request: Request) {
 
     const { password: _, ...userWithoutPassword } = user
 
+    const scope = isGlobal ? 'platform' : 'tenant'
+
     return NextResponse.json({
       success: true,
       data: {
         user: {
           ...userWithoutPassword,
-          baseGymId: user.gymId
+          baseGymId: user.gymId,
+          isGlobal,
+          scope
         },
         accessToken,
         refreshToken

@@ -102,6 +102,7 @@ export async function GET(req: NextRequest) {
         gym: currentGym,
         gymId: user.gymId, // Use gymId from JWT (contextual)
         isGlobal: user.isGlobal, // Include isGlobal from JWT
+        scope: user.scope, // Include scope from JWT
         baseGymId: userData.gymId // Keep a reference to the original base gym ID
       }
     })
