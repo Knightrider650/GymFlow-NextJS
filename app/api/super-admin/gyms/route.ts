@@ -174,7 +174,7 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ success: true, data: mergedGyms })
   } catch (error: any) {
     console.error('Super Admin Gyms Fetch Error:', error)
-    return NextResponse.json({ success: false, error: 'Failed to fetch gyms' }, { status: 500 })
+    return NextResponse.json({ success: false, error: error.message || 'Failed to fetch gyms', stack: error.stack }, { status: 500 })
   }
 }
 
