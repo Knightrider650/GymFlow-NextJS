@@ -132,17 +132,33 @@ function normalizeGymId(item: any): any {
   if (Array.isArray(item)) {
     return item.map(normalizeGymId);
   }
+  
+  let normalized = { ...item };
+  
+  // Normalize gymId / tenantId equivalents
   const gymId = item.gymId || item.gym_id || item.tenantId || item.tenant_id;
   if (gymId !== undefined) {
-    return {
-      ...item,
-      gymId,
-      gym_id: gymId,
-      tenantId: gymId,
-      tenant_id: gymId
-    };
+    normalized.gymId = gymId;
+    normalized.gym_id = gymId;
+    normalized.tenantId = gymId;
+    normalized.tenant_id = gymId;
   }
-  return item;
+
+  // Normalize password / password_hash for users
+  const pwd = item.password || item.password_hash;
+  if (pwd !== undefined) {
+    normalized.password = pwd;
+    normalized.password_hash = pwd;
+  }
+
+  // Normalize fullname / name for users/members/staff
+  const fullname = item.fullname || item.name;
+  if (fullname !== undefined) {
+    normalized.fullname = fullname;
+    normalized.name = fullname;
+  }
+
+  return normalized;
 }
 
 function resolveRelations(modelName: string, itemOrItems: any, include: any, jsonData: any): any {
