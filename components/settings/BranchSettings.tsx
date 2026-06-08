@@ -143,22 +143,22 @@ export function BranchSettings() {
                  </div>
               </div>
 
-              <div className="pt-4 border-t border-slate-100 dark:border-slate-800 grid grid-cols-2 gap-4">
-                 <div className="space-y-1">
-                    <span className="text-[10px] uppercase tracking-wider text-muted-foreground font-bold block">Hours of Operation</span>
-                    <div className="flex items-center gap-1.5 text-sm font-semibold text-slate-700 dark:text-slate-300">
-                       <Clock className="h-3.5 w-3.5 text-indigo-500" />
-                       {branch.openingTime} - {branch.closingTime}
-                    </div>
-                 </div>
-                 <div className="space-y-1">
-                    <span className="text-[10px] uppercase tracking-wider text-muted-foreground font-bold block">Max Capacity</span>
-                    <div className="flex items-center gap-1.5 text-sm font-semibold text-slate-700 dark:text-slate-300">
-                       <Users className="h-3.5 w-3.5 text-indigo-500" />
-                       {branch.capacity} active slots
-                    </div>
-                 </div>
-              </div>
+               <div className="pt-4 border-t border-slate-100 dark:border-slate-800 grid grid-cols-2 gap-4">
+                  <div className="space-y-1">
+                     <span className="text-[10px] uppercase tracking-wider text-muted-foreground font-bold block">Hours of Operation</span>
+                     <div className="flex items-center gap-1.5 text-sm font-semibold text-slate-700 dark:text-slate-300">
+                        <Clock className="h-3.5 w-3.5 text-indigo-500" />
+                        {branch.openingTime || '06:00'} - {branch.closingTime || '22:00'}
+                     </div>
+                  </div>
+                  <div className="space-y-1">
+                     <span className="text-[10px] uppercase tracking-wider text-muted-foreground font-bold block">Max Capacity</span>
+                     <div className="flex items-center gap-1.5 text-sm font-semibold text-slate-700 dark:text-slate-300">
+                        <Users className="h-3.5 w-3.5 text-indigo-500" />
+                        {branch.capacity ?? 50} active slots
+                     </div>
+                  </div>
+               </div>
             </CardContent>
           </Card>
         ))}

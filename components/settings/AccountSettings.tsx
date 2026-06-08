@@ -4,8 +4,19 @@ import { Button } from '@/components/ui/button'
 import { Progress } from '@/components/ui/progress'
 import { Badge } from '@/components/ui/badge'
 import { CreditCard, Zap, CheckCircle2, Crown, ArrowUpRight, HelpCircle } from 'lucide-react'
+import { useGymStore } from '@/lib/store'
 
 export function AccountSettings() {
+  const { members, fetchMembers } = useGymStore()
+
+  React.useEffect(() => {
+    fetchMembers()
+  }, [fetchMembers])
+
+  const memberCount = members.length
+  const limit = 2000
+  const percent = Math.min(Math.round((memberCount / limit) * 100), 100)
+
   return (
     <div className="space-y-6">
       <Card className="bg-gradient-to-br from-slate-900 to-slate-800 text-white overflow-hidden relative">
@@ -28,10 +39,10 @@ export function AccountSettings() {
 
           <div className="space-y-2">
             <div className="flex justify-between text-xs mb-1">
-              <span className="text-slate-300">Member Limit (850 / 2,000)</span>
-              <span className="text-primary font-bold">42% used</span>
+              <span className="text-slate-300">Member Limit ({memberCount} / 2,000)</span>
+              <span className="text-primary font-bold">{percent}% used</span>
             </div>
-            <Progress value={42} className="h-2 bg-slate-700" />
+            <Progress value={percent} className="h-2 bg-slate-700" />
           </div>
 
           <div className="flex gap-3 pt-4">
@@ -47,7 +58,10 @@ export function AccountSettings() {
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <Card>
           <CardHeader>
-            <CardTitle className="text-lg">Billing History</CardTitle>
+            <div className="flex items-center justify-between">
+              <CardTitle className="text-lg">Billing History</CardTitle>
+              <Badge variant="outline" className="text-[10px] bg-slate-800 text-slate-400 border-slate-700">Sandbox Demo</Badge>
+            </div>
             <CardDescription>Recent subscription payments</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">

@@ -134,7 +134,11 @@ export function Sidebar() {
   // Group by section while preserving order
   const sections = Array.from(new Set(visibleItems.map((i) => i.section ?? 'core')))
 
-  const isActive = (href: string) => pathname === href || pathname.startsWith(href + '/')
+  const isActive = (href: string) => {
+    if (pathname === href) return true
+    if (href !== '/' && pathname.startsWith(href + '/')) return true
+    return false
+  }
 
   return (
     <>

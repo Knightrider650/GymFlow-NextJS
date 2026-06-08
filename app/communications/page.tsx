@@ -232,7 +232,11 @@ export default function CommunicationsPage() {
                                <Badge variant="outline" className="bg-amber-500/10 text-amber-500 border-amber-500/20 text-[10px] py-0 px-1.5">Draft</Badge>
                              )}
                            </div>
-                           <span className="text-[10px] text-muted-foreground shrink-0">{formatDate(campaign.sentAt, 'MMM dd, yyyy')}</span>
+                           <span className="text-[10px] text-muted-foreground shrink-0">
+                             {campaign.status === 'sent' 
+                               ? `Sent: ${formatDate(campaign.sentAt, 'MMM dd, yyyy')}` 
+                               : 'Not sent yet'}
+                           </span>
                          </div>
                          <CardTitle className="group-hover:text-primary transition-colors">{campaign.title}</CardTitle>
                          <CardDescription className="line-clamp-2">{campaign.subject}</CardDescription>

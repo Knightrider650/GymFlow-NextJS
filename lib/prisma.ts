@@ -399,6 +399,7 @@ const prisma = new Proxy({} as PrismaClient, {
                   const newItem = normalizeGymId({
                     id: createData.id || Math.random().toString(),
                     ...createData,
+                    timestamp: createData.timestamp || new Date(),
                     createdAt: new Date(),
                     updatedAt: new Date()
                   });
@@ -418,6 +419,7 @@ const prisma = new Proxy({} as PrismaClient, {
                 const newItem = normalizeGymId({
                   id: data.id || Math.random().toString(),
                   ...data,
+                  timestamp: data.timestamp || new Date(),
                   createdAt: new Date(),
                   updatedAt: new Date()
                 });

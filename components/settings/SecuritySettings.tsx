@@ -1,4 +1,4 @@
-import React from 'react'
+import React, { useState, useEffect } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Label } from '@/components/ui/label'
 import { Button } from '@/components/ui/button'
@@ -6,8 +6,29 @@ import { Switch } from '@/components/ui/switch'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Shield, Lock, History, UserX, AlertTriangle, ShieldCheck } from 'lucide-react'
 import Link from 'next/link'
+import { apiClient } from '@/lib/api-client'
+import { formatDateTime } from '@/utils/format'
 
 export function SecuritySettings() {
+  const [logs, setLogs] = useState<any[]>([])
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    const fetchLogs = async () => {
+      try {
+        const res = await apiClient.get('/api/activity-log')
+        if (res.success) {
+          setLogs((res.data || []).slice(0, 5))
+        }
+      } catch (e) {
+        console.error(e)
+      } finally {
+        setLoading(false)
+      }
+    }
+    fetchLogs()
+  }, [])
+
   return (
     <div className="space-y-6">
       <Card>
@@ -82,18 +103,20 @@ export function SecuritySettings() {
         </CardHeader>
         <CardContent>
            <div className="space-y-4">
-              <div className="flex items-center gap-4 p-3 rounded-lg bg-slate-50 text-xs">
-                 <div className="w-2 h-2 rounded-full bg-green-500" />
-                 <span className="font-mono text-slate-500">2024-05-20 14:22:10</span>
-                 <span className="font-bold">Admin</span>
-                 <span className="text-muted-foreground italic">updated gym branding colors</span>
-              </div>
-              <div className="flex items-center gap-4 p-3 rounded-lg bg-slate-50 text-xs">
-                 <div className="w-2 h-2 rounded-full bg-blue-500" />
-                 <span className="font-mono text-slate-500">2024-05-20 12:05:45</span>
-                 <span className="font-bold">Manager</span>
-                 <span className="text-muted-foreground italic">processed refund for INV-2024-089</span>
-              </div>
+              {loading ? (
+                <p className="text-xs text-muted-foreground animate-pulse">Loading audit logs...</p>
+              ) : logs.length === 0 ? (
+                <p className="text-xs text-muted-foreground">No recent activity logs found.</p>
+              ) : (
+                logs.map((log) => (
+                  <div key={log.id} className="flex items-center gap-4 p-3 rounded-lg bg-slate-50 dark:bg-slate-900/50 text-xs">
+                     <div className={`w-2 h-2 rounded-full ${log.action.toLowerCase().includes('delete') ? 'bg-red-500' : 'bg-green-500'}`} />
+                     <span className="font-mono text-slate-500">{formatDateTime(log.timestamp, 'yyyy-MM-dd HH:mm:ss')}</span>
+                     <span className="font-bold">{log.userName || 'System'}</span>
+                     <span className="text-muted-foreground italic">{log.action}: {log.details}</span>
+                  </div>
+                ))
+              )}
            </div>
         </CardContent>
       </Card>

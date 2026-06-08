@@ -119,8 +119,8 @@
       "name": "Dumbbell Set",
       "category": "Equipment",
       "quantity": 15,
-      "min_threshold": 5,
-      "cost_per_unit": 120,
+      "minThreshold": 5,
+      "costPerUnit": 120,
       "last_updated": "2026-04-26T22:32:53.342Z",
       "tenant_id": "gym-001",
       "tenantId": "gym-001"
@@ -130,8 +130,8 @@
       "name": "Yoga Mats",
       "category": "Fitness Pros",
       "quantity": 4,
-      "min_threshold": 10,
-      "cost_per_unit": 25,
+      "minThreshold": 10,
+      "costPerUnit": 25,
       "last_updated": "2026-04-26T22:32:53.342Z",
       "tenant_id": "gym-001",
       "tenantId": "gym-001"
@@ -339,7 +339,8 @@
       "entityType": "support-session",
       "entityId": "gym-001",
       "entityName": "GymFlow Pro",
-      "details": "Opened support session for GymFlow Pro"
+      "details": "Opened support session for GymFlow Pro",
+      "timestamp": "2026-05-20T22:32:53.342Z"
     },
     {
       "id": "0.9780058355561791",
@@ -354,7 +355,8 @@
       "updatedAt": "2026-06-07T17:34:00.533Z",
       "gym_id": "default-gym",
       "tenantId": "default-gym",
-      "tenant_id": "default-gym"
+      "tenant_id": "default-gym",
+      "timestamp": "2026-06-07T17:34:00.533Z"
     },
     {
       "id": "0.09431832577417443",
@@ -369,7 +371,8 @@
       "updatedAt": "2026-06-07T17:35:39.504Z",
       "gym_id": "default-gym",
       "tenantId": "default-gym",
-      "tenant_id": "default-gym"
+      "tenant_id": "default-gym",
+      "timestamp": "2026-06-07T17:35:39.504Z"
     }
   ],
   "branches": [
@@ -381,6 +384,9 @@
       "address": "123 Fitness Ave, Wellness City",
       "phone": "+1 (555) 999-8888",
       "email": "contact@gymflow.com",
+      "openingTime": "06:00",
+      "closingTime": "22:00",
+      "capacity": 150,
       "isDefault": true,
       "is_default": true
     },
@@ -392,6 +398,9 @@
       "address": "456 Central Ave, Metro City",
       "phone": "555-0301",
       "email": "downtown@gymflow.com",
+      "openingTime": "06:00",
+      "closingTime": "22:00",
+      "capacity": 120,
       "isDefault": true,
       "is_default": true
     }

@@ -18,6 +18,20 @@ const nextConfig = {
     NEXT_PUBLIC_API_URL: process.env.NEXT_PUBLIC_API_URL || '',
     NEXT_PUBLIC_WS_URL: process.env.NEXT_PUBLIC_WS_URL || '',
   },
+  async redirects() {
+    return [
+      {
+        source: '/portal',
+        destination: '/member-portal',
+        permanent: true,
+      },
+      {
+        source: '/user',
+        destination: '/member-portal',
+        permanent: true,
+      },
+    ]
+  },
   async headers() {
     return [
       {

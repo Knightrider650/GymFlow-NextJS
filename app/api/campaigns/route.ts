@@ -40,6 +40,11 @@ export async function POST(req: NextRequest) {
 
     const gymId = await getRequiredGymId(user, req, data)
 
+    const userDb = await prisma.user.findFirst({
+      where: { email: user.email }
+    })
+    const senderName = userDb?.fullname || user.email
+
     const campaign = await prisma.campaign.create({
       data: {
         title,
@@ -47,7 +52,8 @@ export async function POST(req: NextRequest) {
         content,
         targetSegment: targetSegment || 'All Members',
         gymId,
-        status: 'draft'
+        status: 'draft',
+        createdBy: senderName
       }
     })
 

@@ -82,7 +82,7 @@ export function DataSettings() {
                    <div className="p-2 bg-green-100 text-green-600 rounded-lg">
                       <FileSpreadsheet className="h-5 w-5" />
                    </div>
-                   <div className="font-bold">Excel/CSV Bundle</div>
+                   <div className="font-bold text-slate-800 dark:text-slate-200">Member & Invoice Export</div>
                 </div>
                 <p className="text-xs text-muted-foreground mb-4">Export members, plans, and invoices as formatted spreadsheets.</p>
                 <Button variant="outline" size="sm" className="w-full gap-2 group-hover:bg-primary group-hover:text-white transition-colors" onClick={handleExport} disabled={isExporting}>
@@ -135,8 +135,8 @@ export function DataSettings() {
               <Badge className="bg-green-100 text-green-700 hover:bg-green-100 border-transparent">ACTIVE</Badge>
            </div>
            <p className="text-xs text-muted-foreground flex items-center gap-2">
-              <ShieldCheck className="h-3 w-3 text-green-500" />
-              Last backup successful: 2 hours ago
+              <ShieldCheck className="h-3 w-3 text-slate-400" />
+              Last backup successful: Backup status unavailable
            </p>
         </CardContent>
       </Card>

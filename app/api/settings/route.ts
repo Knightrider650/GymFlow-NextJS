@@ -26,6 +26,12 @@ const DEFAULT_SETTINGS = {
   },
   pos: {
     enabledMethods: ['cash', 'card'],
+    methodLabels: {
+      cash: 'Cash Payment',
+      card: 'Debit/Credit Card',
+      upi: 'UPI (GPay/PhonePe)',
+      transfer: 'Bank Transfer'
+    },
     autoPrintReceipt: false,
     allowGuestSales: true,
   },

@@ -13,16 +13,17 @@ interface PaymentSettingsProps {
 }
 
 export function PaymentSettings({ settings, onSave }: PaymentSettingsProps) {
-  const [formData, setFormData] = React.useState(settings.pos || {
-    enabledMethods: ['cash', 'card', 'upi'],
+  const [formData, setFormData] = React.useState({
+    enabledMethods: settings.pos?.enabledMethods || ['cash', 'card'],
     methodLabels: {
       cash: 'Cash Payment',
       card: 'Debit/Credit Card',
       upi: 'UPI (GPay/PhonePe)',
-      transfer: 'Bank Transfer'
+      transfer: 'Bank Transfer',
+      ...(settings.pos?.methodLabels || {})
     },
-    autoPrintReceipt: false,
-    allowGuestSales: true
+    autoPrintReceipt: settings.pos?.autoPrintReceipt ?? false,
+    allowGuestSales: settings.pos?.allowGuestSales ?? true
   })
 
   const handleChange = (name: string, value: any) => {
@@ -74,9 +75,9 @@ export function PaymentSettings({ settings, onSave }: PaymentSettingsProps) {
                   <div className="space-y-1.5">
                     <Label className="text-xs">Display Label in POS</Label>
                     <Input 
-                      value={formData.methodLabels?.[method] || ''} 
+                      value={(formData.methodLabels as any)[method] || ''} 
                       onChange={(e) => {
-                        const labels = { ...(formData.methodLabels || {}) }
+                        const labels = { ...(formData.methodLabels || {}) } as any
                         labels[method] = e.target.value
                         handleChange('methodLabels', labels)
                       }}

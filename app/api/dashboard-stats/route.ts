@@ -210,7 +210,7 @@ export async function GET(req: NextRequest) {
         activeMembersTrend,
         todayRevenueTrend,
         monthlyRevenueTrend,
-        retention: '98%'
+        retention: totalMembers > 0 ? `${Math.round((activeMembers / totalMembers) * 100)}%` : '—'
       }
     })
   } catch (error: any) {

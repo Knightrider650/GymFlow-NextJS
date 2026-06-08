@@ -250,9 +250,9 @@ export default function InventoryPage() {
                             {item.quantity}
                           </span>
                         </TableCell>
-                        <TableCell className="text-center text-muted-foreground">{item.minThreshold}</TableCell>
+                        <TableCell className="text-center text-muted-foreground">{item.minThreshold ?? '—'}</TableCell>
                         <TableCell className="font-medium text-foreground">
-                          {formatCurrency(item.costPerUnit, settings?.currency)}
+                          {formatCurrency(item.costPerUnit || 0, settings?.currency)}
                         </TableCell>
                         <TableCell className="text-right">
                           <Badge

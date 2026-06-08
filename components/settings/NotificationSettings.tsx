@@ -58,7 +58,7 @@ export function NotificationSettings({ settings, onSave }: NotificationSettingsP
               return (
                 <div key={channel.id} className={`p-4 rounded-xl border flex flex-col items-center gap-3 transition-all ${isEnabled ? 'bg-primary/5 border-primary/20' : 'bg-slate-50 border-transparent'}`}>
                   <channel.icon className={`h-6 w-6 ${isEnabled ? 'text-primary' : 'text-slate-300'}`} />
-                  <span className="text-sm font-medium">{channel.label}</span>
+                  <span className={`text-sm font-medium ${isEnabled ? 'text-slate-950 dark:text-slate-50' : 'text-slate-500 dark:text-slate-400'}`}>{channel.label}</span>
                   <Switch checked={isEnabled} onCheckedChange={() => toggleChannel(channel.id)} />
                 </div>
               )

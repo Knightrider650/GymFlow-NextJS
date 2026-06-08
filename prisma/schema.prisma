@@ -280,6 +280,7 @@ model Campaign {
   targetSegment String
   status        String   @default("draft") // draft, sent
   sentAt        DateTime @default(now())
+  createdBy     String?
   gymId         String
   gym           Gym      @relation(fields: [gymId], references: [id])
   createdAt     DateTime @default(now())
