@@ -35,6 +35,12 @@ export default function AttendancePage() {
   const [notes, setNotes] = useState('')
   const [searchTerm, setSearchTerm] = useState('')
   const [selectedBranch, setSelectedBranch] = useState<string>('all')
+  const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null)
+
+  const showToast = (message: string, type: 'success' | 'error' = 'success') => {
+    setToast({ message, type })
+    setTimeout(() => setToast(null), 3000)
+  }
   
   // Scanner state variables
   const [isScannerOpen, setIsScannerOpen] = useState(false)
@@ -196,17 +202,29 @@ export default function AttendancePage() {
   const handleCheckIn = async (e: React.FormEvent) => {
     e.preventDefault()
     if (selectedMemberId) {
-      await checkInMember(selectedMemberId, notes)
-      setIsDialogOpen(false)
-      setSelectedMemberId('')
-      setNotes('')
-      await fetchAttendance()
+      try {
+        await checkInMember(selectedMemberId, notes)
+        showToast('Member successfully checked in!')
+        setIsDialogOpen(false)
+        setSelectedMemberId('')
+        setNotes('')
+        await fetchAttendance()
+      } catch (err) {
+        showToast('Failed to check in member.', 'error')
+      }
+    } else {
+      showToast('Please select a member first.', 'error')
     }
   }
 
   const handleCheckOut = async (attendanceId: string) => {
-    await checkOutMember(attendanceId)
-    await fetchAttendance()
+    try {
+      await checkOutMember(attendanceId)
+      showToast('Member successfully checked out!')
+      await fetchAttendance()
+    } catch (err) {
+      showToast('Failed to check out member.', 'error')
+    }
   }
 
   const filteredAttendance = attendance.filter(record => {
@@ -283,24 +301,20 @@ export default function AttendancePage() {
               </DialogHeader>
               <form onSubmit={handleCheckIn} className="space-y-4">
                 <div>
-                  <Label htmlFor="member">Select Member *</Label>
-                  <select
-                    id="member"
-                    aria-label="Select member"
-                    value={selectedMemberId}
-                    onChange={(e) => setSelectedMemberId(e.target.value)}
-                    className="w-full h-10 px-3 rounded-md border border-input text-sm"
-                    required
-                  >
-                    <option value="">-- Select a member --</option>
-                    {members
-                      .filter(m => m.status === 'active' && (selectedBranch === 'all' || m.branchId === selectedBranch))
-                      .map(member => (
-                        <option key={member.id} value={member.id}>
-                          {member.name} ({member.email})
-                        </option>
-                      ))}
-                  </select>
+                  <Select value={selectedMemberId} onValueChange={setSelectedMemberId}>
+                    <SelectTrigger className="w-full bg-slate-900 border-slate-800 text-slate-100">
+                      <SelectValue placeholder="-- Select a member --" />
+                    </SelectTrigger>
+                    <SelectContent className="bg-slate-950 border-slate-800 text-slate-100">
+                      {members
+                        .filter(m => m.status === 'active' && (selectedBranch === 'all' || m.branchId === selectedBranch))
+                        .map(member => (
+                          <SelectItem key={member.id} value={member.id}>
+                            {member.name} ({member.email})
+                          </SelectItem>
+                        ))}
+                    </SelectContent>
+                  </Select>
                 </div>
 
                 <div>
@@ -569,6 +583,21 @@ export default function AttendancePage() {
             </DialogFooter>
           </DialogContent>
         </Dialog>
+
+        {/* Dynamic Toast Notification */}
+        {toast && (
+          <div className="fixed bottom-5 right-5 z-[100] animate-in slide-in-from-bottom-5 fade-in duration-300">
+            <div className={`px-4 py-3 rounded-xl shadow-2xl border backdrop-blur-md flex items-center gap-3 font-semibold text-sm ${
+              toast.type === 'success' 
+                ? 'bg-emerald-950/80 border-emerald-500/30 text-emerald-400' 
+                : 'bg-red-950/80 border-red-500/30 text-red-400'
+            }`}>
+              {toast.type === 'success' ? <CheckCircle className="h-5 w-5" /> : <AlertTriangle className="h-5 w-5" />}
+              {toast.message}
+            </div>
+          </div>
+        )}
+
       </div>
     </ProtectedLayout>
   )

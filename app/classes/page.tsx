@@ -17,7 +17,7 @@ import {
   DialogTrigger,
 } from '@/components/ui/dialog'
 import { useClasses, useStaff, useBranches, useMembers } from '@/hooks'
-import { Plus, Edit2, Trash2, Clock, Users, User, Calendar, MapPin, CheckCircle2, Filter } from 'lucide-react'
+import { Plus, Edit2, Trash2, Clock, Users, User, Calendar, MapPin, CheckCircle2, Filter, AlertTriangle } from 'lucide-react'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { useAuthStore } from '@/lib/store'
 import { apiClient } from '@/lib/api-client'
@@ -37,6 +37,12 @@ export default function ClassesPage() {
   const [selectedMemberId, setSelectedMemberId] = useState('')
   const [editingClassId, setEditingClassId] = useState<string | null>(null)
   const [users, setUsers] = useState<any[]>([])
+  const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null)
+
+  const showToast = (message: string, type: 'success' | 'error' = 'success') => {
+    setToast({ message, type })
+    setTimeout(() => setToast(null), 3000)
+  }
 
   const [formData, setFormData] = useState({
     name: '',
@@ -120,22 +126,40 @@ export default function ClassesPage() {
   const handleAddClass = async (e: React.FormEvent) => {
     e.preventDefault()
     const capacity = parseInt(formData.maxCapacity) || 0
-    if (editingClassId) {
-      await updateClass(editingClassId, {
-        ...formData,
-        maxCapacity: capacity,
-      })
-    } else {
-      await createClass({
-        ...formData,
-        maxCapacity: capacity,
-        currentEnrollment: 0
-      })
+    try {
+      if (editingClassId) {
+        await updateClass(editingClassId, {
+          ...formData,
+          maxCapacity: capacity,
+        })
+        showToast('Class details updated successfully!')
+      } else {
+        await createClass({
+          ...formData,
+          maxCapacity: capacity,
+          currentEnrollment: 0
+        })
+        showToast('New class scheduled successfully!')
+      }
+      setIsAddDialogOpen(false)
+      setEditingClassId(null)
+      setFormData({ name: '', instructorName: '', instructorId: '', maxCapacity: '', description: '', time: '10:00 AM', days: 'Mon, Wed, Fri', branchId: '' })
+      fetchClasses()
+    } catch (err) {
+      showToast('Failed to save class schedule.', 'error')
     }
-    setIsAddDialogOpen(false)
-    setEditingClassId(null)
-    setFormData({ name: '', instructorName: '', instructorId: '', maxCapacity: '', description: '', time: '10:00 AM', days: 'Mon, Wed, Fri', branchId: '' })
-    fetchClasses()
+  }
+
+  const handleDeleteClass = async (id: string) => {
+    if (confirm('Are you absolutely sure you want to delete this class schedule?')) {
+      try {
+        await deleteClass(id)
+        showToast('Class schedule deleted successfully.')
+        fetchClasses()
+      } catch (err) {
+        showToast('Failed to delete class schedule.', 'error')
+      }
+    }
   }
 
   const handleBookMember = async () => {
@@ -152,15 +176,17 @@ export default function ClassesPage() {
       })
       
       if (response.ok) {
+        showToast('Member successfully enrolled in class!')
         setIsBookDialogOpen(false)
         setSelectedMemberId('')
         fetchClasses()
       } else {
         const error = await response.json()
-        alert(error.error || 'Failed to book member')
+        showToast(error.error || 'Failed to book member.', 'error')
       }
     } catch (err) {
       console.error('Booking error:', err)
+      showToast('An error occurred during booking.', 'error')
     }
   }
 
@@ -213,10 +239,10 @@ export default function ClassesPage() {
                   Add New Class
                 </Button>
               </DialogTrigger>
-              <DialogContent className="sm:max-w-[425px] max-h-[90vh] overflow-y-auto border-none shadow-2xl">
-                <DialogHeader className="bg-slate-50 -m-6 mb-0 p-6 border-b border-slate-100">
-                  <DialogTitle className="text-xl">{editingClassId ? 'Edit Class' : 'Add New Class'}</DialogTitle>
-                  <DialogDescription>
+              <DialogContent className="sm:max-w-[425px] max-h-[90vh] overflow-y-auto border border-slate-800 bg-slate-950 text-white shadow-2xl">
+                <DialogHeader className="bg-slate-900/50 -m-6 mb-0 p-6 border-b border-slate-800">
+                  <DialogTitle className="text-xl text-white font-bold">{editingClassId ? 'Edit Class' : 'Add New Class'}</DialogTitle>
+                  <DialogDescription className="text-slate-400">
                     {editingClassId ? 'Modify the class parameters and assigned instructor.' : 'Define a new class schedule and assign a specialized instructor.'}
                   </DialogDescription>
                 </DialogHeader>
@@ -434,7 +460,7 @@ export default function ClassesPage() {
                   <CardHeader className="bg-muted/30 pb-3 border-b border-white/5">
                     <div className="flex items-start justify-between">
                       <div className="space-y-1">
-                        <CardTitle className="text-xl font-bold group-hover:text-primary transition-colors line-clamp-1">{fitnessClass.name}</CardTitle>
+                        <CardTitle className="text-xl font-bold group-hover:text-primary transition-colors">{fitnessClass.name}</CardTitle>
                         <div className="flex items-center gap-2 text-sm text-slate-500 font-medium">
                           <User className="h-3 w-3 text-primary" />
                           <span>Led by {fitnessClass.instructorName || 'Expert Trainer'}</span>
@@ -463,7 +489,7 @@ export default function ClassesPage() {
                           >
                             <Edit2 className="h-4 w-4" />
                           </Button>
-                          <Button size="icon" variant="ghost" className="h-8 w-8 text-slate-400 hover:text-red-500" onClick={() => deleteClass(fitnessClass.id)}>
+                          <Button size="icon" variant="ghost" className="h-8 w-8 text-slate-400 hover:text-red-500" onClick={() => handleDeleteClass(fitnessClass.id)}>
                             <Trash2 className="h-4 w-4" />
                           </Button>
                         </div>
@@ -497,7 +523,7 @@ export default function ClassesPage() {
                     <div className="flex flex-wrap gap-2 pt-2">
                       <Badge variant="secondary" className="bg-slate-100 text-slate-600 border-none">{fitnessClass.days || 'Weekdays'}</Badge>
                       <Badge className="bg-indigo-500/10 text-indigo-600 hover:bg-indigo-500/20 border-none font-bold">
-                        {branches.find(b => b.id === fitnessClass.branchId)?.name || 'Main Branch'}
+                        {branches.find(b => b.id === fitnessClass.branchId)?.name || 'Default Branch'}
                       </Badge>
                     </div>
  
@@ -526,22 +552,22 @@ export default function ClassesPage() {
 
         {/* Enrollment Dialog */}
         <Dialog open={isBookDialogOpen} onOpenChange={setIsBookDialogOpen}>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>Enroll Member in Session</DialogTitle>
-              <DialogDescription>
+          <DialogContent className="bg-slate-950 border border-slate-800 text-white shadow-2xl">
+            <DialogHeader className="border-b border-slate-800 pb-4">
+              <DialogTitle className="text-xl text-white font-bold">Enroll Member in Session</DialogTitle>
+              <DialogDescription className="text-slate-400">
                 Select a member to add to the &quot;{classes.find(c => c.id === selectedClassId)?.name}&quot; class.
               </DialogDescription>
             </DialogHeader>
             <div className="space-y-4 py-4">
               <div className="space-y-2">
-                <Label htmlFor="member-select">Select Member</Label>
+                <Label htmlFor="member-select" className="text-xs text-slate-400">Select Member</Label>
                 <select
                   id="member-select"
                   aria-label="Select member"
                   value={selectedMemberId}
                   onChange={(e) => setSelectedMemberId(e.target.value)}
-                  className="w-full h-10 px-3 rounded-md border border-input bg-background text-sm focus:ring-2 focus:ring-primary/20 outline-none"
+                  className="w-full h-10 px-3 rounded-md border border-slate-800 bg-slate-900 text-slate-100 text-sm focus:ring-2 focus:ring-primary/20 outline-none"
                 >
                   <option value="">-- Choose Member --</option>
                   {members.map(m => (
@@ -550,11 +576,26 @@ export default function ClassesPage() {
                 </select>
               </div>
             </div>
-            <DialogFooter>
-              <Button onClick={handleBookMember} className="w-full font-bold">Confirm Enrollment</Button>
+            <DialogFooter className="border-t border-slate-800 pt-4">
+              <Button onClick={handleBookMember} className="w-full font-bold bg-primary hover:bg-primary/95 text-slate-950">Confirm Enrollment</Button>
             </DialogFooter>
           </DialogContent>
         </Dialog>
+
+        {/* Dynamic Toast Notification */}
+        {toast && (
+          <div className="fixed bottom-5 right-5 z-[100] animate-in slide-in-from-bottom-5 fade-in duration-300">
+            <div className={`px-4 py-3 rounded-xl shadow-2xl border backdrop-blur-md flex items-center gap-3 font-semibold text-sm ${
+              toast.type === 'success' 
+                ? 'bg-emerald-950/80 border-emerald-500/30 text-emerald-400' 
+                : 'bg-red-950/80 border-red-500/30 text-red-400'
+            }`}>
+              {toast.type === 'success' ? <CheckCircle2 className="h-5 w-5" /> : <AlertTriangle className="h-5 w-5" />}
+              {toast.message}
+            </div>
+          </div>
+        )}
+
       </div>
     </ProtectedLayout>
   )

@@ -106,10 +106,16 @@ function matchesFilter(item: any, where: any): boolean {
         if (!valAny.in.includes(itemVal)) return false;
       }
       if ('gte' in valAny) {
-        if (!itemVal || itemVal < valAny.gte) return false;
+        if (!itemVal) return false;
+        const itemDate = itemVal instanceof Date ? itemVal : new Date(itemVal);
+        const filterDate = valAny.gte instanceof Date ? valAny.gte : new Date(valAny.gte);
+        if (isNaN(itemDate.getTime()) || itemDate < filterDate) return false;
       }
       if ('lte' in valAny) {
-        if (!itemVal || itemVal > valAny.lte) return false;
+        if (!itemVal) return false;
+        const itemDate = itemVal instanceof Date ? itemVal : new Date(itemVal);
+        const filterDate = valAny.lte instanceof Date ? valAny.lte : new Date(valAny.lte);
+        if (isNaN(itemDate.getTime()) || itemDate > filterDate) return false;
       }
       if ('contains' in valAny) {
         const needle = String(valAny.contains);

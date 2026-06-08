@@ -94,20 +94,20 @@
   "staff": [
     {
       "id": "s-1",
-      "name": "Mike Tyson",
+      "name": "Marcus Vance",
       "position": "Head Trainer",
       "salary": 5000,
-      "email": "mike@gym.com",
+      "email": "marcus@gym.com",
       "phone": "555-0201",
       "tenant_id": "gym-001",
       "tenantId": "gym-001"
     },
     {
       "id": "s-2",
-      "name": "Sylvester Stallone",
+      "name": "Sarah Jenkins",
       "position": "Floor Staff",
       "salary": 3000,
-      "email": "sly@gym.com",
+      "email": "sarah@gym.com",
       "phone": "555-0202",
       "tenant_id": "gym-001",
       "tenantId": "gym-001"
@@ -142,7 +142,10 @@
     {
       "id": "inv-1",
       "memberId": "m-1",
+      "invoiceNumber": "INV-1001",
       "amount": 99.99,
+      "subtotal": 92.58,
+      "taxAmount": 7.41,
       "status": "paid",
       "paymentMethod": "Card",
       "paymentDate": "2026-05-20T22:32:53.342Z",
@@ -153,7 +156,10 @@
     {
       "id": "inv-2",
       "memberId": "m-2",
+      "invoiceNumber": "INV-1002",
       "amount": 49.99,
+      "subtotal": 46.29,
+      "taxAmount": 3.70,
       "status": "paid",
       "paymentMethod": "Cash",
       "paymentDate": "2026-05-22T22:32:53.342Z",
@@ -164,7 +170,10 @@
     {
       "id": "inv-3",
       "memberId": "m-1",
+      "invoiceNumber": "INV-1003",
       "amount": 150,
+      "subtotal": 138.89,
+      "taxAmount": 11.11,
       "status": "paid",
       "paymentMethod": "UPI",
       "paymentDate": "2026-05-24T22:32:53.342Z",
@@ -177,20 +186,24 @@
     {
       "id": "c-1",
       "name": "Morning Yoga",
-      "instructorName": "Mike Tyson",
+      "instructorName": "Marcus Vance",
       "maxCapacity": 20,
       "currentEnrollment": 12,
       "description": "Relaxing yoga session",
+      "time": "08:00 AM",
+      "days": "Mon, Wed, Fri",
       "tenant_id": "gym-001",
       "tenantId": "gym-001"
     },
     {
       "id": "c-2",
       "name": "Heavy HIIT",
-      "instructorName": "Sylvester Stallone",
+      "instructorName": "Sarah Jenkins",
       "maxCapacity": 15,
       "currentEnrollment": 8,
       "description": "Intense interval training",
+      "time": "05:30 PM",
+      "days": "Tue, Thu",
       "tenant_id": "gym-001",
       "tenantId": "gym-001"
     }

@@ -18,6 +18,12 @@ export default function LoginPage() {
 
   useEffect(() => {
     checkAuth()
+    // Clear fields after a short delay to wipe browser autofill on logout redirect
+    const timer = setTimeout(() => {
+      setEmail('')
+      setPassword('')
+    }, 150)
+    return () => clearTimeout(timer)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
@@ -101,11 +107,8 @@ export default function LoginPage() {
               {isLoading ? 'Signing in...' : 'Sign In'}
             </Button>
           </form>
-          <div className="mt-4 text-center text-sm text-muted-foreground">
-            Don&apos;t have an account?{' '}
-            <Link href="/register" className="text-primary hover:underline font-medium">
-              Sign Up
-            </Link>
+          <div className="mt-6 text-center text-xs text-muted-foreground leading-relaxed">
+            Need an account? Contact your gym administrator or platform support to request access.
           </div>
         </CardContent>
       </Card>

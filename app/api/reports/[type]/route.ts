@@ -28,9 +28,17 @@ export async function GET(
             where: filter,
             take: 10,
             orderBy: { joinDate: 'desc' },
-            select: { name: true, email: true, membershipType: true, status: true, joinDate: true }
+            include: { plan: true }
           })
         ])
+
+        const formattedList = list.map((m: any) => ({
+          name: m.name,
+          email: m.email,
+          membershipType: m.plan?.name || m.membershipType || 'Standard',
+          status: m.status,
+          joinDate: m.joinDate
+        }))
 
         // Monthly registration trend
         const months = Array.from({ length: 6 }, (_, i) => subMonths(new Date(), 5 - i))
@@ -51,7 +59,7 @@ export async function GET(
           })
         )
 
-        reportData = { active, expired, pending, total, recentMembers: list, registrationTrend }
+        reportData = { active, expired, pending, total, recentMembers: formattedList, registrationTrend }
         break
       }
 

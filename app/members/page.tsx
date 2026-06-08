@@ -66,11 +66,20 @@ export default function MembersPage() {
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false)
   const [editingMember, setEditingMember] = useState<Member | null>(null)
   const [memberToDelete, setMemberToDelete] = useState<string | null>(null)
+  const [terminateConfirmText, setTerminateConfirmText] = useState('')
+  const [viewingMember, setViewingMember] = useState<Member | null>(null)
+  const [isProfileOpen, setIsProfileOpen] = useState(false)
   const [searchTerm, setSearchTerm] = useState('')
   const [debouncedSearch, setDebouncedSearch] = useState('')
   const [selectedBranch, setSelectedBranch] = useState<string>('all')
   const [selectedPassMember, setSelectedPassMember] = useState<Member | null>(null)
   const [isPassModalOpen, setIsPassModalOpen] = useState(false)
+  const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null)
+
+  const showToast = (message: string, type: 'success' | 'error' = 'success') => {
+    setToast({ message, type })
+    setTimeout(() => setToast(null), 3000)
+  }
 
   const sendMessageToMembers = useGymStore(state => state.sendMessageToMembers)
   const settings = useGymStore(state => state.settings)
@@ -260,7 +269,7 @@ export default function MembersPage() {
             <div class="details-grid">
               <div>
                 <div class="details-label">Branch</div>
-                <div class="details-val">\${branches.find(b => b.id === selectedPassMember.branchId)?.name || 'Main Branch'}</div>
+                <div class="details-val">\${branches.find(b => b.id === selectedPassMember.branchId)?.name || 'Default Branch'}</div>
               </div>
               <div>
                 <div class="details-label">Expires</div>
@@ -401,7 +410,7 @@ export default function MembersPage() {
 
       ctx.fillStyle = '#f1f5f9'
       ctx.font = 'bold 13px system-ui, -apple-system, sans-serif'
-      const branchName = branches.find(b => b.id === selectedPassMember.branchId)?.name || 'Main Branch'
+      const branchName = branches.find(b => b.id === selectedPassMember.branchId)?.name || 'Default Branch'
       ctx.fillText(branchName, 45, 515)
       ctx.fillText(formatDate(selectedPassMember.expiryDate), 225, 515)
 
@@ -499,16 +508,20 @@ export default function MembersPage() {
 
   useEffect(() => {
     if (!isDialogOpen) return
-    if (!watchedPlanId || !watchedJoinDate) return
-    
-    const hasChanged = watchedPlanId !== lastPlanIdRef.current || watchedJoinDate !== lastJoinDateRef.current
-    if (!hasChanged) return
-
-    const selectedPlan = plans.find((p: any) => p.id === watchedPlanId)
-    if (!selectedPlan) return
+    if (!watchedJoinDate) return
 
     const baseDate = new Date(watchedJoinDate)
     if (isNaN(baseDate.getTime())) return
+
+    if (!watchedPlanId) {
+      // Default to 1 month from join date if no plan selected
+      baseDate.setMonth(baseDate.getMonth() + 1)
+      setValue('expiryDate', baseDate.toISOString().split('T')[0])
+      return
+    }
+
+    const selectedPlan = plans.find((p: any) => p.id === watchedPlanId)
+    if (!selectedPlan) return
 
     if (selectedPlan.durationDays || selectedPlan.duration_days) {
       const days = selectedPlan.durationDays || selectedPlan.duration_days
@@ -536,14 +549,17 @@ export default function MembersPage() {
       }
       if (editingMember) {
         await updateMember(editingMember.id, formattedData as any)
+        showToast('Member details successfully updated!')
       } else {
         await createMember(formattedData as any)
+        showToast('New member successfully added!')
       }
       
       setIsDialogOpen(false)
       await fetchMembers()
     } catch (error) {
       console.error('Error submitting form:', error)
+      showToast('An error occurred while saving the member.', 'error')
     }
   }
 
@@ -596,6 +612,8 @@ export default function MembersPage() {
       await deleteMember(memberToDelete)
       setIsDeleteDialogOpen(false)
       setMemberToDelete(null)
+      setTerminateConfirmText('')
+      showToast('Membership terminated successfully.')
       await fetchMembers()
     }
   }
@@ -648,12 +666,12 @@ export default function MembersPage() {
       try {
         const res = await bulkCreateMembers(formattedMembers)
         if (res?.success) {
-          alert(`Successfully imported ${formattedMembers.length} members!`)
+          showToast(`Successfully imported ${formattedMembers.length} members!`)
         } else {
-          alert(`Import failed: ${res?.error || 'Unknown error'}`)
+          showToast(`Import failed: ${res?.error || 'Unknown error'}`, 'error')
         }
       } catch (err: any) {
-        alert(`Import error: ${err?.message || 'Unknown error occurred'}`)
+        showToast(`Import error: ${err?.message || 'Unknown error occurred'}`, 'error')
       } finally {
         await fetchMembers()
         if (fileInputRef.current) {
@@ -976,7 +994,16 @@ export default function MembersPage() {
                         </TableCell>
                         <TableCell>
                           <div className="flex flex-col">
-                            <span className="font-bold text-foreground">{member.name}</span>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setViewingMember(member)
+                                setIsProfileOpen(true)
+                              }}
+                              className="font-bold text-foreground hover:text-primary transition-colors text-left hover:underline focus:outline-none"
+                            >
+                              {member.name}
+                            </button>
                             <span className="text-xs text-muted-foreground flex items-center gap-1 mt-0.5">
                               <MapPin className="h-2.5 w-2.5 text-primary" />
                               {branches.find(b => b.id === member.branchId)?.name || 'Default Branch'}
@@ -1098,20 +1125,146 @@ export default function MembersPage() {
         </Card>
 
         {/* Delete Confirmation */}
-        <Dialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
-          <DialogContent>
+        <Dialog open={isDeleteDialogOpen} onOpenChange={(open) => {
+          setIsDeleteDialogOpen(open)
+          if (!open) setTerminateConfirmText('')
+        }}>
+          <DialogContent className="bg-slate-950 border-slate-800 text-white">
             <DialogHeader>
-              <DialogTitle className="flex items-center gap-2 text-red-600">
-                <AlertTriangle className="h-5 w-5" />
+              <DialogTitle className="flex items-center gap-2 text-red-500 font-bold">
+                <AlertTriangle className="h-5 w-5 text-red-500 animate-pulse" />
                 Terminate Membership?
               </DialogTitle>
-              <DialogDescription>
+              <DialogDescription className="text-slate-400">
                 This action will permanently revoke membership access for this user. This cannot be undone.
               </DialogDescription>
             </DialogHeader>
-            <DialogFooter className="gap-2 sm:gap-0">
-              <Button variant="ghost" onClick={() => setIsDeleteDialogOpen(false)}>Cancel</Button>
-              <Button variant="destructive" onClick={handleDelete}>Confirm Termination</Button>
+            <div className="space-y-2 py-3">
+              <Label htmlFor="terminateConfirmInput" className="text-xs text-slate-400">Please type <span className="font-extrabold text-red-400">TERMINATE</span> to confirm:</Label>
+              <Input 
+                id="terminateConfirmInput"
+                value={terminateConfirmText}
+                onChange={(e) => setTerminateConfirmText(e.target.value)}
+                placeholder="TERMINATE"
+                className="bg-slate-900 border-slate-800 text-slate-100 focus:ring-red-500 focus:border-red-500"
+              />
+            </div>
+            <DialogFooter className="gap-2 sm:gap-0 border-t border-slate-800/60 pt-4">
+              <Button variant="ghost" className="hover:bg-slate-800 text-slate-300 border border-slate-800" onClick={() => { setIsDeleteDialogOpen(false); setTerminateConfirmText(''); }}>Cancel</Button>
+              <Button 
+                variant="destructive" 
+                disabled={terminateConfirmText !== 'TERMINATE'}
+                onClick={handleDelete}
+                className="bg-red-600 hover:bg-red-500 disabled:opacity-50 text-white font-bold"
+              >
+                Confirm Termination
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Member Profile Dialog */}
+        <Dialog open={isProfileOpen} onOpenChange={setIsProfileOpen}>
+          <DialogContent className="sm:max-w-[500px] bg-slate-950 border-slate-800 text-white">
+            <DialogHeader className="border-b border-slate-800 pb-4">
+              <DialogTitle className="text-xl font-bold flex items-center gap-2 text-primary">
+                <Shield className="h-5 w-5 text-primary" />
+                Member Profile
+              </DialogTitle>
+              <DialogDescription className="text-slate-400">
+                Detailed view of membership account details and contact information.
+              </DialogDescription>
+            </DialogHeader>
+            {viewingMember && (
+              <div className="space-y-4 py-4">
+                <div className="flex items-center gap-3">
+                  <div className="h-12 w-12 rounded-full bg-primary/10 border border-primary/20 flex items-center justify-center font-extrabold text-primary text-lg">
+                    {viewingMember.name.charAt(0).toUpperCase()}
+                  </div>
+                  <div>
+                    <h3 className="font-bold text-lg leading-tight">{viewingMember.name}</h3>
+                    <p className="text-xs text-slate-400 font-mono">ID: {viewingMember.id}</p>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4 border-t border-slate-900 pt-4 text-sm">
+                  <div className="space-y-1">
+                    <span className="text-xs text-slate-400 block uppercase tracking-wider">Status</span>
+                    <Badge className={`${getStatusBadgeColor(viewingMember.status)} border-none text-xs`}>
+                      {viewingMember.status.toUpperCase()}
+                    </Badge>
+                  </div>
+                  <div className="space-y-1">
+                    <span className="text-xs text-slate-400 block uppercase tracking-wider">Branch</span>
+                    <span className="font-semibold text-slate-200">
+                      {branches.find(b => b.id === viewingMember.branchId)?.name || 'Default Branch'}
+                    </span>
+                  </div>
+                  <div className="space-y-1">
+                    <span className="text-xs text-slate-400 block uppercase tracking-wider">Membership Plan</span>
+                    <span className="font-semibold text-slate-200 block">
+                      {(viewingMember as any).planId 
+                        ? plans.find((p: any) => p.id === (viewingMember as any).planId)?.name 
+                        : (viewingMember.membershipType || 'N/A')}
+                    </span>
+                  </div>
+                  <div className="space-y-1">
+                    <span className="text-xs text-slate-400 block uppercase tracking-wider">Join Date</span>
+                    <span className="font-semibold text-slate-200 block">
+                      {formatDate(viewingMember.joinDate)}
+                    </span>
+                  </div>
+                  <div className="space-y-1">
+                    <span className="text-xs text-slate-400 block uppercase tracking-wider">Expiry Date</span>
+                    <span className="font-semibold text-slate-200 block">
+                      {formatDate(viewingMember.expiryDate)}
+                    </span>
+                  </div>
+                  <div className="space-y-1">
+                    <span className="text-xs text-slate-400 block uppercase tracking-wider">Date of Birth</span>
+                    <span className="font-semibold text-slate-200 block">
+                      {viewingMember.dob ? formatDate(viewingMember.dob) : 'N/A'}
+                    </span>
+                  </div>
+                </div>
+
+                <div className="space-y-3 border-t border-slate-900 pt-4 text-sm">
+                  <h4 className="font-semibold text-primary text-xs uppercase tracking-wider">Contact & Location</h4>
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-2 text-slate-300">
+                      <Mail className="h-4 w-4 text-slate-400" />
+                      <span>{viewingMember.email}</span>
+                    </div>
+                    <div className="flex items-center gap-2 text-slate-300">
+                      <Phone className="h-4 w-4 text-slate-400" />
+                      <span>{viewingMember.phone}</span>
+                    </div>
+                    <div className="flex items-center gap-2 text-slate-300">
+                      <MapPin className="h-4 w-4 text-slate-400" />
+                      <span>{viewingMember.address || 'No address provided'}</span>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="space-y-3 border-t border-slate-900 pt-4 text-sm">
+                  <h4 className="font-semibold text-primary text-xs uppercase tracking-wider">Emergency Contact</h4>
+                  <div className="grid grid-cols-2 gap-2 text-slate-300">
+                    <div>
+                      <span className="text-[10px] text-slate-500 block">NAME</span>
+                      <span>{viewingMember.emergencyContact || 'N/A'}</span>
+                    </div>
+                    <div>
+                      <span className="text-[10px] text-slate-500 block">PHONE</span>
+                      <span>{viewingMember.emergencyPhone || 'N/A'}</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+            <DialogFooter className="border-t border-slate-900 pt-4">
+              <Button type="button" variant="outline" className="border-slate-800 hover:bg-slate-800 text-slate-300" onClick={() => setIsProfileOpen(false)}>
+                Close
+              </Button>
             </DialogFooter>
           </DialogContent>
         </Dialog>
@@ -1167,7 +1320,7 @@ export default function MembersPage() {
                   <div>
                     <span className="text-slate-400 block text-[10px] uppercase tracking-wider">Branch</span>
                     <span className="font-semibold text-slate-200">
-                      {branches.find(b => b.id === selectedPassMember?.branchId)?.name || 'Main Branch'}
+                      {branches.find(b => b.id === selectedPassMember?.branchId)?.name || 'Default Branch'}
                     </span>
                   </div>
                   <div>
@@ -1200,6 +1353,7 @@ export default function MembersPage() {
             </DialogFooter>
           </DialogContent>
         </Dialog>
+
         {/* Send Message Dialog */}
         <Dialog open={isMessageDialogOpen} onOpenChange={setIsMessageDialogOpen}>
           <DialogContent className="sm:max-w-[500px]">
@@ -1284,6 +1438,21 @@ export default function MembersPage() {
             </form>
           </DialogContent>
         </Dialog>
+
+        {/* Dynamic Toast Notification */}
+        {toast && (
+          <div className="fixed bottom-5 right-5 z-[100] animate-in slide-in-from-bottom-5 fade-in duration-300">
+            <div className={`px-4 py-3 rounded-xl shadow-2xl border backdrop-blur-md flex items-center gap-3 font-semibold text-sm ${
+              toast.type === 'success' 
+                ? 'bg-emerald-950/80 border-emerald-500/30 text-emerald-400' 
+                : 'bg-red-950/80 border-red-500/30 text-red-400'
+            }`}>
+              {toast.type === 'success' ? <CheckCircle2 className="h-5 w-5" /> : <AlertTriangle className="h-5 w-5" />}
+              {toast.message}
+            </div>
+          </div>
+        )}
+
       </div>
     </ProtectedLayout>
   )

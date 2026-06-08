@@ -349,8 +349,14 @@ export default function SuperDashboard() {
 
   const [isDeleteOpen, setIsDeleteOpen] = useState(false)
   const [deleteTargetIds, setDeleteTargetIds] = useState<string[]>([])
+  const [deleteConfirmText, setDeleteConfirmText] = useState('')
 
   const [currentPath, setCurrentPath] = useState<string>('.')
+  const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null)
+  const showToast = (message: string, type: 'success' | 'error' = 'success') => {
+    setToast({ message, type })
+    setTimeout(() => setToast(null), 3000)
+  }
   const [explorerFiles, setExplorerFiles] = useState<any[]>([])
   const [explorerLoading, setExplorerLoading] = useState<boolean>(false)
   const [selectedFile, setSelectedFile] = useState<string | null>(null)
@@ -374,7 +380,7 @@ export default function SuperDashboard() {
     if (success) {
       router.push('/dashboard')
     } else {
-      alert(`Failed to impersonate tenant [${tenantId}]`)
+      showToast(`Failed to impersonate tenant [${tenantId}]`, 'error')
     }
   }
 
@@ -393,14 +399,14 @@ export default function SuperDashboard() {
           await fetchGyms()
           setIsNewTenantOpen(false)
           setNewTenantData({ name: '', subdomain: '', plan: 'Basic', email: '', phone: '', address: '' })
-          alert('Gym tenant successfully provisioned!')
+          showToast('Gym tenant successfully provisioned!')
         }
       } else {
-        alert('Failed to provision tenant')
+        showToast('Failed to provision tenant', 'error')
       }
     } catch (err) {
       console.error('Error provisioning tenant:', err)
-      alert('Error provisioning tenant')
+      showToast('Error provisioning tenant', 'error')
     } finally {
       setIsProvisioning(false)
     }
@@ -424,9 +430,9 @@ export default function SuperDashboard() {
       if (response.ok) {
         await fetchGyms()
         setSelectedTenant(null)
-        alert('Tenant settings successfully updated!')
+        showToast('Tenant settings successfully updated!')
       } else {
-        alert('Failed to update tenant overrides')
+        showToast('Failed to update tenant overrides', 'error')
       }
     } catch (err) {
       console.error('Error updating tenant overrides:', err)
@@ -454,9 +460,9 @@ export default function SuperDashboard() {
         setIsDeleteOpen(false)
         setSelectedTenant(null)
         await fetchGyms()
-        alert('Tenant permanently deleted successfully!')
+        showToast('Tenant permanently deleted successfully!')
       } else {
-        alert('Failed to delete gym')
+        showToast('Failed to delete gym', 'error')
       }
     } catch (err) {
       console.error('Delete error:', err)
@@ -477,9 +483,9 @@ export default function SuperDashboard() {
         setSelectedIds([])
         setIsDeleteOpen(false)
         await fetchGyms()
-        alert('Selected tenants permanently deleted successfully!')
+        showToast('Selected tenants permanently deleted successfully!')
       } else {
-        alert('Failed to delete gyms')
+        showToast('Failed to delete gyms', 'error')
       }
     } catch (err) {
       console.error('Delete error:', err)
@@ -490,7 +496,7 @@ export default function SuperDashboard() {
 
   const handleSendNotifications = async () => {
     if (!notificationTitle.trim() || !notificationMessage.trim()) {
-      alert('Title and message are required')
+      showToast('Title and message are required', 'error')
       return
     }
     try {
@@ -507,9 +513,9 @@ export default function SuperDashboard() {
         setIsNotifyOpen(false)
         setNotificationTitle('')
         setNotificationMessage('')
-        alert(`Notifications successfully sent to ${notifyTargetIds.length} gym(s).`)
+        showToast(`Notifications successfully sent to ${notifyTargetIds.length} gym(s).`)
       } else {
-        alert('Failed to send notifications')
+        showToast('Failed to send notifications', 'error')
       }
     } catch (err) {
       console.error('Notify error:', err)
@@ -617,7 +623,7 @@ export default function SuperDashboard() {
           setNewItemName('')
           fetchDirectory(currentPath)
         } else {
-          alert(result.error || 'Failed to create item')
+          showToast(result.error || 'Failed to create item', 'error')
         }
       }
     } catch (err) {
@@ -628,7 +634,11 @@ export default function SuperDashboard() {
   }
 
   const handleDeleteItem = async (itemPath: string) => {
-    if (!confirm(`Are you sure you want to delete ${itemPath}? This action is irreversible.`)) return
+    const userInput = prompt(`Are you absolutely sure you want to delete "${itemPath}"? This action is irreversible.\n\nPlease type CONFIRM to proceed:`)
+    if (userInput !== 'CONFIRM') {
+      showToast('Deletion cancelled. "CONFIRM" was not typed correctly.', 'error')
+      return
+    }
     try {
       setEditorSaving(true)
       const res = await fetch('/api/super-admin/files', {
@@ -644,8 +654,9 @@ export default function SuperDashboard() {
             setEditorContent('')
           }
           fetchDirectory(currentPath)
+          showToast('Item deleted successfully!')
         } else {
-          alert(result.error || 'Failed to delete item')
+          showToast(result.error || 'Failed to delete item', 'error')
         }
       }
     } catch (err) {
@@ -1217,6 +1228,7 @@ export default function SuperDashboard() {
                                 title="Delete Gym"
                                 onClick={() => {
                                   setDeleteTargetIds([gym.id])
+                                  setDeleteConfirmText('')
                                   setIsDeleteOpen(true)
                                 }}
                               >
@@ -2095,10 +2107,13 @@ export default function SuperDashboard() {
 
               <div className="p-6 border-t border-slate-800 bg-slate-900/60 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
                 <Button 
+                  type="button"
                   variant="destructive" 
+                  disabled={loading}
                   className="bg-red-950/60 border border-red-500/30 text-red-400 hover:bg-red-900/60 font-bold text-xs w-full sm:w-auto"
                   onClick={() => {
                     setDeleteTargetIds([selectedTenant.id])
+                    setDeleteConfirmText('')
                     setIsDeleteOpen(true)
                   }}
                 >
@@ -2107,7 +2122,9 @@ export default function SuperDashboard() {
                 </Button>
                 <div className="flex flex-wrap items-center gap-2 justify-end">
                   <Button 
+                    type="button"
                     variant="outline" 
+                    disabled={loading}
                     className="border-violet-500/20 text-violet-400 hover:bg-violet-500/10 font-bold text-xs"
                     onClick={() => {
                       setNotifyTargetIds([selectedTenant.id])
@@ -2118,12 +2135,20 @@ export default function SuperDashboard() {
                     Notify
                   </Button>
                   <Button 
+                    type="button"
+                    disabled={loading}
                     onClick={() => configDraft && handleSaveTenantLimits(configDraft)} 
                     className="bg-primary hover:bg-primary/95 text-slate-950 font-bold text-xs"
                   >
-                    Save Changes
+                    {loading ? 'Saving...' : 'Save Changes'}
                   </Button>
-                  <Button variant="ghost" onClick={() => setSelectedTenant(null)} className="hover:bg-slate-800 text-slate-300 font-bold text-xs">
+                  <Button 
+                    type="button"
+                    variant="ghost" 
+                    disabled={loading}
+                    onClick={() => setSelectedTenant(null)} 
+                    className="hover:bg-slate-800 text-slate-300 font-bold text-xs"
+                  >
                     Cancel
                   </Button>
                 </div>
@@ -2210,20 +2235,49 @@ export default function SuperDashboard() {
                   This will permanently delete all isolated tables and database records for this tenant. This operation is irreversible.
                 </p>
 
+                <div className="space-y-2">
+                  <Label htmlFor="deleteConfirmInput" className="text-xs text-slate-400">Please type <span className="font-extrabold text-red-400">DELETE</span> to confirm:</Label>
+                  <Input 
+                    id="deleteConfirmInput"
+                    value={deleteConfirmText}
+                    onChange={(e) => setDeleteConfirmText(e.target.value)}
+                    placeholder="DELETE"
+                    className="bg-slate-950 border-slate-800 text-slate-100"
+                  />
+                </div>
+
                 <div className="flex justify-end gap-3 pt-6 border-t border-slate-800">
-                  <Button type="button" variant="outline" onClick={() => setIsDeleteOpen(false)} className="border-slate-800 hover:bg-slate-800 font-bold text-xs">
+                  <Button type="button" variant="outline" onClick={() => { setIsDeleteOpen(false); setDeleteConfirmText(''); }} className="border-slate-800 hover:bg-slate-800 font-bold text-xs">
                     Cancel
                   </Button>
                   <Button 
                     type="button" 
                     variant="destructive"
-                    onClick={handleDeleteAction}
-                    className="font-bold bg-red-600 hover:bg-red-500 text-white text-xs"
+                    disabled={deleteConfirmText !== 'DELETE'}
+                    onClick={() => {
+                      handleDeleteAction();
+                      setDeleteConfirmText('');
+                    }}
+                    className="font-bold bg-red-600 hover:bg-red-500 disabled:opacity-50 text-white text-xs"
                   >
                     Permanently Delete
                   </Button>
                 </div>
               </div>
+            </div>
+          </div>
+        )}
+
+        {/* Dynamic Toast Notification */}
+        {toast && (
+          <div className="fixed bottom-5 right-5 z-[100] animate-in slide-in-from-bottom-5 fade-in duration-300">
+            <div className={`px-4 py-3 rounded-xl shadow-2xl border backdrop-blur-md flex items-center gap-3 font-semibold text-sm ${
+              toast.type === 'success' 
+                ? 'bg-emerald-950/80 border-emerald-500/30 text-emerald-400' 
+                : 'bg-red-950/80 border-red-500/30 text-red-400'
+            }`}>
+              {toast.type === 'success' ? <CheckCircle className="h-5 w-5" /> : <AlertTriangle className="h-5 w-5" />}
+              {toast.message}
             </div>
           </div>
         )}
