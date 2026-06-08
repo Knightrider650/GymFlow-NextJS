@@ -57,11 +57,29 @@ export async function POST(request: Request) {
     // 4. Hash password
     const hashedPassword = await bcrypt.hash(password, 10)
 
-    // 5. Create user and update invite status within a transaction
-    const lowercasedRole = invite.role.toLowerCase()
-    
-    const [user, updatedInvite] = await prisma.$transaction([
-      prisma.user.create({
+function isStrongPassword(password: string): boolean {
+  if (password.length < 8) return false;
+  const hasUpperCase = /[A-Z]/.test(password);
+  const hasLowerCase = /[a-z]/.test(password);
+  const hasNumber = /[0-9]/.test(password);
+  return hasUpperCase && hasLowerCase && hasNumber;
+}
+
+// 5. Create user and update invite status within a transaction
+const lowercasedRole = invite.role.toLowerCase()
+
+const adminRoles = ['admin', 'ceo', 'cto', 'owner', 'manager'];
+if (adminRoles.includes(lowercasedRole)) {
+  if (!isStrongPassword(password)) {
+    return NextResponse.json(
+      { success: false, error: 'Password must be at least 8 characters long, and contain a mix of uppercase letters, lowercase letters, and numbers.' },
+      { status: 400 }
+    )
+  }
+}
+
+const [user, updatedInvite] = await prisma.$transaction([
+  prisma.user.create({
         data: {
           email: normalizedEmail,
           password: hashedPassword,

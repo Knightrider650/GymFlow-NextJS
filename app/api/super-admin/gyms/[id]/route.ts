@@ -45,6 +45,7 @@ export async function PATCH(
     // Apply updates
     if (body.status !== undefined) gymOverride.status = body.status
     if (body.plan !== undefined) gymOverride.plan = body.plan
+    if (body.subdomain !== undefined) gymOverride.subdomain = body.subdomain
     if (body.maxMembersLimit !== undefined) gymOverride.maxMembersLimit = body.maxMembersLimit
     if (body.maxBranchesLimit !== undefined) gymOverride.maxBranchesLimit = body.maxBranchesLimit
     if (body.enabledModules !== undefined) gymOverride.enabledModules = body.enabledModules

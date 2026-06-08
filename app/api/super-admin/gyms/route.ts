@@ -146,10 +146,11 @@ export async function GET(req: NextRequest) {
         .filter((i: any) => i.status === 'paid')
         .reduce((sum: number, i: any) => sum + i.amount, 0)
 
+      const override = overrides[gym.id] || {}
       return {
         id: gym.id,
         name: gym.name,
-        subdomain: `${gym.id}.gymflow.app`,
+        subdomain: override.subdomain || `${gym.id}.gymflow.app`,
         email: gym.email,
         phone: gym.phone,
         address: gym.address,
@@ -164,6 +165,7 @@ export async function GET(req: NextRequest) {
       const override = overrides[gym.id] || {}
       return {
         ...gym,
+        subdomain: override.subdomain || gym.subdomain,
         status: override.status || (gym.id === 'metro-iron-gym' ? 'suspended' : 'active'),
         plan: override.plan || (gym.id === 'gymflow-hq' ? 'Enterprise' : gym.id === 'elite-athletics' || gym.id === 'metro-iron-gym' ? 'Pro' : 'Basic'),
         maxMembersLimit: override.maxMembersLimit || (gym.id === 'gymflow-hq' ? 2000 : gym.id === 'elite-athletics' || gym.id === 'metro-iron-gym' ? 500 : 150),
@@ -193,6 +195,7 @@ export async function POST(req: NextRequest) {
     overrides[id] = {
       status: 'active',
       plan,
+      subdomain: subdomain || `${id}.gymflow.app`,
       maxMembersLimit: plan === 'Enterprise' ? 2000 : plan === 'Pro' ? 500 : 150,
       maxBranchesLimit: plan === 'Enterprise' ? 10 : plan === 'Pro' ? 3 : 1,
       enabledModules: plan === 'Enterprise' ? ['POS', 'Inventory', 'Advanced Analytics'] : ['POS']

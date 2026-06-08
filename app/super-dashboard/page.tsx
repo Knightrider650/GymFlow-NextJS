@@ -320,6 +320,12 @@ export default function SuperDashboard() {
 
   // UI state for modals / details
   const [selectedTenant, setSelectedTenant] = useState<GymOverview | null>(null)
+  const [configDraft, setConfigDraft] = useState<GymOverview | null>(null)
+  
+  useEffect(() => {
+    setConfigDraft(selectedTenant)
+  }, [selectedTenant])
+
   const [isNewTenantOpen, setIsNewTenantOpen] = useState(false)
   const [isProvisioning, setIsProvisioning] = useState(false)
   const [newTenantData, setNewTenantData] = useState({
@@ -402,12 +408,14 @@ export default function SuperDashboard() {
 
   const handleSaveTenantLimits = async (updated: GymOverview) => {
     try {
+      setLoading(true)
       const response = await fetch(`/api/super-admin/gyms/${updated.id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           status: updated.status,
           plan: updated.plan,
+          subdomain: updated.subdomain,
           maxMembersLimit: updated.maxMembersLimit,
           maxBranchesLimit: updated.maxBranchesLimit,
           enabledModules: updated.enabledModules
@@ -415,12 +423,15 @@ export default function SuperDashboard() {
       })
       if (response.ok) {
         await fetchGyms()
-        setSelectedTenant(updated)
+        setSelectedTenant(null)
+        alert('Tenant settings successfully updated!')
       } else {
         alert('Failed to update tenant overrides')
       }
     } catch (err) {
       console.error('Error updating tenant overrides:', err)
+    } finally {
+      setLoading(false)
     }
   }
 
@@ -434,6 +445,7 @@ export default function SuperDashboard() {
 
   const handleSingleDelete = async (id: string) => {
     try {
+      setLoading(true)
       const response = await fetch(`/api/super-admin/gyms/${id}`, {
         method: 'DELETE'
       })
@@ -442,16 +454,20 @@ export default function SuperDashboard() {
         setIsDeleteOpen(false)
         setSelectedTenant(null)
         await fetchGyms()
+        alert('Tenant permanently deleted successfully!')
       } else {
         alert('Failed to delete gym')
       }
     } catch (err) {
       console.error('Delete error:', err)
+    } finally {
+      setLoading(false)
     }
   }
 
   const handleBulkDelete = async (ids: string[]) => {
     try {
+      setLoading(true)
       const response = await fetch('/api/super-admin/gyms', {
         method: 'DELETE',
         headers: { 'Content-Type': 'application/json' },
@@ -461,11 +477,14 @@ export default function SuperDashboard() {
         setSelectedIds([])
         setIsDeleteOpen(false)
         await fetchGyms()
+        alert('Selected tenants permanently deleted successfully!')
       } else {
         alert('Failed to delete gyms')
       }
     } catch (err) {
       console.error('Delete error:', err)
+    } finally {
+      setLoading(false)
     }
   }
 
@@ -1033,7 +1052,7 @@ export default function SuperDashboard() {
                     onClick={() => setStatusFilter('suspended')} 
                     className={`px-3 py-1.5 text-xs font-semibold rounded-md transition-all ${statusFilter === 'suspended' ? 'bg-violet-600 text-slate-50' : 'text-slate-400 hover:text-slate-200'}`}
                   >
-                    Suspended
+                    Suspended DB
                   </button>
                 </div>
               </div>
@@ -1048,161 +1067,169 @@ export default function SuperDashboard() {
             </div>
  
             {/* Gyms Directory Table */}
+            {/* Gyms Directory Table */}
             <Card className="border-none bg-slate-900/40 backdrop-blur-sm overflow-hidden shadow-xl">
-              <Table>
-                <TableHeader>
-                  <TableRow className="bg-slate-900 border-slate-800 hover:bg-slate-900">
-                    <TableHead className="w-[50px] font-bold text-slate-300">
-                      <input 
-                        type="checkbox"
-                        checked={filteredTenants.length > 0 && selectedIds.length === filteredTenants.length}
-                        onChange={(e) => {
-                          if (e.target.checked) {
-                            setSelectedIds(filteredTenants.map(g => g.id))
-                          } else {
-                            setSelectedIds([])
-                          }
-                        }}
-                        className="rounded border-slate-800 bg-slate-950 text-violet-600 focus:ring-violet-500 w-4 h-4 cursor-pointer"
-                      />
-                    </TableHead>
-                    <TableHead className="font-bold text-slate-300">Gym Identity</TableHead>
-                    <TableHead className="font-bold text-slate-300">Subdomain Slug</TableHead>
-                    <TableHead className="font-bold text-slate-300">Plan</TableHead>
-                    <TableHead className="font-bold text-slate-300">System Usage</TableHead>
-                    <TableHead className="font-bold text-slate-300">Branches</TableHead>
-                    <TableHead className="font-bold text-slate-300">Status</TableHead>
-                    <TableHead className="text-right font-bold text-slate-300">Action</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {filteredTenants.length === 0 ? (
-                    <TableRow>
-                      <TableCell colSpan={8} className="text-center py-20 text-slate-400 font-bold">
-                        No customer gyms match current platform filter keys.
-                      </TableCell>
+              {loading ? (
+                <div className="flex flex-col items-center justify-center py-20 gap-3">
+                  <RefreshCw className="h-8 w-8 text-primary animate-spin" />
+                  <span className="text-xs text-slate-500 font-bold uppercase tracking-wider animate-pulse">Syncing tenants...</span>
+                </div>
+              ) : (
+                <Table>
+                  <TableHeader>
+                    <TableRow className="bg-slate-900 border-slate-800 hover:bg-slate-900">
+                      <TableHead className="w-[50px] font-bold text-slate-300">
+                        <input 
+                          type="checkbox"
+                          checked={filteredTenants.length > 0 && selectedIds.length === filteredTenants.length}
+                          onChange={(e) => {
+                            if (e.target.checked) {
+                              setSelectedIds(filteredTenants.map(g => g.id))
+                            } else {
+                              setSelectedIds([])
+                            }
+                          }}
+                          className="rounded border-slate-800 bg-slate-950 text-violet-600 focus:ring-violet-500 w-4 h-4 cursor-pointer"
+                        />
+                      </TableHead>
+                      <TableHead className="font-bold text-slate-300">Gym Identity</TableHead>
+                      <TableHead className="font-bold text-slate-300">Subdomain Slug</TableHead>
+                      <TableHead className="font-bold text-slate-300">Plan</TableHead>
+                      <TableHead className="font-bold text-slate-300">System Usage</TableHead>
+                      <TableHead className="font-bold text-slate-300">Branches</TableHead>
+                      <TableHead className="font-bold text-slate-300">Status</TableHead>
+                      <TableHead className="text-right font-bold text-slate-300">Action</TableHead>
                     </TableRow>
-                  ) : (
-                    filteredTenants.map((gym) => (
-                      <TableRow 
-                        key={gym.id} 
-                        onClick={() => setSelectedTenant(gym)}
-                        className={`hover:bg-slate-900/60 border-slate-800 cursor-pointer transition-colors group ${
-                          selectedIds.includes(gym.id) ? 'bg-violet-950/15' : ''
-                        }`}
-                      >
-                        <TableCell onClick={(e) => e.stopPropagation()}>
-                          <input 
-                            type="checkbox"
-                            checked={selectedIds.includes(gym.id)}
-                            onChange={(e) => {
-                              if (e.target.checked) {
-                                setSelectedIds(prev => [...prev, gym.id])
-                              } else {
-                                setSelectedIds(prev => prev.filter(id => id !== gym.id))
-                              }
-                            }}
-                            className="rounded border-slate-800 bg-slate-950 text-violet-600 focus:ring-violet-500 w-4 h-4 cursor-pointer"
-                          />
-                        </TableCell>
-                        <TableCell>
-                          <div className="flex flex-col">
-                            <span className="font-extrabold text-slate-200 group-hover:text-primary transition-colors">{gym.name}</span>
-                            <span className="text-xs text-slate-400">{gym.email}</span>
-                          </div>
-                        </TableCell>
-                        <TableCell className="font-mono text-xs text-indigo-400">
-                          {gym.subdomain}
-                        </TableCell>
-                        <TableCell>
-                          <Badge variant="outline" className={`px-2 py-0.5 text-[10px] font-black uppercase ${
-                            gym.plan === 'Enterprise' 
-                              ? 'bg-purple-950/40 text-purple-400 border-purple-500/20' 
-                              : gym.plan === 'Pro' 
-                              ? 'bg-blue-950/40 text-blue-400 border-blue-500/20' 
-                              : 'bg-slate-900 text-slate-400 border-slate-800'
-                          }`}>
-                            {gym.plan}
-                          </Badge>
-                        </TableCell>
-                        <TableCell>
-                          <div className="space-y-1.5 w-[140px]">
-                            <div className="flex items-center justify-between text-[10px] text-slate-400">
-                              <span>Members</span>
-                              <span>{gym.activeMembers} / {gym.maxMembersLimit}</span>
-                            </div>
-                            <div className="w-full bg-slate-800 rounded-full h-1.5 overflow-hidden">
-                              <div 
-                                className="bg-primary h-full rounded-full transition-all duration-300"
-                                style={{ width: `${Math.min(100, (gym.activeMembers / gym.maxMembersLimit) * 100)}%` }}
-                              />
-                            </div>
-                          </div>
-                        </TableCell>
-                        <TableCell className="font-bold text-slate-300">
-                          {gym.branchesCount} <span className="text-[10px] text-slate-500">/ {gym.maxBranchesLimit} max</span>
-                        </TableCell>
-                        <TableCell>
-                          <Badge className={`px-2 py-0.5 rounded-full text-[10px] uppercase font-black tracking-wider ${
-                            gym.status === 'active' 
-                              ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' 
-                              : gym.status === 'suspended' 
-                              ? 'bg-rose-500/10 text-rose-400 border border-rose-500/20' 
-                              : 'bg-amber-500/10 text-amber-400 border border-amber-500/20'
-                          }`}>
-                            {gym.status}
-                          </Badge>
-                        </TableCell>
-                        <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
-                          <div className="flex items-center justify-end gap-1.5">
-                            <Button 
-                              variant="ghost" 
-                              size="sm" 
-                              className="h-8 px-2 hover:bg-slate-800 font-bold text-xs"
-                              onClick={() => setSelectedTenant(gym)}
-                            >
-                              Config
-                            </Button>
-                            <Button 
-                              variant="outline" 
-                              size="sm" 
-                              className="h-8 px-2 border-violet-500/20 text-violet-400 hover:bg-violet-500/10 font-bold text-xs flex items-center gap-1"
-                              onClick={() => handleOpenImpersonation(gym.id)}
-                            >
-                              <Play className="h-3 w-3" />
-                              Impersonate
-                            </Button>
-                            <Button 
-                              variant="ghost" 
-                              size="icon" 
-                              className="h-8 w-8 text-slate-400 hover:text-violet-400 hover:bg-slate-800"
-                              title="Notify Gym"
-                              onClick={() => {
-                                setNotifyTargetIds([gym.id])
-                                setIsNotifyOpen(true)
-                              }}
-                            >
-                              <Bell className="h-4 w-4" />
-                            </Button>
-                            <Button 
-                              variant="ghost" 
-                              size="icon" 
-                              className="h-8 w-8 text-slate-400 hover:text-red-400 hover:bg-slate-800"
-                              title="Delete Gym"
-                              onClick={() => {
-                                setDeleteTargetIds([gym.id])
-                                setIsDeleteOpen(true)
-                              }}
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
-                          </div>
+                  </TableHeader>
+                  <TableBody>
+                    {filteredTenants.length === 0 ? (
+                      <TableRow>
+                        <TableCell colSpan={8} className="text-center py-20 text-slate-400 font-bold">
+                          No customer gyms match current platform filter keys.
                         </TableCell>
                       </TableRow>
-                    ))
-                  )}
-                </TableBody>
-              </Table>
+                    ) : (
+                      filteredTenants.map((gym) => (
+                        <TableRow 
+                          key={gym.id} 
+                          onClick={() => setSelectedTenant(gym)}
+                          className={`hover:bg-slate-900/60 border-slate-800 cursor-pointer transition-colors group ${
+                            selectedIds.includes(gym.id) ? 'bg-primary/5 border-primary/20 border-l-2 border-l-primary' : ''
+                          }`}
+                        >
+                          <TableCell onClick={(e) => e.stopPropagation()}>
+                            <input 
+                              type="checkbox"
+                              checked={selectedIds.includes(gym.id)}
+                              onChange={(e) => {
+                                if (e.target.checked) {
+                                  setSelectedIds(prev => [...prev, gym.id])
+                                } else {
+                                  setSelectedIds(prev => prev.filter(id => id !== gym.id))
+                                }
+                              }}
+                              className="rounded border-slate-800 bg-slate-950 text-violet-600 focus:ring-violet-500 w-4 h-4 cursor-pointer"
+                            />
+                          </TableCell>
+                          <TableCell>
+                            <div className="flex flex-col">
+                              <span className="font-extrabold text-slate-200 group-hover:text-primary transition-colors">{gym.name}</span>
+                              <span className="text-xs text-slate-400">{gym.email}</span>
+                            </div>
+                          </TableCell>
+                          <TableCell className="font-mono text-xs text-indigo-400">
+                            {gym.subdomain}
+                          </TableCell>
+                          <TableCell>
+                            <Badge variant="outline" className={`px-2 py-0.5 text-[10px] font-black uppercase ${
+                              gym.plan === 'Enterprise' 
+                                ? 'bg-purple-950/40 text-purple-400 border-purple-500/20' 
+                                : gym.plan === 'Pro' 
+                                ? 'bg-blue-950/40 text-blue-400 border-blue-500/20' 
+                                : 'bg-slate-900 text-slate-400 border-slate-800'
+                            }`}>
+                              {gym.plan}
+                            </Badge>
+                          </TableCell>
+                          <TableCell>
+                            <div className="space-y-1.5 w-[140px]">
+                              <div className="flex items-center justify-between text-[10px] text-slate-400">
+                                <span>Members</span>
+                                <span>{gym.activeMembers} / {gym.maxMembersLimit}</span>
+                              </div>
+                              <div className="w-full bg-slate-800 rounded-full h-1.5 overflow-hidden">
+                                <div 
+                                  className="bg-primary h-full rounded-full transition-all duration-300"
+                                  style={{ width: `${Math.min(100, (gym.activeMembers / gym.maxMembersLimit) * 100)}%` }}
+                                />
+                              </div>
+                            </div>
+                          </TableCell>
+                          <TableCell className="font-bold text-slate-300">
+                            {gym.branchesCount} <span className="text-[10px] text-slate-500">/ {gym.maxBranchesLimit} max</span>
+                          </TableCell>
+                          <TableCell>
+                            <Badge className={`px-2 py-0.5 rounded-full text-[10px] uppercase font-black tracking-wider ${
+                              gym.status === 'active' 
+                                ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' 
+                                : gym.status === 'suspended' 
+                                ? 'bg-rose-500/10 text-rose-400 border border-rose-500/20' 
+                                : 'bg-amber-500/10 text-amber-400 border border-amber-500/20'
+                            }`}>
+                              {gym.status}
+                            </Badge>
+                          </TableCell>
+                          <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
+                            <div className="flex items-center justify-end gap-1.5">
+                              <Button 
+                                variant="ghost" 
+                                size="sm" 
+                                className="h-8 px-2 hover:bg-slate-800 font-bold text-xs"
+                                onClick={() => setSelectedTenant(gym)}
+                              >
+                                Config
+                              </Button>
+                              <Button 
+                                variant="outline" 
+                                size="sm" 
+                                className="h-8 px-2 border-violet-500/20 text-violet-400 hover:bg-violet-500/10 font-bold text-xs flex items-center gap-1"
+                                onClick={() => handleOpenImpersonation(gym.id)}
+                              >
+                                <Play className="h-3 w-3" />
+                                Impersonate
+                              </Button>
+                              <Button 
+                                variant="ghost" 
+                                size="icon" 
+                                className="h-8 w-8 text-slate-400 hover:text-violet-400 hover:bg-slate-800"
+                                title="Notify Gym"
+                                onClick={() => {
+                                  setNotifyTargetIds([gym.id])
+                                  setIsNotifyOpen(true)
+                                }}
+                              >
+                                <Bell className="h-4 w-4" />
+                              </Button>
+                              <Button 
+                                variant="ghost" 
+                                size="icon" 
+                                className="h-8 w-8 text-slate-400 hover:text-red-400 hover:bg-slate-800"
+                                title="Delete Gym"
+                                onClick={() => {
+                                  setDeleteTargetIds([gym.id])
+                                  setIsDeleteOpen(true)
+                                }}
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      ))
+                    )}
+                  </TableBody>
+                </Table>
+              )}
             </Card>
           </div>
         )}
@@ -1826,7 +1853,17 @@ export default function SuperDashboard() {
                     id="gymName" 
                     required 
                     value={newTenantData.name}
-                    onChange={(e) => setNewTenantData({ ...newTenantData, name: e.target.value })}
+                    onChange={(e) => {
+                      const name = e.target.value
+                      const generatedSlug = name.toLowerCase().replace(/\s+/g, '-') + '.gymflow.app'
+                      setNewTenantData({
+                        ...newTenantData,
+                        name,
+                        subdomain: newTenantData.subdomain === '' || newTenantData.subdomain === (newTenantData.name.toLowerCase().replace(/\s+/g, '-') + '.gymflow.app')
+                          ? generatedSlug
+                          : newTenantData.subdomain
+                      })
+                    }}
                     placeholder="e.g. Paramount Physical Fitness" 
                     className="bg-slate-950 border-slate-800"
                   />
@@ -1946,109 +1983,120 @@ export default function SuperDashboard() {
                   </Button>
                 </div>
 
-                {/* Hard Limit Custom Sliders */}
-                <div className="space-y-4">
-                  <h4 className="text-xs uppercase tracking-wider text-slate-500 font-bold flex items-center gap-2">
-                    <Sliders className="h-3.5 w-3.5" /> Limit Controls & Overrides
-                  </h4>
+                {configDraft && (
+                  <>
+                    {/* Hard Limit Custom Sliders */}
+                    <div className="space-y-4">
+                      <h4 className="text-xs uppercase tracking-wider text-slate-500 font-bold flex items-center gap-2">
+                        <Sliders className="h-3.5 w-3.5" /> Limit Controls & Overrides
+                      </h4>
 
-                  <div className="space-y-3 bg-slate-950/40 p-4 rounded-xl border border-slate-800/80">
-                    <div className="flex items-center justify-between text-xs">
-                      <span className="font-bold text-slate-300">Max Member Enrollment Limit</span>
-                      <span className="font-mono font-bold text-indigo-400">{selectedTenant.maxMembersLimit} active members</span>
-                    </div>
-                    <input 
-                      type="range" 
-                      min="100" 
-                      max="5000" 
-                      step="50"
-                      value={selectedTenant.maxMembersLimit} 
-                      onChange={(e) => handleSaveTenantLimits({
-                        ...selectedTenant, 
-                        maxMembersLimit: parseInt(e.target.value)
-                      })}
-                      className="w-full h-1.5 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-violet-500"
-                    />
-                    <div className="flex justify-between text-[9px] text-slate-500 font-bold">
-                      <span>100 min</span>
-                      <span>5,000 max</span>
-                    </div>
-                  </div>
+                      <div className="space-y-3 bg-slate-950/40 p-4 rounded-xl border border-slate-800/80">
+                        <div className="flex items-center justify-between text-xs">
+                          <span className="font-bold text-slate-300">Max Member Enrollment Limit</span>
+                          <span className="font-mono font-bold text-indigo-400">{configDraft.maxMembersLimit} active members</span>
+                        </div>
+                        <input 
+                          type="range" 
+                          min="100" 
+                          max="5000" 
+                          step="50"
+                          value={configDraft.maxMembersLimit} 
+                          onChange={(e) => setConfigDraft({
+                            ...configDraft,
+                            maxMembersLimit: parseInt(e.target.value)
+                          })}
+                          className="w-full h-1.5 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-violet-500"
+                        />
+                        <div className="flex justify-between text-[9px] text-slate-500 font-bold">
+                          <span>100 min</span>
+                          <span>5,000 max</span>
+                        </div>
+                      </div>
 
-                  <div className="space-y-3 bg-slate-950/40 p-4 rounded-xl border border-slate-800/80">
-                    <div className="flex items-center justify-between text-xs">
-                      <span className="font-bold text-slate-300">Max Branches Location Cap</span>
-                      <span className="font-mono font-bold text-indigo-400">{selectedTenant.maxBranchesLimit} branches</span>
+                      <div className="space-y-3 bg-slate-950/40 p-4 rounded-xl border border-slate-800/80">
+                        <div className="flex items-center justify-between text-xs">
+                          <span className="font-bold text-slate-300">Max Branches Location Cap</span>
+                          <span className="font-mono font-bold text-indigo-400">{configDraft.maxBranchesLimit} branches</span>
+                        </div>
+                        <input 
+                          type="range" 
+                          min="1" 
+                          max="20" 
+                          value={configDraft.maxBranchesLimit} 
+                          onChange={(e) => setConfigDraft({
+                            ...configDraft,
+                            maxBranchesLimit: parseInt(e.target.value)
+                          })}
+                          className="w-full h-1.5 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-violet-500"
+                        />
+                        <div className="flex justify-between text-[9px] text-slate-500 font-bold">
+                          <span>1 branch min</span>
+                          <span>20 branches max</span>
+                        </div>
+                      </div>
                     </div>
-                    <input 
-                      type="range" 
-                      min="1" 
-                      max="20" 
-                      value={selectedTenant.maxBranchesLimit} 
-                      onChange={(e) => handleSaveTenantLimits({
-                        ...selectedTenant, 
-                        maxBranchesLimit: parseInt(e.target.value)
-                      })}
-                      className="w-full h-1.5 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-violet-500"
-                    />
-                    <div className="flex justify-between text-[9px] text-slate-500 font-bold">
-                      <span>1 branch min</span>
-                      <span>20 branches max</span>
-                    </div>
-                  </div>
-                </div>
 
-                {/* Subdomain & Metadata Info */}
-                <div className="space-y-3">
-                  <h4 className="text-xs uppercase tracking-wider text-slate-500 font-bold">Tenant Metadata</h4>
-                  <div className="grid grid-cols-2 gap-4 text-xs">
-                    <div className="space-y-1">
-                      <span className="text-slate-500 block">Support Domain URL</span>
-                      <span className="font-semibold text-slate-300 font-mono">{selectedTenant.subdomain}</span>
+                    {/* Subdomain & Metadata Info */}
+                    <div className="space-y-3">
+                      <h4 className="text-xs uppercase tracking-wider text-slate-500 font-bold">Tenant Metadata</h4>
+                      <div className="grid grid-cols-2 gap-4 text-xs">
+                        <div className="space-y-1">
+                          <span className="text-slate-500 block">Support Domain URL</span>
+                          <Input 
+                            value={configDraft.subdomain || ''} 
+                            onChange={(e) => setConfigDraft({
+                              ...configDraft,
+                              subdomain: e.target.value
+                            })}
+                            className="h-8 px-2 rounded border border-slate-800 bg-slate-950 text-xs text-slate-300 font-mono focus:outline-none w-full"
+                          />
+                        </div>
+                        <div className="space-y-1">
+                          <span className="text-slate-500 block">Pricing Tier Plan</span>
+                          <select 
+                            value={configDraft.plan} 
+                            onChange={(e) => setConfigDraft({
+                              ...configDraft,
+                              plan: e.target.value as any
+                            })}
+                            className="h-8 px-2 rounded border border-slate-800 bg-slate-950 text-xs focus:outline-none w-full"
+                          >
+                            <option value="Basic">Basic Plan</option>
+                            <option value="Pro">Pro Plan</option>
+                            <option value="Enterprise">Enterprise Plan</option>
+                          </select>
+                        </div>
+                        <div className="space-y-1">
+                          <span className="text-slate-500 block">Created On</span>
+                          <span className="font-semibold text-slate-300">{formatDate(configDraft.createdAt)}</span>
+                        </div>
+                        <div className="space-y-1">
+                          <span className="text-slate-500 block">Isolation Status</span>
+                          <select 
+                            value={configDraft.status} 
+                            onChange={(e) => setConfigDraft({
+                              ...configDraft,
+                              status: e.target.value as any
+                            })}
+                            className="h-8 px-2 rounded border border-slate-800 bg-slate-950 text-xs focus:outline-none w-full font-bold"
+                          >
+                            <option value="active">Active System</option>
+                            <option value="suspended">Suspended DB</option>
+                            <option value="pending">Provisioning Queue</option>
+                          </select>
+                        </div>
+                      </div>
                     </div>
-                    <div className="space-y-1">
-                      <span className="text-slate-500 block">Pricing Tier Plan</span>
-                      <select 
-                        value={selectedTenant.plan} 
-                        onChange={(e) => handleSaveTenantLimits({
-                          ...selectedTenant, 
-                          plan: e.target.value as any
-                        })}
-                        className="h-8 px-2 rounded border border-slate-800 bg-slate-950 text-xs focus:outline-none w-full"
-                      >
-                        <option value="Basic">Basic Plan</option>
-                        <option value="Pro">Pro Plan</option>
-                        <option value="Enterprise">Enterprise Plan</option>
-                      </select>
-                    </div>
-                    <div className="space-y-1">
-                      <span className="text-slate-500 block">Created On</span>
-                      <span className="font-semibold text-slate-300">{formatDate(selectedTenant.createdAt)}</span>
-                    </div>
-                    <div className="space-y-1">
-                      <span className="text-slate-500 block">Isolation Status</span>
-                      <select 
-                        value={selectedTenant.status} 
-                        onChange={(e) => handleSaveTenantLimits({
-                          ...selectedTenant, 
-                          status: e.target.value as any
-                        })}
-                        className="h-8 px-2 rounded border border-slate-800 bg-slate-950 text-xs focus:outline-none w-full font-bold"
-                      >
-                        <option value="active">Active System</option>
-                        <option value="suspended">Suspended DB</option>
-                        <option value="pending">Provisioning Queue</option>
-                      </select>
-                    </div>
-                  </div>
-                </div>
+                  </>
+                )}
 
               </div>
 
-              <div className="p-6 border-t border-slate-800 bg-slate-900/60 flex items-center justify-between gap-3">
+              <div className="p-6 border-t border-slate-800 bg-slate-900/60 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
                 <Button 
                   variant="destructive" 
-                  className="bg-red-950/60 border border-red-500/30 text-red-400 hover:bg-red-900/60 font-bold text-xs"
+                  className="bg-red-950/60 border border-red-500/30 text-red-400 hover:bg-red-900/60 font-bold text-xs w-full sm:w-auto"
                   onClick={() => {
                     setDeleteTargetIds([selectedTenant.id])
                     setIsDeleteOpen(true)
@@ -2057,7 +2105,7 @@ export default function SuperDashboard() {
                   <Trash2 className="h-3 w-3 mr-1" />
                   Delete Tenant
                 </Button>
-                <div className="flex items-center gap-2">
+                <div className="flex flex-wrap items-center gap-2 justify-end">
                   <Button 
                     variant="outline" 
                     className="border-violet-500/20 text-violet-400 hover:bg-violet-500/10 font-bold text-xs"
@@ -2067,10 +2115,16 @@ export default function SuperDashboard() {
                     }}
                   >
                     <Bell className="h-3 w-3 mr-1" />
-                    Send Notification
+                    Notify
                   </Button>
-                  <Button onClick={() => setSelectedTenant(null)} className="font-bold text-xs">
-                    Close Details
+                  <Button 
+                    onClick={() => configDraft && handleSaveTenantLimits(configDraft)} 
+                    className="bg-primary hover:bg-primary/95 text-slate-950 font-bold text-xs"
+                  >
+                    Save Changes
+                  </Button>
+                  <Button variant="ghost" onClick={() => setSelectedTenant(null)} className="hover:bg-slate-800 text-slate-300 font-bold text-xs">
+                    Cancel
                   </Button>
                 </div>
               </div>

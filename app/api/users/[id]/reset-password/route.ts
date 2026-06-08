@@ -4,6 +4,14 @@ import { getAuthUser, getGymIdContext } from '@/lib/auth'
 import { ELEVATED_ROLES, canManageRole, type UserRole } from '@/lib/permissions'
 import bcrypt from 'bcryptjs'
 
+function isStrongPassword(password: string): boolean {
+  if (password.length < 8) return false;
+  const hasUpperCase = /[A-Z]/.test(password);
+  const hasLowerCase = /[a-z]/.test(password);
+  const hasNumber = /[0-9]/.test(password);
+  return hasUpperCase && hasLowerCase && hasNumber;
+}
+
 // POST /api/users/[id]/reset-password — admin-initiated password reset
 export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
@@ -31,6 +39,16 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     })
     if (!targetUser) {
       return NextResponse.json({ success: false, error: 'User not found' }, { status: 404 })
+    }
+
+    const adminRoles = ['admin', 'ceo', 'cto', 'owner', 'manager'];
+    if (adminRoles.includes(targetUser.role)) {
+      if (!isStrongPassword(newPassword)) {
+        return NextResponse.json(
+          { success: false, error: 'Password must be at least 8 characters long, and contain a mix of uppercase letters, lowercase letters, and numbers.' },
+          { status: 400 }
+        )
+      }
     }
 
     if (!canManageRole(actor.role as UserRole, targetUser.role as UserRole)) {
