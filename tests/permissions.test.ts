@@ -31,10 +31,10 @@ describe('permissions helpers', () => {
   })
 
   it('route permission map enforces visibility', () => {
-    // Quick sanity: '/staff' is only for elevated roles
-    expect(ROUTE_PERMISSIONS['/staff']).toBeDefined()
-    expect(canAccessRoute('manager', '/staff')).toBe(true)
-    expect(canAccessRoute('trainer', '/staff')).toBe(false)
+    // Quick sanity: '/staff-hr' is only for elevated roles
+    expect(ROUTE_PERMISSIONS['/staff-hr']).toBeDefined()
+    expect(canAccessRoute('manager', '/staff-hr')).toBe(true)
+    expect(canAccessRoute('trainer', '/staff-hr')).toBe(false)
   })
 
   it('isTrainer and asUserRole behave as expected', () => {
