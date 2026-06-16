@@ -13,272 +13,61 @@
       "tenant_id": "all"
     },
     {
-      "id": "owner-001",
-      "email": "owner@powerhouse.com",
-      "password_hash": "$2b$10$QVTaDlKUHz52rex/l.Mjv.hAgIAYbNczU79IAQCt9M7JQ7VX19wuC",
-      "name": "Powerhouse Owner",
-      "role": "owner",
-      "gymId": "gym-001",
-      "created_at": "2026-04-26T22:32:53.342Z",
-      "scope": "tenant",
-      "tenantId": "gym-001",
-      "tenant_id": "gym-001"
-    },
-    {
       "id": "admin-001",
       "email": "admin@gym.com",
       "password_hash": "$2b$10$QVTaDlKUHz52rex/l.Mjv.0DwlVnpbR74J0HYwi23/uXKOmrhzr4q",
       "name": "Gym Administrator",
       "role": "admin",
-      "gymId": "gym-001",
+      "gymId": "default-gym",
       "created_at": "2026-04-26T22:32:53.342Z",
       "scope": "platform",
-      "tenantId": "gym-001",
-      "tenant_id": "gym-001",
-      "updatedAt": "2026-06-07T17:23:42.558Z",
-      "gym_id": "gym-001"
+      "tenantId": "default-gym",
+      "tenant_id": "default-gym",
+      "gym_id": "default-gym",
+      "updatedAt": "2026-06-16T16:17:01.705Z",
+      "password": "$2b$10$QVTaDlKUHz52rex/l.Mjv.0DwlVnpbR74J0HYwi23/uXKOmrhzr4q",
+      "fullname": "Gym Administrator"
     },
     {
-      "id": "0.07172314174038075",
+      "id": "cto-001",
       "email": "cto@gym.com",
       "password": "$2b$10$4ehHNEfoEi1G6FyQQZyl6OHMe3492vRvJfYq4QdZvJH8MLRGynOhO",
       "fullname": "CTO User",
       "role": "cto",
       "gymId": "default-gym",
       "createdAt": "2026-06-07T07:07:20.577Z",
-      "updatedAt": "2026-06-07T17:23:42.616Z",
       "gym_id": "default-gym",
       "tenantId": "default-gym",
-      "tenant_id": "default-gym"
+      "tenant_id": "default-gym",
+      "updatedAt": "2026-06-16T16:17:01.761Z",
+      "password_hash": "$2b$10$4ehHNEfoEi1G6FyQQZyl6OHMe3492vRvJfYq4QdZvJH8MLRGynOhO",
+      "name": "CTO User"
     },
     {
-      "id": "0.05520859356913421",
+      "id": "ceo-001",
       "email": "ceo@gym.com",
       "password": "$2b$10$qJceDvtriog3kCykIsy/3eEHN.Ik0xvIbQHjAB/qUjtqrJ43.aCTe",
       "fullname": "CEO User",
       "role": "ceo",
       "gymId": "default-gym",
       "createdAt": "2026-06-07T07:07:20.640Z",
-      "updatedAt": "2026-06-07T17:23:42.674Z",
       "gym_id": "default-gym",
       "tenantId": "default-gym",
-      "tenant_id": "default-gym"
+      "tenant_id": "default-gym",
+      "updatedAt": "2026-06-16T16:17:01.816Z",
+      "password_hash": "$2b$10$qJceDvtriog3kCykIsy/3eEHN.Ik0xvIbQHjAB/qUjtqrJ43.aCTe",
+      "name": "CEO User"
     }
   ],
-  "members": [
-    {
-      "id": "m-1",
-      "name": "John Doe",
-      "email": "john@example.com",
-      "phone": "555-0101",
-      "membership_type": "Premium",
-      "status": "expired",
-      "join_date": "2023-11-01",
-      "expiry_date": "2024-11-01",
-      "tenant_id": "gym-001",
-      "tenantId": "gym-001"
-    },
-    {
-      "id": "m-2",
-      "name": "Jane Smith",
-      "email": "jane@example.com",
-      "phone": "555-0102",
-      "membership_type": "Basic",
-      "status": "expired",
-      "join_date": "2023-12-15",
-      "expiry_date": "2024-06-15",
-      "tenant_id": "gym-001",
-      "tenantId": "gym-001"
-    }
-  ],
-  "staff": [
-    {
-      "id": "s-1",
-      "name": "Marcus Vance",
-      "position": "Head Trainer",
-      "salary": 5000,
-      "email": "marcus@gym.com",
-      "phone": "555-0201",
-      "tenant_id": "gym-001",
-      "tenantId": "gym-001"
-    },
-    {
-      "id": "s-2",
-      "name": "Sarah Jenkins",
-      "position": "Floor Staff",
-      "salary": 3000,
-      "email": "sarah@gym.com",
-      "phone": "555-0202",
-      "tenant_id": "gym-001",
-      "tenantId": "gym-001"
-    }
-  ],
-  "inventory": [
-    {
-      "id": "i-1",
-      "name": "Dumbbell Set",
-      "category": "Equipment",
-      "quantity": 15,
-      "minThreshold": 5,
-      "costPerUnit": 120,
-      "last_updated": "2026-04-26T22:32:53.342Z",
-      "tenant_id": "gym-001",
-      "tenantId": "gym-001"
-    },
-    {
-      "id": "i-2",
-      "name": "Yoga Mats",
-      "category": "Fitness Pros",
-      "quantity": 4,
-      "minThreshold": 10,
-      "costPerUnit": 25,
-      "last_updated": "2026-04-26T22:32:53.342Z",
-      "tenant_id": "gym-001",
-      "tenantId": "gym-001"
-    }
-  ],
+  "members": [],
+  "staff": [],
+  "inventory": [],
   "attendance": [],
-  "billing": [
-    {
-      "id": "inv-1",
-      "memberId": "m-1",
-      "invoiceNumber": "INV-1001",
-      "amount": 99.99,
-      "subtotal": 92.58,
-      "taxAmount": 7.41,
-      "status": "paid",
-      "paymentMethod": "Card",
-      "paymentDate": "2026-05-20T22:32:53.342Z",
-      "invoiceDate": "2026-05-20",
-      "tenant_id": "gym-001",
-      "tenantId": "gym-001"
-    },
-    {
-      "id": "inv-2",
-      "memberId": "m-2",
-      "invoiceNumber": "INV-1002",
-      "amount": 49.99,
-      "subtotal": 46.29,
-      "taxAmount": 3.70,
-      "status": "paid",
-      "paymentMethod": "Cash",
-      "paymentDate": "2026-05-22T22:32:53.342Z",
-      "invoiceDate": "2026-05-22",
-      "tenant_id": "gym-001",
-      "tenantId": "gym-001"
-    },
-    {
-      "id": "inv-3",
-      "memberId": "m-1",
-      "invoiceNumber": "INV-1003",
-      "amount": 150,
-      "subtotal": 138.89,
-      "taxAmount": 11.11,
-      "status": "paid",
-      "paymentMethod": "UPI",
-      "paymentDate": "2026-05-24T22:32:53.342Z",
-      "invoiceDate": "2026-05-24",
-      "tenant_id": "gym-001",
-      "tenantId": "gym-001"
-    }
-  ],
-  "classes": [
-    {
-      "id": "c-1",
-      "name": "Morning Yoga",
-      "instructorName": "Marcus Vance",
-      "maxCapacity": 20,
-      "currentEnrollment": 12,
-      "description": "Relaxing yoga session",
-      "time": "08:00 AM",
-      "days": "Mon, Wed, Fri",
-      "tenant_id": "gym-001",
-      "tenantId": "gym-001"
-    },
-    {
-      "id": "c-2",
-      "name": "Heavy HIIT",
-      "instructorName": "Sarah Jenkins",
-      "maxCapacity": 15,
-      "currentEnrollment": 8,
-      "description": "Intense interval training",
-      "time": "05:30 PM",
-      "days": "Tue, Thu",
-      "tenant_id": "gym-001",
-      "tenantId": "gym-001"
-    }
-  ],
-  "notifications": [
-    {
-      "id": "n-1",
-      "title": "System Configured",
-      "message": "Welcome to GymFlow Pro Edition.",
-      "read": false,
-      "createdAt": "2026-04-26T22:32:53.342Z",
-      "tenant_id": "gym-001",
-      "tenantId": "gym-001"
-    }
-  ],
-  "leads": [
-    {
-      "id": "l-1",
-      "name": "John Doe Partner",
-      "email": "johndoe+lead@example.com",
-      "phone": "123-456-7890",
-      "status": "New",
-      "notes": "Interested in Premium Trial",
-      "created_at": "2026-04-26T22:32:53.342Z",
-      "tenant_id": "gym-001",
-      "tenantId": "gym-001"
-    },
-    {
-      "id": "0.4603506593022284",
-      "name": "Test LeadTest Lead",
-      "email": "test@lead.com",
-      "phone": "555-1234",
-      "status": "New",
-      "notes": "Test note",
-      "gymId": "default-gym",
-      "createdAt": "2026-06-07T17:34:00.530Z",
-      "updatedAt": "2026-06-07T17:34:00.530Z",
-      "gym_id": "default-gym",
-      "tenantId": "default-gym",
-      "tenant_id": "default-gym"
-    },
-    {
-      "id": "0.5789350400196767",
-      "name": "Test Lead",
-      "email": "test@lead.com",
-      "phone": "555-1234",
-      "status": "New",
-      "notes": "Test note",
-      "gymId": "default-gym",
-      "createdAt": "2026-06-07T17:35:39.493Z",
-      "updatedAt": "2026-06-07T17:35:39.493Z",
-      "gym_id": "default-gym",
-      "tenantId": "default-gym",
-      "tenant_id": "default-gym"
-    }
-  ],
+  "billing": [],
+  "classes": [],
+  "notifications": [],
+  "leads": [],
   "plans": [
-    {
-      "id": "p-1",
-      "name": "Premium Plan",
-      "price": 99.99,
-      "durationMonths": 12,
-      "features": "Full Access, Classes, Gym",
-      "tenant_id": "gym-001",
-      "tenantId": "gym-001"
-    },
-    {
-      "id": "p-2",
-      "name": "Basic Plan",
-      "price": 49.99,
-      "durationMonths": 1,
-      "features": "Gym Only",
-      "tenant_id": "gym-001",
-      "tenantId": "gym-001"
-    },
     {
       "id": "plan-1",
       "name": "Basic Monthly",
@@ -287,10 +76,11 @@
       "features": "Gym Access, Locker Room",
       "gymId": "default-gym",
       "createdAt": "2026-06-07T07:07:20.641Z",
-      "updatedAt": "2026-06-07T17:23:42.675Z",
       "gym_id": "default-gym",
       "tenantId": "default-gym",
-      "tenant_id": "default-gym"
+      "tenant_id": "default-gym",
+      "updatedAt": "2026-06-16T16:17:01.816Z",
+      "fullname": "Basic Monthly"
     },
     {
       "id": "plan-2",
@@ -300,17 +90,18 @@
       "features": "Gym Access, Pool, Personal Trainer",
       "gymId": "default-gym",
       "createdAt": "2026-06-07T07:07:20.641Z",
-      "updatedAt": "2026-06-07T17:23:42.676Z",
       "gym_id": "default-gym",
       "tenantId": "default-gym",
-      "tenant_id": "default-gym"
+      "tenant_id": "default-gym",
+      "updatedAt": "2026-06-16T16:17:01.817Z",
+      "fullname": "Annual Premium"
     }
   ],
   "settings": {
-    "gymName": "GymFlow Pro",
+    "gymName": "GymFlow HQ",
     "gymLogo": "",
-    "gymEmail": "admin@gymflow.com",
-    "currency": "USD",
+    "gymEmail": "contact@gymflow.com",
+    "currency": "INR",
     "taxRate": 0.08,
     "enableNotifications": true
   },
@@ -318,18 +109,6 @@
   "campaigns": [],
   "messageLogs": [],
   "tenants": [
-    {
-      "id": "gym-001",
-      "name": "GymFlow Pro",
-      "slug": "gymflow-pro",
-      "status": "active",
-      "plan": "Pro",
-      "membersLimit": 500,
-      "branchesLimit": 5,
-      "contactEmail": "admin@gymflow.com",
-      "createdAt": "2026-05-17T09:13:56.039Z",
-      "lastActiveAt": "2026-05-17T09:13:56.039Z"
-    },
     {
       "id": "default-gym",
       "name": "GymFlow HQ",
@@ -340,54 +119,11 @@
       "dateFormat": "MM/DD/YYYY",
       "invoicePrefix": "GF-",
       "createdAt": "2026-06-07T07:07:20.438Z",
-      "updatedAt": "2026-06-07T17:23:42.494Z"
+      "updatedAt": "2026-06-16T16:17:01.638Z",
+      "fullname": "GymFlow HQ"
     }
   ],
-  "activity_logs": [
-    {
-      "id": "3f2a2983-9974-40ca-afc6-09d499e9e404",
-      "userId": "admin-001",
-      "userName": "Gym Administrator",
-      "action": "create",
-      "entityType": "support-session",
-      "entityId": "gym-001",
-      "entityName": "GymFlow Pro",
-      "details": "Opened support session for GymFlow Pro",
-      "timestamp": "2026-05-20T22:32:53.342Z"
-    },
-    {
-      "id": "0.9780058355561791",
-      "action": "Add Lead",
-      "details": "Added new lead: Test LeadTest Lead",
-      "entityType": "Lead",
-      "entityId": "0.4603506593022284",
-      "userName": "ceo@gym.com",
-      "userId": "0.05520859356913421",
-      "gymId": "default-gym",
-      "createdAt": "2026-06-07T17:34:00.533Z",
-      "updatedAt": "2026-06-07T17:34:00.533Z",
-      "gym_id": "default-gym",
-      "tenantId": "default-gym",
-      "tenant_id": "default-gym",
-      "timestamp": "2026-06-07T17:34:00.533Z"
-    },
-    {
-      "id": "0.09431832577417443",
-      "action": "Add Lead",
-      "details": "Added new lead: Test Lead",
-      "entityType": "Lead",
-      "entityId": "0.5789350400196767",
-      "userName": "ceo@gym.com",
-      "userId": "0.05520859356913421",
-      "gymId": "default-gym",
-      "createdAt": "2026-06-07T17:35:39.504Z",
-      "updatedAt": "2026-06-07T17:35:39.504Z",
-      "gym_id": "default-gym",
-      "tenantId": "default-gym",
-      "tenant_id": "default-gym",
-      "timestamp": "2026-06-07T17:35:39.504Z"
-    }
-  ],
+  "activity_logs": [],
   "branches": [
     {
       "id": "branch-default-1",
@@ -400,20 +136,6 @@
       "openingTime": "06:00",
       "closingTime": "22:00",
       "capacity": 150,
-      "isDefault": true,
-      "is_default": true
-    },
-    {
-      "id": "branch-pro-1",
-      "gymId": "gym-001",
-      "owner_id": "gym-001",
-      "name": "Downtown Branch",
-      "address": "456 Central Ave, Metro City",
-      "phone": "555-0301",
-      "email": "downtown@gymflow.com",
-      "openingTime": "06:00",
-      "closingTime": "22:00",
-      "capacity": 120,
       "isDefault": true,
       "is_default": true
     }
