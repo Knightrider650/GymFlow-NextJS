@@ -24,12 +24,12 @@
       "tenantId": "default-gym",
       "tenant_id": "default-gym",
       "gym_id": "default-gym",
-      "updatedAt": "2026-06-16T16:17:01.705Z",
+      "updatedAt": "2026-06-16T16:22:08.739Z",
       "password": "$2b$10$QVTaDlKUHz52rex/l.Mjv.0DwlVnpbR74J0HYwi23/uXKOmrhzr4q",
       "fullname": "Gym Administrator"
     },
     {
-      "id": "cto-001",
+      "id": "0.07172314174038075",
       "email": "cto@gym.com",
       "password": "$2b$10$4ehHNEfoEi1G6FyQQZyl6OHMe3492vRvJfYq4QdZvJH8MLRGynOhO",
       "fullname": "CTO User",
@@ -39,12 +39,12 @@
       "gym_id": "default-gym",
       "tenantId": "default-gym",
       "tenant_id": "default-gym",
-      "updatedAt": "2026-06-16T16:17:01.761Z",
+      "updatedAt": "2026-06-16T16:22:08.797Z",
       "password_hash": "$2b$10$4ehHNEfoEi1G6FyQQZyl6OHMe3492vRvJfYq4QdZvJH8MLRGynOhO",
       "name": "CTO User"
     },
     {
-      "id": "ceo-001",
+      "id": "0.05520859356913421",
       "email": "ceo@gym.com",
       "password": "$2b$10$qJceDvtriog3kCykIsy/3eEHN.Ik0xvIbQHjAB/qUjtqrJ43.aCTe",
       "fullname": "CEO User",
@@ -54,7 +54,7 @@
       "gym_id": "default-gym",
       "tenantId": "default-gym",
       "tenant_id": "default-gym",
-      "updatedAt": "2026-06-16T16:17:01.816Z",
+      "updatedAt": "2026-06-16T16:22:08.852Z",
       "password_hash": "$2b$10$qJceDvtriog3kCykIsy/3eEHN.Ik0xvIbQHjAB/qUjtqrJ43.aCTe",
       "name": "CEO User"
     }
@@ -79,7 +79,7 @@
       "gym_id": "default-gym",
       "tenantId": "default-gym",
       "tenant_id": "default-gym",
-      "updatedAt": "2026-06-16T16:17:01.816Z",
+      "updatedAt": "2026-06-16T16:22:08.853Z",
       "fullname": "Basic Monthly"
     },
     {
@@ -93,7 +93,7 @@
       "gym_id": "default-gym",
       "tenantId": "default-gym",
       "tenant_id": "default-gym",
-      "updatedAt": "2026-06-16T16:17:01.817Z",
+      "updatedAt": "2026-06-16T16:22:08.853Z",
       "fullname": "Annual Premium"
     }
   ],
@@ -119,7 +119,7 @@
       "dateFormat": "MM/DD/YYYY",
       "invoicePrefix": "GF-",
       "createdAt": "2026-06-07T07:07:20.438Z",
-      "updatedAt": "2026-06-16T16:17:01.638Z",
+      "updatedAt": "2026-06-16T16:22:08.661Z",
       "fullname": "GymFlow HQ"
     }
   ],

@@ -25,6 +25,7 @@ async function main() {
     where: { email: 'admin@gym.com' },
     update: {},
     create: {
+      id: 'admin-001',
       email: 'admin@gym.com',
       password: adminPassword,
       fullname: 'Admin User',
@@ -39,6 +40,7 @@ async function main() {
     where: { email: 'cto@gym.com' },
     update: {},
     create: {
+      id: '0.07172314174038075',
       email: 'cto@gym.com',
       password: ctoPassword,
       fullname: 'CTO User',
@@ -53,6 +55,7 @@ async function main() {
     where: { email: 'ceo@gym.com' },
     update: {},
     create: {
+      id: '0.05520859356913421',
       email: 'ceo@gym.com',
       password: ceoPassword,
       fullname: 'CEO User',
