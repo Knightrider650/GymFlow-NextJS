@@ -254,31 +254,45 @@ export default function AttendancePage() {
     <ProtectedLayout>
       <div className="p-6 lg:p-8 space-y-8">
         {/* Header */}
-        <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-          <div>
-            <h1 className="text-3xl font-bold tracking-tight">Attendance</h1>
-            <p className="text-sm text-muted-foreground mt-1">
-              Track member check-ins and check-outs
-            </p>
+        <div className="flex flex-col gap-2">
+          <h1 className="text-3xl font-bold tracking-tight">Attendance</h1>
+          <p className="text-sm text-muted-foreground">
+            Track member check-ins and check-outs
+          </p>
+        </div>
+
+        {/* Controls: Search, Filter, and Actions */}
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between bg-muted/20 p-4 rounded-xl border border-muted-foreground/10">
+          <div className="relative flex-1 max-w-md">
+            <Search className="absolute left-3 top-3 h-5 w-5 text-muted-foreground" />
+            <Input
+              className="pl-10 h-11 bg-card placeholder:text-muted-foreground/75"
+              placeholder="Search by member name..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+            />
           </div>
-          <div className="flex items-center gap-4">
-            <div className="flex items-center gap-2 bg-muted/50 px-3 py-1.5 rounded-lg border">
-              <Filter className="h-4 w-4 text-muted-foreground" />
-              <Select value={selectedBranch} onValueChange={setSelectedBranch}>
-                <SelectTrigger className="w-[180px] border-none bg-transparent focus:ring-0">
-                  <SelectValue placeholder="All Branches" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Branches</SelectItem>
-                  {branches.map(b => (
-                    <SelectItem key={b.id} value={b.id}>{b.name}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+          
+          <div className="flex flex-wrap items-center gap-3">
+            {branches.length > 1 && (
+              <div className="flex items-center gap-2 bg-card px-3 py-1.5 rounded-lg border h-11 shadow-sm">
+                <Filter className="h-4 w-4 text-muted-foreground" />
+                <Select value={selectedBranch} onValueChange={setSelectedBranch}>
+                  <SelectTrigger className="w-[180px] border-none bg-transparent focus:ring-0">
+                    <SelectValue placeholder="All Branches" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Branches</SelectItem>
+                    {branches.map(b => (
+                      <SelectItem key={b.id} value={b.id}>{b.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
             <Button
               variant="outline"
-              className="gap-2 w-fit border-primary/20 hover:bg-primary/5 hover:text-primary transition-all duration-300 shadow-sm"
+              className="gap-2 h-11 border-primary/20 hover:bg-primary/5 hover:text-primary transition-all duration-300 shadow-sm bg-card"
               onClick={() => setIsScannerOpen(true)}
             >
               <Camera className="h-4 w-4 text-primary" />
@@ -287,54 +301,54 @@ export default function AttendancePage() {
 
             <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
               <DialogTrigger asChild>
-                <Button className="gap-2 w-fit">
+                <Button className="gap-2 h-11 bg-primary hover:bg-primary/95 text-white shadow-lg shadow-primary/20">
                   <Plus className="h-4 w-4" />
                   Check-in Member
                 </Button>
               </DialogTrigger>
-            <DialogContent>
-              <DialogHeader>
-                <DialogTitle>Check-in Member</DialogTitle>
-                <DialogDescription>
-                  Record member arrival at the gym
-                </DialogDescription>
-              </DialogHeader>
-              <form onSubmit={handleCheckIn} className="space-y-4">
-                <div>
-                  <Select value={selectedMemberId} onValueChange={setSelectedMemberId}>
-                    <SelectTrigger className="w-full bg-slate-900 border-slate-800 text-slate-100">
-                      <SelectValue placeholder="-- Select a member --" />
-                    </SelectTrigger>
-                    <SelectContent className="bg-slate-950 border-slate-800 text-slate-100">
-                      {members
-                        .filter(m => m.status === 'active' && (selectedBranch === 'all' || m.branchId === selectedBranch))
-                        .map(member => (
-                          <SelectItem key={member.id} value={member.id}>
-                            {member.name} ({member.email})
-                          </SelectItem>
-                        ))}
-                    </SelectContent>
-                  </Select>
-                </div>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>Check-in Member</DialogTitle>
+                  <DialogDescription>
+                    Record member arrival at the gym
+                  </DialogDescription>
+                </DialogHeader>
+                <form onSubmit={handleCheckIn} className="space-y-4">
+                  <div>
+                    <Select value={selectedMemberId} onValueChange={setSelectedMemberId}>
+                      <SelectTrigger className="w-full bg-slate-900 border-slate-800 text-slate-100">
+                        <SelectValue placeholder="-- Select a member --" />
+                      </SelectTrigger>
+                      <SelectContent className="bg-slate-950 border-slate-800 text-slate-100">
+                        {members
+                          .filter(m => m.status === 'active' && (selectedBranch === 'all' || m.branchId === selectedBranch))
+                          .map(member => (
+                            <SelectItem key={member.id} value={member.id}>
+                              {member.name} ({member.email})
+                            </SelectItem>
+                          ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
 
-                <div>
-                  <Label htmlFor="notes">Notes (Optional)</Label>
-                  <Input
-                    id="notes"
-                    value={notes}
-                    onChange={(e) => setNotes(e.target.value)}
-                    placeholder="Add any notes..."
-                  />
-                </div>
+                  <div>
+                    <Label htmlFor="notes">Notes (Optional)</Label>
+                    <Input
+                      id="notes"
+                      value={notes}
+                      onChange={(e) => setNotes(e.target.value)}
+                      placeholder="Add any notes..."
+                    />
+                  </div>
 
-                <DialogFooter>
-                  <Button type="submit" className="w-full">
-                    Check-in
-                  </Button>
-                </DialogFooter>
-              </form>
-            </DialogContent>
-          </Dialog>
+                  <DialogFooter>
+                    <Button type="submit" className="w-full">
+                      Check-in
+                    </Button>
+                  </DialogFooter>
+                </form>
+              </DialogContent>
+            </Dialog>
           </div>
         </div>
 
@@ -364,17 +378,6 @@ export default function AttendancePage() {
             </div>
           </CardContent>
         </Card>
-
-        {/* Search */}
-        <div className="relative">
-          <Search className="absolute left-3 top-3 h-5 w-5 text-muted-foreground" />
-          <Input
-            className="pl-10"
-            placeholder="Search by member name..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-          />
-        </div>
 
         {/* Attendance Records */}
         <Card>

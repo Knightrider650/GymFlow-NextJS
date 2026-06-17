@@ -686,14 +686,26 @@ export default function MembersPage() {
     <ProtectedLayout>
       <div className="p-6 lg:p-8 space-y-8">
         {/* Header */}
-        <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-          <div>
-            <h1 className="text-3xl font-bold tracking-tight bg-gradient-to-r from-primary to-indigo-600 bg-clip-text text-transparent">Member Management</h1>
-            <p className="text-sm text-muted-foreground mt-1">
-              Maintain your gym&apos;s community and membership status across {branches.length} branches
-            </p>
+        <div className="flex flex-col gap-2">
+          <h1 className="text-3xl font-bold tracking-tight bg-gradient-to-r from-primary to-indigo-600 bg-clip-text text-transparent">Member Management</h1>
+          <p className="text-sm text-muted-foreground">
+            Maintain your gym&apos;s community and membership status across {branches.length} {branches.length === 1 ? 'branch' : 'branches'}
+          </p>
+        </div>
+
+        {/* Controls: Search, Filter, and Actions */}
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between bg-muted/20 p-4 rounded-xl border border-muted-foreground/10">
+          <div className="relative flex-1 max-w-md">
+            <Search className="absolute left-3 top-3 h-5 w-5 text-muted-foreground" />
+            <Input
+              className="pl-10 h-11 bg-card placeholder:text-muted-foreground/75"
+              placeholder="Search by name, email, or phone number..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+            />
           </div>
-          <div className="flex flex-wrap gap-3">
+          
+          <div className="flex flex-wrap items-center gap-3">
             <input
               type="file"
               aria-label="Import members file"
@@ -704,13 +716,20 @@ export default function MembersPage() {
             />
             {!isTrainer(user?.role) && (
               <>
-                <Button variant="outline" className="gap-2 shadow-sm" onClick={handleImportClick}>
-                  <UploadCloud className="h-4 w-4" />
-                  Import Excel
-                </Button>
-                <div className="flex gap-2">
+                <div className="relative group">
+                  <Button variant="outline" className="gap-2 shadow-sm h-11 bg-card hover:bg-muted" onClick={handleImportClick}>
+                    <UploadCloud className="h-4 w-4" />
+                    Import Excel
+                  </Button>
+                  <div className="absolute z-50 bottom-full mb-2 hidden group-hover:flex flex-col bg-slate-900 border border-slate-850 text-slate-200 text-xs rounded-lg p-2.5 shadow-xl w-60 pointer-events-none">
+                    <p className="font-bold mb-1 text-primary">Accepted Columns:</p>
+                    <p className="text-slate-400">Name, Email, Phone, DOB, Plan (or membershipType)</p>
+                  </div>
+                </div>
+
+                {branches.length > 1 && (
                   <Select value={selectedBranch} onValueChange={setSelectedBranch}>
-                    <SelectTrigger className="w-[180px] h-10 shadow-sm bg-card border-muted-foreground/20">
+                    <SelectTrigger className="w-[180px] h-11 shadow-sm bg-card border-muted-foreground/20">
                       <SelectValue placeholder="All Branches" />
                     </SelectTrigger>
                     <SelectContent>
@@ -720,16 +739,18 @@ export default function MembersPage() {
                       ))}
                     </SelectContent>
                   </Select>
-                  <Dialog open={isDialogOpen} onOpenChange={(open) => {
-                    setIsDialogOpen(open)
-                    if (!open) resetForm()
-                  }}>
-                    <DialogTrigger asChild>
-                      <Button className="gap-2 shadow-lg shadow-primary/20">
-                        <Plus className="h-4 w-4" />
-                        Add New Member
-                      </Button>
-                    </DialogTrigger>
+                )}
+
+                <Dialog open={isDialogOpen} onOpenChange={(open) => {
+                  setIsDialogOpen(open)
+                  if (!open) resetForm()
+                }}>
+                  <DialogTrigger asChild>
+                    <Button className="gap-2 h-11 shadow-lg shadow-primary/20 bg-primary hover:bg-primary/95 text-white">
+                      <Plus className="h-4 w-4" />
+                      Add New Member
+                    </Button>
+                  </DialogTrigger>
                   <DialogContent className="sm:max-w-[600px]">
                     <DialogHeader>
                       <DialogTitle>{editingMember ? 'Edit Member' : 'Add New Member'}</DialogTitle>
@@ -738,7 +759,6 @@ export default function MembersPage() {
                       </DialogDescription>
                     </DialogHeader>
                     <form onSubmit={handleSubmit(onFormSubmit)} className="space-y-4 py-4">
-                      {/* ... form content ... */}
                       <div className="grid grid-cols-2 gap-4">
                         <div className="space-y-2">
                           <Label htmlFor="name">Full Name *</Label>
@@ -892,22 +912,10 @@ export default function MembersPage() {
                       </DialogFooter>
                     </form>
                   </DialogContent>
-                  </Dialog>
-                </div>
+                </Dialog>
               </>
             )}
           </div>
-        </div>
-
-        {/* Search */}
-        <div className="relative">
-          <Search className="absolute left-3 top-3 h-5 w-5 text-muted-foreground" />
-          <Input
-            className="pl-10 h-11"
-            placeholder="Search by name, email, or phone number..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-          />
         </div>
 
         {selectedMembers.length > 0 && (
@@ -1004,15 +1012,27 @@ export default function MembersPage() {
                             >
                               {member.name}
                             </button>
-                            <span className="text-xs text-muted-foreground flex items-center gap-1 mt-0.5">
-                              <MapPin className="h-2.5 w-2.5 text-primary" />
-                              {branches.find(b => b.id === member.branchId)?.name || 'Default Branch'}
-                            </span>
-                            {member.dob && (
-                              <span className="text-xs text-muted-foreground mt-0.5">
-                                DOB: {formatDate(member.dob)}
+                            <div className="flex flex-wrap gap-x-2 gap-y-0.5 text-xs text-muted-foreground mt-1 items-center">
+                              <span className="flex items-center gap-1">
+                                <Mail className="h-3 w-3 text-muted-foreground/60" /> {member.email}
                               </span>
-                            )}
+                              <span className="text-muted-foreground/30">•</span>
+                              <span className="flex items-center gap-1">
+                                <Phone className="h-3 w-3 text-muted-foreground/60" /> {member.phone}
+                              </span>
+                            </div>
+                            <div className="flex flex-wrap gap-x-2 gap-y-0.5 text-xs text-muted-foreground mt-0.5 items-center">
+                              <span className="flex items-center gap-1">
+                                <MapPin className="h-2.5 w-2.5 text-primary" />
+                                {branches.find(b => b.id === member.branchId)?.name || 'Default Branch'}
+                              </span>
+                              {member.dob && (
+                                <>
+                                  <span className="text-muted-foreground/30">•</span>
+                                  <span>DOB: {formatDate(member.dob)}</span>
+                                </>
+                              )}
+                            </div>
                           </div>
                         </TableCell>
                         <TableCell>
@@ -1041,7 +1061,7 @@ export default function MembersPage() {
                           {!isTrainer(user?.role) && (
                             <DropdownMenu>
                               <DropdownMenuTrigger asChild>
-                                <Button variant="ghost" size="icon" className="opacity-0 group-hover:opacity-100 transition-opacity">
+                                <Button variant="ghost" size="icon" className="opacity-70 group-hover:opacity-100 transition-opacity">
                                   <MoreHorizontal className="h-4 w-4" />
                                 </Button>
                               </DropdownMenuTrigger>

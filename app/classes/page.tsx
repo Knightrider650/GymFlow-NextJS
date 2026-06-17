@@ -17,7 +17,7 @@ import {
   DialogTrigger,
 } from '@/components/ui/dialog'
 import { useClasses, useStaff, useBranches, useMembers } from '@/hooks'
-import { Plus, Edit2, Trash2, Clock, Users, User, Calendar, MapPin, CheckCircle2, Filter, AlertTriangle } from 'lucide-react'
+import { Plus, Edit2, Trash2, Clock, Users, User, Calendar, MapPin, CheckCircle2, Filter, AlertTriangle, Search } from 'lucide-react'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { useAuthStore } from '@/lib/store'
 import { apiClient } from '@/lib/api-client'
@@ -33,6 +33,7 @@ export default function ClassesPage() {
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false)
   const [isBookDialogOpen, setIsBookDialogOpen] = useState(false)
   const [selectedClassId, setSelectedClassId] = useState<string | null>(null)
+  const [searchTerm, setSearchTerm] = useState('')
   const [selectedBranch, setSelectedBranch] = useState<string>('all')
   const [selectedMemberId, setSelectedMemberId] = useState('')
   const [editingClassId, setEditingClassId] = useState<string | null>(null)
@@ -119,9 +120,14 @@ export default function ClassesPage() {
     return ''
   }
 
-  const filteredClasses = selectedBranch === 'all'
-    ? classes
-    : classes.filter(c => c.branchId === selectedBranch)
+  const filteredClasses = classes.filter(c => {
+    const matchesSearch = c.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (c.instructorName || '').toLowerCase().includes(searchTerm.toLowerCase())
+    
+    const matchesBranch = selectedBranch === 'all' || c.branchId === selectedBranch
+    
+    return matchesSearch && matchesBranch
+  })
 
   const handleAddClass = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -194,31 +200,45 @@ export default function ClassesPage() {
     <ProtectedLayout>
       <div className="p-6 lg:p-8 space-y-8 min-h-screen">
         {/* Header */}
-        <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-          <div>
-            <h1 className="text-3xl font-bold tracking-tight bg-gradient-to-r from-primary to-indigo-600 bg-clip-text text-transparent flex items-center gap-3">
-              <Calendar className="h-8 w-8 text-primary" />
-              Classes & Booking
-            </h1>
-            <p className="text-sm text-muted-foreground mt-1">
-              Manage class schedules, trainers, enrollment capacity, and member bookings
-            </p>
+        <div className="flex flex-col gap-2">
+          <h1 className="text-3xl font-bold tracking-tight bg-gradient-to-r from-primary to-indigo-600 bg-clip-text text-transparent flex items-center gap-3">
+            <Calendar className="h-8 w-8 text-primary" />
+            Classes & Booking
+          </h1>
+          <p className="text-sm text-muted-foreground">
+            Manage class schedules, trainers, enrollment capacity, and member bookings
+          </p>
+        </div>
+
+        {/* Controls: Search, Filter, and Actions */}
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between bg-muted/20 p-4 rounded-xl border border-muted-foreground/10">
+          <div className="relative flex-1 max-w-md">
+            <Search className="absolute left-3 top-3 h-5 w-5 text-muted-foreground" />
+            <Input
+              className="pl-10 h-11 bg-card placeholder:text-muted-foreground/75"
+              placeholder="Search classes by name or instructor..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+            />
           </div>
+          
           <div className="flex flex-wrap items-center gap-3">
-            <div className="flex items-center gap-2 bg-muted/50 px-3 py-1.5 rounded-lg border">
-              <Filter className="h-4 w-4 text-muted-foreground" />
-              <Select value={selectedBranch} onValueChange={setSelectedBranch}>
-                <SelectTrigger className="w-[180px] border-none bg-transparent focus:ring-0">
-                  <SelectValue placeholder="All Branches" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Branches</SelectItem>
-                  {branches.map(b => (
-                    <SelectItem key={b.id} value={b.id}>{b.name}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+            {branches.length > 1 && (
+              <div className="flex items-center gap-2 bg-card px-3 py-1.5 rounded-lg border h-11 shadow-sm">
+                <Filter className="h-4 w-4 text-muted-foreground" />
+                <Select value={selectedBranch} onValueChange={setSelectedBranch}>
+                  <SelectTrigger className="w-[180px] border-none bg-transparent focus:ring-0">
+                    <SelectValue placeholder="All Branches" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Branches</SelectItem>
+                    {branches.map(b => (
+                      <SelectItem key={b.id} value={b.id}>{b.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
             {canAddClass && (
               <Dialog open={isAddDialogOpen} onOpenChange={(open) => {
                 setIsAddDialogOpen(open)
@@ -227,18 +247,18 @@ export default function ClassesPage() {
                   setFormData({ name: '', instructorName: '', instructorId: '', maxCapacity: '', description: '', time: '10:00 AM', days: 'Mon, Wed, Fri', branchId: '' })
                 }
               }}>
-              <DialogTrigger asChild>
-                <Button 
-                  onClick={() => {
-                    setEditingClassId(null)
-                    setFormData({ name: '', instructorName: '', instructorId: '', maxCapacity: '', description: '', time: '10:00 AM', days: 'Mon, Wed, Fri', branchId: '' })
-                  }}
-                  className="gap-2 w-fit shadow-lg shadow-primary/20 transition-all hover:scale-105 active:scale-95"
-                >
-                  <Plus className="h-4 w-4" />
-                  Add New Class
-                </Button>
-              </DialogTrigger>
+                <DialogTrigger asChild>
+                  <Button 
+                    onClick={() => {
+                      setEditingClassId(null)
+                      setFormData({ name: '', instructorName: '', instructorId: '', maxCapacity: '', description: '', time: '10:00 AM', days: 'Mon, Wed, Fri', branchId: '' })
+                    }}
+                    className="gap-2 h-11 bg-primary hover:bg-primary/95 text-white shadow-lg shadow-primary/20"
+                  >
+                    <Plus className="h-4 w-4" />
+                    Add New Class
+                  </Button>
+                </DialogTrigger>
               <DialogContent className="sm:max-w-[425px] max-h-[90vh] overflow-y-auto border border-slate-800 bg-slate-950 text-white shadow-2xl">
                 <DialogHeader className="bg-slate-900/50 -m-6 mb-0 p-6 border-b border-slate-800">
                   <DialogTitle className="text-xl text-white font-bold">{editingClassId ? 'Edit Class' : 'Add New Class'}</DialogTitle>
@@ -467,7 +487,7 @@ export default function ClassesPage() {
                         </div>
                       </div>
                       {canEditDeleteClass && (
-                        <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <div className="flex gap-1 opacity-70 group-hover:opacity-100 transition-opacity">
                           <Button 
                             size="icon" 
                             variant="ghost" 

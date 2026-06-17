@@ -227,9 +227,36 @@ export const useAuthStore = create<AuthState>()(
                 if (parts.length === 2) return parts.pop()?.split(';').shift() || null
                 return null
               }
-              const hasCookieToken = typeof document !== 'undefined' && !!getCookie('token')
+              const cookieToken = typeof document !== 'undefined' ? getCookie('token') : null
+              const accessToken = typeof window !== 'undefined' ? localStorage.getItem('accessToken') : null
+              const refreshToken = typeof window !== 'undefined' ? localStorage.getItem('refreshToken') : null
 
-              if (!hasAccessToken && !hasRefreshToken && !hasCookieToken) {
+              const isTokenExpired = (token: string | null) => {
+                if (!token) return true
+                try {
+                  const parts = token.split('.')
+                  if (parts.length !== 3) return true
+                  const payload = JSON.parse(atob(parts[1].replace(/-/g, '+').replace(/_/g, '/')))
+                  if (payload.exp && typeof payload.exp === 'number') {
+                    return payload.exp * 1000 < Date.now()
+                  }
+                  return false
+                } catch {
+                  return true
+                }
+              }
+
+              const tokenToUse = accessToken || cookieToken
+              const hasValidToken = tokenToUse && !isTokenExpired(tokenToUse)
+              const hasValidRefresh = refreshToken && !isTokenExpired(refreshToken)
+
+              if (!hasValidToken && !hasValidRefresh) {
+                localStorage.removeItem('accessToken')
+                localStorage.removeItem('refreshToken')
+                localStorage.removeItem('auth-storage')
+                if (typeof document !== 'undefined') {
+                  document.cookie = 'token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT'
+                }
                 set({ user: null, isAuthenticated: false })
                 return
               }

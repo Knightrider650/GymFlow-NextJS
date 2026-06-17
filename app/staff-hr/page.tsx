@@ -19,7 +19,7 @@ import {
 import { useStaff, useSettings, useBranches } from '@/hooks'
 import { useAuthStore } from '@/lib/store'
 import { isTrainer } from '@/lib/permissions'
-import { Plus, Edit2, Trash2, Users, Mail, Phone, Briefcase, MapPin, Filter } from 'lucide-react'
+import { Plus, Edit2, Trash2, Users, Mail, Phone, Briefcase, MapPin, Filter, Search } from 'lucide-react'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { formatCurrency } from '@/utils/format'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
@@ -30,6 +30,7 @@ export default function StaffPage() {
   const { branches, fetchBranches } = useBranches()
   const user = useAuthStore((state: any) => state.user)
   const [isDialogOpen, setIsDialogOpen] = useState(false)
+  const [searchTerm, setSearchTerm] = useState('')
   const [selectedBranch, setSelectedBranch] = useState<string>('all')
   const [editingStaffId, setEditingStaffId] = useState<string | null>(null)
   const [formData, setFormData] = useState({
@@ -48,9 +49,15 @@ export default function StaffPage() {
     fetchBranches()
   }, [fetchStaff, fetchSettings, fetchBranches])
 
-  const filteredStaff = selectedBranch === 'all'
-    ? staff
-    : staff.filter(s => s.branchId === selectedBranch)
+  const filteredStaff = staff.filter(s => {
+    const matchesSearch = s.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      s.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      s.position.toLowerCase().includes(searchTerm.toLowerCase())
+    
+    const matchesBranch = selectedBranch === 'all' || s.branchId === selectedBranch
+    
+    return matchesSearch && matchesBranch
+  })
 
   const handleAddStaff = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -97,28 +104,42 @@ export default function StaffPage() {
     <ProtectedLayout>
       <div className="p-6 lg:p-8 space-y-8">
         {/* Header */}
-        <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-          <div>
-            <h1 className="text-3xl font-bold tracking-tight">Staff Management</h1>
-            <p className="text-sm text-muted-foreground mt-1">
-              Oversee your gym&apos;s team and personnel details
-            </p>
+        <div className="flex flex-col gap-2">
+          <h1 className="text-3xl font-bold tracking-tight">Staff Management</h1>
+          <p className="text-sm text-muted-foreground">
+            Oversee your gym&apos;s team and personnel details
+          </p>
+        </div>
+
+        {/* Controls: Search, Filter, and Actions */}
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between bg-muted/20 p-4 rounded-xl border border-muted-foreground/10">
+          <div className="relative flex-1 max-w-md">
+            <Search className="absolute left-3 top-3 h-5 w-5 text-muted-foreground" />
+            <Input
+              className="pl-10 h-11 bg-card placeholder:text-muted-foreground/75"
+              placeholder="Search staff by name, email, or position..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+            />
           </div>
-          <div className="flex items-center gap-4">
-            <div className="flex items-center gap-2 bg-muted/50 px-3 py-1.5 rounded-lg border">
-              <Filter className="h-4 w-4 text-muted-foreground" />
-              <Select value={selectedBranch} onValueChange={setSelectedBranch}>
-                <SelectTrigger className="w-[180px] border-none bg-transparent focus:ring-0">
-                  <SelectValue placeholder="All Branches" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Branches</SelectItem>
-                  {branches.map(b => (
-                    <SelectItem key={b.id} value={b.id}>{b.name}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+          
+          <div className="flex flex-wrap items-center gap-3">
+            {branches.length > 1 && (
+              <div className="flex items-center gap-2 bg-card px-3 py-1.5 rounded-lg border h-11 shadow-sm">
+                <Filter className="h-4 w-4 text-muted-foreground" />
+                <Select value={selectedBranch} onValueChange={setSelectedBranch}>
+                  <SelectTrigger className="w-[180px] border-none bg-transparent focus:ring-0">
+                    <SelectValue placeholder="All Branches" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Branches</SelectItem>
+                    {branches.map(b => (
+                      <SelectItem key={b.id} value={b.id}>{b.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
             {!isTrainer(user?.role) && (
               <Dialog open={isDialogOpen} onOpenChange={(open) => {
                 setIsDialogOpen(open)
@@ -133,7 +154,7 @@ export default function StaffPage() {
                       setEditingStaffId(null)
                       setFormData({ name: '', email: '', phone: '', position: 'Trainer', salary: '', status: 'active', branchId: '' })
                     }}
-                    className="gap-2 w-fit bg-primary hover:bg-primary/90 shadow-lg shadow-primary/20"
+                    className="gap-2 h-11 bg-primary hover:bg-primary/95 text-white shadow-lg shadow-primary/20"
                   >
                     <Plus className="h-4 w-4" />
                     Add Staff Member
@@ -326,7 +347,7 @@ export default function StaffPage() {
                         </TableCell>
                         {!isTrainer(user?.role) && (
                           <TableCell className="text-right">
-                            <div className="flex justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                            <div className="flex justify-end gap-1 opacity-70 group-hover:opacity-100 transition-opacity">
                               <Button 
                                 size="icon" 
                                 variant="ghost" 

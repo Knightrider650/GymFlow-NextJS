@@ -184,92 +184,11 @@ export default function BillingPage() {
     <ProtectedLayout>
       <div className="p-6 lg:p-8 space-y-8">
         {/* Header */}
-        <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-          <div>
-            <h1 className="text-3xl font-bold tracking-tight">Billing & Revenue</h1>
-            <p className="text-sm text-muted-foreground mt-1">
-              Monitor financial health and manage member subscriptions
-            </p>
-          </div>
-          <Dialog open={isInvoiceDialogOpen} onOpenChange={setIsInvoiceDialogOpen}>
-            <DialogTrigger asChild>
-              <Button className="gap-2 w-fit bg-primary shadow-lg shadow-primary/20">
-                <Plus className="h-4 w-4" />
-                Create New Invoice
-              </Button>
-            </DialogTrigger>
-            <DialogContent className="sm:max-w-[425px]">
-              <DialogHeader>
-                <DialogTitle>Generate New Invoice</DialogTitle>
-                <DialogDescription>
-                  Issue a billing statement for a gym member.
-                </DialogDescription>
-              </DialogHeader>
-              <form onSubmit={handleCreateInvoice} className="space-y-4 py-4">
-                <div className="space-y-2">
-                  <Label htmlFor="member">Select Member *</Label>
-                  <select
-                    id="member"
-                    aria-label="Select member"
-                    value={invoiceForm.memberId}
-                    onChange={(e) => handleMemberSelect(e.target.value)}
-                    className="w-full h-10 px-3 rounded-md border border-input bg-background text-sm focus:ring-2 focus:ring-primary outline-none transition-all"
-                    required
-                  >
-                    <option value="">-- Choose a member --</option>
-                    {members.map(member => (
-                      <option key={member.id} value={member.id}>
-                        {member.name}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="amount">Amount ({settings?.currency || 'USD'}) *</Label>
-                  <div className="relative">
-                    <span className="absolute left-3 top-2.5 text-sm font-semibold text-muted-foreground select-none">
-                      {settings?.currency === 'INR' ? '₹' : settings?.currency === 'EUR' ? '€' : settings?.currency === 'GBP' ? '£' : '$'}
-                    </span>
-                    <Input
-                      id="amount"
-                      type="number"
-                      step="0.01"
-                      className="pl-9"
-                      value={invoiceForm.amount}
-                      onChange={(e) => setInvoiceForm({ ...invoiceForm, amount: e.target.value })}
-                      placeholder="0.00"
-                      required
-                    />
-                  </div>
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="description">Invoice Description</Label>
-                  <Input
-                    id="description"
-                    value={invoiceForm.description}
-                    onChange={(e) => setInvoiceForm({ ...invoiceForm, description: e.target.value })}
-                    placeholder="e.g. Premium Monthly Plan"
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="dueDate">Due Date</Label>
-                  <Input
-                    id="dueDate"
-                    type="date"
-                    value={invoiceForm.dueDate}
-                    onChange={(e) => setInvoiceForm({ ...invoiceForm, dueDate: e.target.value })}
-                  />
-                </div>
-
-                <DialogFooter className="pt-4">
-                  <Button type="submit" className="w-full font-bold">Generate Invoice</Button>
-                </DialogFooter>
-              </form>
-            </DialogContent>
-          </Dialog>
+        <div className="flex flex-col gap-2">
+          <h1 className="text-3xl font-bold tracking-tight">Billing & Revenue</h1>
+          <p className="text-sm text-muted-foreground">
+            Monitor financial health and manage member subscriptions
+          </p>
         </div>
 
         {/* Stats Cards */}
@@ -329,17 +248,103 @@ export default function BillingPage() {
           </div>
         )}
 
-        {/* Search & Table */}
-        <div className="space-y-4">
-          <div className="relative group">
-            <Search className="absolute left-3 top-3 h-5 w-5 text-muted-foreground group-focus-within:text-primary transition-colors" />
+        {/* Controls: Search and Actions */}
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between bg-muted/20 p-4 rounded-xl border border-muted-foreground/10">
+          <div className="relative flex-1 max-w-md">
+            <Search className="absolute left-3 top-3 h-5 w-5 text-muted-foreground" />
             <Input
-              className="pl-10 h-11 bg-card/50 border-none shadow-inner"
+              className="pl-10 h-11 bg-card placeholder:text-muted-foreground/75"
               placeholder="Search by member name or invoice reference..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
             />
           </div>
+          
+          <div className="flex items-center gap-3">
+            <Dialog open={isInvoiceDialogOpen} onOpenChange={setIsInvoiceDialogOpen}>
+              <DialogTrigger asChild>
+                <Button className="gap-2 h-11 bg-primary hover:bg-primary/95 text-white shadow-lg shadow-primary/20">
+                  <Plus className="h-4 w-4" />
+                  Create New Invoice
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="sm:max-w-[425px]">
+                <DialogHeader>
+                  <DialogTitle>Generate New Invoice</DialogTitle>
+                  <DialogDescription>
+                    Issue a billing statement for a gym member.
+                  </DialogDescription>
+                </DialogHeader>
+                <form onSubmit={handleCreateInvoice} className="space-y-4 py-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="member">Select Member *</Label>
+                    <select
+                      id="member"
+                      aria-label="Select member"
+                      value={invoiceForm.memberId}
+                      onChange={(e) => handleMemberSelect(e.target.value)}
+                      className="w-full h-10 px-3 rounded-md border border-input bg-background text-sm focus:ring-2 focus:ring-primary outline-none transition-all"
+                      required
+                    >
+                      <option value="">-- Choose a member --</option>
+                      {members.map(member => (
+                        <option key={member.id} value={member.id}>
+                          {member.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="amount">Amount ({settings?.currency || 'USD'}) *</Label>
+                    <div className="relative">
+                      <span className="absolute left-3 top-2.5 text-sm font-semibold text-muted-foreground select-none">
+                        {settings?.currency === 'INR' ? '₹' : settings?.currency === 'EUR' ? '€' : settings?.currency === 'GBP' ? '£' : '$'}
+                      </span>
+                      <Input
+                        id="amount"
+                        type="number"
+                        step="0.01"
+                        className="pl-9"
+                        value={invoiceForm.amount}
+                        onChange={(e) => setInvoiceForm({ ...invoiceForm, amount: e.target.value })}
+                        placeholder="0.00"
+                        required
+                      />
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="description">Invoice Description</Label>
+                    <Input
+                      id="description"
+                      value={invoiceForm.description}
+                      onChange={(e) => setInvoiceForm({ ...invoiceForm, description: e.target.value })}
+                      placeholder="e.g. Premium Monthly Plan"
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="dueDate">Due Date</Label>
+                    <Input
+                      id="dueDate"
+                      type="date"
+                      value={invoiceForm.dueDate}
+                      onChange={(e) => setInvoiceForm({ ...invoiceForm, dueDate: e.target.value })}
+                    />
+                  </div>
+
+                  <DialogFooter className="pt-4">
+                    <Button type="submit" className="w-full font-bold">Generate Invoice</Button>
+                  </DialogFooter>
+                </form>
+              </DialogContent>
+            </Dialog>
+          </div>
+        </div>
+
+        {/* Invoice Table Container */}
+        <div className="space-y-4">
 
           <Card className="overflow-hidden border-none shadow-xl bg-card/50 backdrop-blur-md">
             <CardContent className="p-0">
