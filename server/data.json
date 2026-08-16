@@ -11,52 +11,6 @@
       "scope": "platform",
       "tenantId": "all",
       "tenant_id": "all"
-    },
-    {
-      "id": "admin-001",
-      "email": "admin@gym.com",
-      "password_hash": "$2b$10$CqVY/ekZYm4webknNQkASeFV9UkcTGyJfLqatH39wVreCNg3VTtUe",
-      "name": "Gym Administrator",
-      "role": "admin",
-      "gymId": "default-gym",
-      "created_at": "2026-04-26T22:32:53.342Z",
-      "scope": "platform",
-      "tenantId": "default-gym",
-      "tenant_id": "default-gym",
-      "gym_id": "default-gym",
-      "updatedAt": "2026-06-16T16:22:08.739Z",
-      "password": "$2b$10$CqVY/ekZYm4webknNQkASeFV9UkcTGyJfLqatH39wVreCNg3VTtUe",
-      "fullname": "Gym Administrator"
-    },
-    {
-      "id": "0.07172314174038075",
-      "email": "cto@gym.com",
-      "password": "$2b$10$JVMk8GFL/YBlQAC7iD2qg.k.cU2QhbeQihH3zwweX2y4KYUwBJlPi",
-      "fullname": "CTO User",
-      "role": "cto",
-      "gymId": "default-gym",
-      "createdAt": "2026-06-07T07:07:20.577Z",
-      "gym_id": "default-gym",
-      "tenantId": "default-gym",
-      "tenant_id": "default-gym",
-      "updatedAt": "2026-06-16T16:22:08.797Z",
-      "password_hash": "$2b$10$JVMk8GFL/YBlQAC7iD2qg.k.cU2QhbeQihH3zwweX2y4KYUwBJlPi",
-      "name": "CTO User"
-    },
-    {
-      "id": "0.05520859356913421",
-      "email": "ceo@gym.com",
-      "password": "$2b$10$N7lmWTASqhr7Hnto3f0.IeoKEAuf5VpOsf8/0pqR96b.DhXUFuJou",
-      "fullname": "CEO User",
-      "role": "ceo",
-      "gymId": "default-gym",
-      "createdAt": "2026-06-07T07:07:20.640Z",
-      "gym_id": "default-gym",
-      "tenantId": "default-gym",
-      "tenant_id": "default-gym",
-      "updatedAt": "2026-06-16T16:22:08.852Z",
-      "password_hash": "$2b$10$N7lmWTASqhr7Hnto3f0.IeoKEAuf5VpOsf8/0pqR96b.DhXUFuJou",
-      "name": "CEO User"
     }
   ],
   "members": [],
@@ -67,36 +21,7 @@
   "classes": [],
   "notifications": [],
   "leads": [],
-  "plans": [
-    {
-      "id": "plan-1",
-      "name": "Basic Monthly",
-      "price": 30,
-      "durationMonths": 1,
-      "features": "Gym Access, Locker Room",
-      "gymId": "default-gym",
-      "createdAt": "2026-06-07T07:07:20.641Z",
-      "gym_id": "default-gym",
-      "tenantId": "default-gym",
-      "tenant_id": "default-gym",
-      "updatedAt": "2026-06-16T16:22:08.853Z",
-      "fullname": "Basic Monthly"
-    },
-    {
-      "id": "plan-2",
-      "name": "Annual Premium",
-      "price": 300,
-      "durationMonths": 12,
-      "features": "Gym Access, Pool, Personal Trainer",
-      "gymId": "default-gym",
-      "createdAt": "2026-06-07T07:07:20.641Z",
-      "gym_id": "default-gym",
-      "tenantId": "default-gym",
-      "tenant_id": "default-gym",
-      "updatedAt": "2026-06-16T16:22:08.853Z",
-      "fullname": "Annual Premium"
-    }
-  ],
+  "plans": [],
   "settings": {
     "gymName": "GymFlow HQ",
     "gymLogo": "",
@@ -108,36 +33,7 @@
   "activity": [],
   "campaigns": [],
   "messageLogs": [],
-  "tenants": [
-    {
-      "id": "default-gym",
-      "name": "GymFlow HQ",
-      "email": "contact@gymflow.com",
-      "phone": "+1 (555) 999-8888",
-      "address": "123 Fitness Ave, Wellness City",
-      "currency": "INR",
-      "dateFormat": "MM/DD/YYYY",
-      "invoicePrefix": "GF-",
-      "createdAt": "2026-06-07T07:07:20.438Z",
-      "updatedAt": "2026-06-16T16:22:08.661Z",
-      "fullname": "GymFlow HQ"
-    }
-  ],
+  "tenants": [],
   "activity_logs": [],
-  "branches": [
-    {
-      "id": "branch-default-1",
-      "gymId": "default-gym",
-      "owner_id": "default-gym",
-      "name": "HQ Main Branch",
-      "address": "123 Fitness Ave, Wellness City",
-      "phone": "+1 (555) 999-8888",
-      "email": "contact@gymflow.com",
-      "openingTime": "06:00",
-      "closingTime": "22:00",
-      "capacity": 150,
-      "isDefault": true,
-      "is_default": true
-    }
-  ]
+  "branches": []
 }
